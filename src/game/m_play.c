@@ -43,6 +43,10 @@
 #include "pc_diag.h"
 #include "pc_platform.h"
 #endif
+#ifdef TARGET_SERVER
+#include "m_start_data_init.h"
+#include "m_flashrom.h"
+#endif
 
 #define Game_play_HYRAL_SIZE 0x3E800 // 256,000 bytes
 #define Game_play_IS_PAUSED(play) (ZURUMODE2_ENABLED() ? (!Pause_proc(&(play)->pause, &(play)->game.pads[PAD1])) : FALSE)
@@ -436,6 +440,31 @@ extern void play_init(GAME* game) {
 
     play->submenu_ground_idx = -1;
 
+#ifdef TARGET_SERVER
+    printf("[SERVER] play_init: checking town map and save data...\n");
+    if (!mFRm_CheckSaveData()) {
+        printf("[SERVER] No existing town map found in save data.\n");
+        printf("[SERVER] Bootstrapping procedural map generation (mSDI_StartInitBefore)...\n");
+        mFI_ClearFieldData();
+        if (mSDI_StartInitBefore(game, 0, mSDI_INIT_MODE_NEW, mSDI_MALLOC_FLAG_GAME) == TRUE) {
+            mSDI_StartInitAfter(game, FALSE, mSDI_MALLOC_FLAG_GAME);
+            printf("[SERVER] Procedural map generation complete!\n");
+            {
+                extern int pc_save_force_write(void);
+                if (pc_save_force_write()) {
+                    printf("[SERVER] Town map persisted to save/card_a/DobutsunomoriP_MURA.gci\n");
+                }
+            }
+        } else {
+            printf("[SERVER ERROR] Procedural map generation failed!\n");
+        }
+    }
+    if (Common_Get(now_private) == NULL) {
+        Common_Set(now_private, Save_GetPointer(private_data[0]));
+    }
+    printf("[SERVER] Loading scene %d...\n", Save_Get(scene_no));
+#endif
+
     Gameplay_Scene_Read(play, Save_Get(scene_no));
 
     mSM_submenu_ct(&play->submenu);
@@ -483,6 +512,10 @@ extern void play_init(GAME* game) {
         my_malloc_current = &my_malloc_func;
     }
 
+#ifdef TARGET_SERVER
+    printf("[SERVER] Initializing world field simulation (mFM_FieldInit)...\n");
+#endif
+
     mFM_FieldInit(play);
     VR_Box_ct(play);
     mMmd_MakeMuseumDisplayData();
@@ -497,6 +530,9 @@ extern void play_init(GAME* game) {
     watch_my_step_ct();
     event_title_flag_off();
     mEA_GetCardDLProgram();
+#ifdef TARGET_SERVER
+    printf("[SERVER] World simulation initialized! Ready for player connections.\n");
+#endif
 }
 
 static void Game_play_move_fbdemo_not_move(GAME* game) {

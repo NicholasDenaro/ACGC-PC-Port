@@ -547,6 +547,9 @@ static void pc_gx_tev_precompile_cached(void) {
 /* --- init / shutdown --- */
 
 void pc_gx_tev_init(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     char* vs_src = load_shader("default.vert");
     char* fs_src = load_shader("default.frag");
 
@@ -580,6 +583,9 @@ void pc_gx_tev_init(void) {
 }
 
 void pc_gx_tev_shutdown(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     for (int i = 0; i < s_variant_count; i++) {
         if (s_variants[i].prog && s_variants[i].prog != default_program)
             glDeleteProgram(s_variants[i].prog);

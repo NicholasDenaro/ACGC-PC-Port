@@ -375,14 +375,18 @@ extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player
     }
 
     /* Try spawning the player actor */
-    player_actor =
-        Actor_info_make_actor(actor_info, game, player_data->profile, player_data->position.x, player_data->position.y,
-                              player_data->position.z, player_data->rotation.x, player_data->rotation.y,
-                              player_data->rotation.z, -1, -1, -1, EMPTY_NO, player_data->arg, -1, -1);
+    if (player_data != NULL) {
+        player_actor =
+            Actor_info_make_actor(actor_info, game, player_data->profile, player_data->position.x, player_data->position.y,
+                                  player_data->position.z, player_data->rotation.x, player_data->rotation.y,
+                                  player_data->rotation.z, -1, -1, -1, EMPTY_NO, player_data->arg, -1, -1);
 
-    if (player_actor != NULL) {
-        player_actor->world.position.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(player_actor->world.position, 0.0f);
-        mFI_SetBearActor(play, player_actor->world.position, FALSE);
+        if (player_actor != NULL) {
+            player_actor->world.position.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(player_actor->world.position, 0.0f);
+            mFI_SetBearActor(play, player_actor->world.position, FALSE);
+        }
+    } else {
+        player_actor = NULL;
     }
 
     /* Spawn the current bg item type actor */

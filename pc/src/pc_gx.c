@@ -337,6 +337,7 @@ void pc_gx_init(void) {
         quad_index_buf[q * 6 + 5] = base + 3;
     }
 
+#ifndef TARGET_SERVER
     glGenVertexArrays(1, &g_gx.vao);
     glGenBuffers(1, &g_gx.vbo);
     glGenBuffers(1, &g_gx.ebo);
@@ -370,11 +371,15 @@ void pc_gx_init(void) {
     glDepthFunc(GL_LEQUAL);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+#endif
 
     g_gx.dirty = PC_GX_DIRTY_ALL;
 }
 
 void pc_gx_begin_frame(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     /* Profiler frame opens in graph_main so game_main is captured */
     Uint64 prof_start = pc_profiler_begin_timer();
     pc_emu64_frame_cmds = 0;
@@ -405,6 +410,9 @@ void pc_gx_begin_frame(void) {
 }
 
 void pc_gx_restore_after_nes(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     /* NES emulator uses its own shader/VAO/state. Rebind the game's GL objects
      * and mark all GX state dirty so uniforms/textures get re-uploaded. */
     glBindVertexArray(g_gx.vao);
@@ -421,6 +429,9 @@ void pc_gx_restore_after_nes(void) {
 }
 
 void pc_gx_shutdown(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     pc_gx_tev_shutdown();
     pc_gx_texture_shutdown();
 #ifdef PC_ENHANCEMENTS
@@ -696,6 +707,11 @@ int pc_gx_draw_call_count = 0;
  * dirty system (viewport, scissor, readpixels, raw texture binds, swap)
  * so the run renders with the state it was built under. */
 void pc_gx_draw_pending(void) {
+#ifdef TARGET_SERVER
+    g_gx.pending_verts = 0;
+    g_gx.current_vertex_idx = 0;
+    return;
+#endif
     int count = g_gx.pending_verts;
     if (count == 0) return;
 
@@ -730,6 +746,11 @@ void pc_gx_draw_pending(void) {
 }
 
 void pc_gx_flush_vertices(void) {
+#ifdef TARGET_SERVER
+    g_gx.pending_verts = 0;
+    g_gx.current_vertex_idx = 0;
+    return;
+#endif
     int count = g_gx.current_vertex_idx - g_gx.pending_verts;
     if (count <= 0) return;
 
@@ -1312,6 +1333,9 @@ void pc_gx_viewport_state_invalidate(void) {
 }
 
 void GXSetViewport(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     int gl_x, gl_y, gl_w, gl_h;
 
     g_gx.viewport[0] = left;
@@ -1373,6 +1397,9 @@ void GXSetViewportJitter(f32 left, f32 top, f32 wd, f32 ht, f32 nearz, f32 farz,
 }
 
 void GXSetScissor(u32 left, u32 top, u32 wd, u32 ht) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     int gl_x, gl_y, gl_w, gl_h;
 
     g_gx.scissor[0] = left;
@@ -1981,8 +2008,18 @@ void GXSetTexCoordGen2(u32 dst, u32 func, u32 src, u32 mtx, GXBool normalize, u3
         g_gx.tex_gen_mtx[dst] = mtx;
     }
 }
-void GXSetLineWidth(u8 width, u32 texOffsets) { glLineWidth(width / 16.0f); }
-void GXSetPointSize(u8 size, u32 texOffsets) { glPointSize(size / 16.0f); }
+void GXSetLineWidth(u8 width, u32 texOffsets) {
+#ifndef TARGET_SERVER
+    glLineWidth(width / 16.0f);
+#endif
+    (void)texOffsets;
+}
+void GXSetPointSize(u8 size, u32 texOffsets) {
+#ifndef TARGET_SERVER
+    glPointSize(size / 16.0f);
+#endif
+    (void)texOffsets;
+}
 void GXEnableTexOffsets(u32 coord, GXBool line, GXBool point) {
     (void)coord; (void)line; (void)point;
 }
@@ -2033,6 +2070,9 @@ void GXAdjustForOverscan(void* rmin, void* rmout, u16 hor, u16 ver) {
 }
 
 static void pc_gx_copy_tex_execute_impl(void* dest, GXBool clear) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     pc_gx_commit_pending_and_flush();
     pc_gx_draw_pending(); /* everything must hit the framebuffer before glReadPixels */
 
@@ -2195,7 +2235,12 @@ void* GXInit(void* base, u32 size) {
 }
 
 void GXSetMisc(u32 token, u32 val) { (void)token; (void)val; }
-void GXFlush(void) { pc_gx_draw_pending(); glFlush(); }
+void GXFlush(void) {
+    pc_gx_draw_pending();
+#ifndef TARGET_SERVER
+    glFlush();
+#endif
+}
 void GXResetWriteGatherPipe(void) {}
 void GXAbortFrame(void) {}
 void GXSetDrawSync(u16 token) { (void)token; }

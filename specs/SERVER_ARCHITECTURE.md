@@ -281,3 +281,45 @@ flowchart TD
 * **Periodic Snapshotting**: Every 5 minutes (and upon server shutdown), the server writes an atomic snapshot to `save/town_master.sav`.
 * **Delta Journal**: To prevent corruption or loss between snapshots, every foreground mutation (`PKT_S2C_FG_DELTA`) and economic transaction is written to an append-only write-ahead log (`save/journal.log`).
 * **Player Character Isolation**: Player pockets, bells, and personal designs are stored in individual files (`save/players/<uuid>.dat`) to enable players to travel between different servers.
+
+---
+
+### 3.8 Autonomous World Generation & Map Seeding (Bootstrap)
+
+When the server starts up without an existing master save file (`save/town_master.sav`), it must autonomously generate a brand-new, valid GameCube *Animal Crossing* town before accepting any client connections.
+
+```mermaid
+flowchart TD
+    Start["Server Startup"] --> Chk{"save/town_master.sav exists?"}
+    Chk -->|Yes & Valid| Load["Load Master Save & Initialize Zones"]
+    Chk -->|No or Corrupt| Gen["Autonomous World Generation Pipeline"]
+
+    Gen --> Seed["1. Initialize RNG Seed (Entropy / CLI --seed)"]
+    Seed --> TownInfo["2. Generate Town Identity (Name, ID, Tune, Grass Texture)"]
+    TownInfo --> Terrain["3. Procedural Map Acre Generation (mRF_MakeRandomField)"]
+    Terrain --> Flora["4. Populate Flora & FG Matrix (mFM_InitFgCombiSaveData)"]
+    Flora --> TownInfra["5. Place Town Infrastructure (Nook, Post Office, Police, Well, Museum)"]
+    TownInfra --> Villagers["6. Roll Initial Villager Roster (mNpc_InitNpcAllInfo) & Island"]
+    Villagers --> SaveSnap["7. Persist Initial Snapshot to save/town_master.sav"]
+    SaveSnap --> Load
+```
+
+#### Map Generation Pipeline Components:
+1. **Save Detection**: On startup, `server_storage_init()` attempts to open and validate `save/town_master.sav` using `mFRm_CheckSaveData()`. If the file is missing or reports header errors (`mFRm_ERROR_*`), the bootstrap generator triggers automatically.
+2. **Procedural Acre Topology (`mRF_MakeRandomField`)**:
+   * Evaluates acre constraints to assemble a 5×6 acre grid (30 total acres).
+   * Generates natural elevation boundaries (stepmode: 2-step vs. 3-step cliffs via `mRF_GetRandomStepMode()`).
+   * Routes procedural river paths from the northern cliff boundary down to the ocean beach, placing waterfalls, river bends, and mandatory bridges.
+   * Places unique required acres: Train Station, Town Hall/Post Office, Tom Nook's Shop, Police Station, Wishing Well, Museum, and Able Sisters.
+3. **Foreground Matrix (`Save.fg`) & Flora Population**:
+   * Runs `mFM_InitFgCombiSaveData()` to populate each acre tile grid with trees, rocks, signboards, flowers, and weed patches.
+   * Selects town native fruit via `decide_fruit()` and transforms designated trees via `mAGrw_ChangeTree2FruitTree()`.
+   * Promotes high-elevation trees to cedar trees via `mAGrw_ChangeTree2Cedar()`.
+   * Ensures essential movement clearings via `mFI_PullTanukiPathTrees()` and player house plot boundaries.
+   * Generates buried fossils, gyroids, and pitfalls in `Save.deposit`.
+4. **Villager & Town Registry Initialization**:
+   * Assigns unique Land ID (`mLd_LandDataInit()`), town melody (`mMld_SetDefaultMelody()`), and grass pattern (`mFM_DecideBgTexIdx()`).
+   * Rolls starting animal villagers (6 initial villagers) with balanced personalities (Lazy, Jock, Cranky, Normal, Peppy, Snooty) using `mNpc_InitNpcAllInfo()`, assigning their house coordinates and default room furniture.
+   * Seeds the offshore island layout and islander via `mISL_init()`.
+   * Flushes the freshly populated `Save` structure to disk as the new base `town_master.sav`.
+

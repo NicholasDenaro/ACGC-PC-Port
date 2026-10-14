@@ -1089,6 +1089,7 @@ static u32 mPlib_Get_UseTexRom_p(void) {
 static int Player_Tex_bank_ID[] = { -1, -1 };
 
 extern void mPlib_Object_Exchange_keep_new_PlayerTex(GAME_PLAY* play, int bank_idx, int bank) {
+    if (Now_Private == NULL) return;
     u32 tex = mPlib_Get_UseTexRom_p();
     int idx = mPlib_Object_Exchange_keep_new(play, ACTOR_OBJ_BANK_14, tex, mNW_DESIGN_TEX_SIZE,
                                              mPlib_Check_PlayerClothInAram(Now_Private->cloth.idx));
@@ -1108,11 +1109,13 @@ extern u32 mPlib_Get_PlayerPalletRom_p(int idx) {
             org_idx = 0;
         }
 
+        if (Now_Private == NULL) return 0;
         return (u32)mNW_PaletteIdx2Palette(Now_Private->my_org[org_idx & 7].palette);
     }
 }
 
 static u32 mPlib_Get_UsePalletRom_p(void) {
+    if (Now_Private == NULL) return 0;
     return mPlib_Get_PlayerPalletRom_p(Now_Private->cloth.idx);
 }
 
@@ -1123,6 +1126,7 @@ static void mPlib_ByteSwapPlayerPalette(u16* pal);
 static int Player_Pallet_bank_ID[] = { -1, -1 };
 
 extern void mPlib_Object_Exchange_keep_new_PlayerPallet(GAME_PLAY* play, int bank_idx, int bank) {
+    if (Now_Private == NULL) return;
     u32 pal = mPlib_Get_UsePalletRom_p();
     int in_aram = mPlib_Check_PlayerClothInAram(Now_Private->cloth.idx);
     int bank_no;
@@ -1331,6 +1335,9 @@ extern cKF_Skeleton_R_c* mPlib_get_player_mdl_p(void) {
 }
 
 extern s16 mPlib_get_player_Object_Bank(void) {
+    if (Now_Private == NULL) {
+        return ACTOR_OBJ_BANK_8;
+    }
     if (Now_Private->gender == mPr_SEX_MALE) {
         return ACTOR_OBJ_BANK_8;
     } else {

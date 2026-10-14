@@ -11,12 +11,25 @@
 #include "boot.h"
 #include "sys_math.h"
 #include "m_nmibuf.h"
+#ifdef TARGET_SERVER
+#include "m_play.h"
+#include "m_scene_table.h"
+#endif
 
 static u8 sound_ok;
 static u8 contpad_ok;
 static u8 frame_count;
 
 static void second_game_main(GAME* game) {
+#ifdef TARGET_SERVER
+  printf("[SERVER] second_game_main: Booting directly into gameplay...\n");
+  if (Save_Get(scene_no) == 0) {
+    Save_Set(scene_no, SCENE_FG);
+  }
+  printf("[SERVER] Entering scene %d (SCENE_FG)...\n", Save_Get(scene_no));
+  GAME_GOTO_NEXT(game, play, PLAY);
+  return;
+#endif
   if (sound_ok == 0) {
     sound_ok = 1;
     Na_RestartPrepare();

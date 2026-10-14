@@ -150,6 +150,10 @@ static TexCacheEntry* tex_cache_insert(u32 data_ptr, int w, int h, u32 fmt, u32 
 }
 
 void pc_gx_texture_cache_invalidate(void) {
+#ifdef TARGET_SERVER
+    tex_cache_count = 0;
+    return;
+#endif
     for (int i = 0; i < tex_cache_count; i++) {
         if (tex_cache[i].gl_tex && !tex_cache[i].external) {
             glDeleteTextures(1, &tex_cache[i].gl_tex);
@@ -822,6 +826,9 @@ static void pc_gx_load_tex_obj_impl(void* obj, u32 id) {
 }
 
 void GXLoadTexObj(void* obj, u32 id) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     Uint64 prof_start = pc_profiler_begin_timer();
     pc_gx_load_tex_obj_impl(obj, id);
     pc_profiler_add_time(PC_PROF_TIMER_TEXOBJ, prof_start);

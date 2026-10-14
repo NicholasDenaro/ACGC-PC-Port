@@ -49,6 +49,9 @@ static int pc_audio_producer_func(void* data) {
 }
 
 void pc_audio_start_producer_thread(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     if (audio_producer_thread) return;
     SDL_AtomicSet(&audio_thread_running, 1);
     audio_producer_thread = SDL_CreateThread(pc_audio_producer_func, "AudioProducer", NULL);
@@ -95,6 +98,9 @@ static void pc_audio_callback(void* userdata, Uint8* stream, int len) {
 
 void AIInit(u8* stack) {
     (void)stack;
+#ifdef TARGET_SERVER
+    return;
+#endif
     if (audio_device != 0) return;
 
     SDL_AudioSpec want, have;
@@ -115,6 +121,14 @@ void AIInit(u8* stack) {
 }
 
 void AIInitDMA(u32 addr, u32 size) {
+#ifdef TARGET_SERVER
+    (void)addr;
+    (void)size;
+    if (ai_dma_callback) {
+        ai_dma_callback();
+    }
+    return;
+#endif
     s16* src = (s16*)(uintptr_t)addr;
     u32 n_samples = size / sizeof(s16);
     n_samples &= ~1u; /* whole stereo frames */
@@ -200,6 +214,9 @@ int pc_audio_is_active(void) {
 }
 
 void pc_audio_shutdown(void) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     /* Stop producer thread first */
     SDL_AtomicSet(&audio_thread_running, 0);
     if (audio_producer_thread) {

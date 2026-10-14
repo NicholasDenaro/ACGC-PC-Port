@@ -410,8 +410,12 @@ static void Scene_Proc_Player_Ptr(GAME_PLAY* play, Scene_Word_u* scene_data) {
     }
 
     data->arg = Common_Get(door_data).extra_data;
-    Object_Exchange_keep_new_Player(play);
-    mSM_Object_Exchange_keep_new_Menu(play);
+#ifndef TARGET_SERVER
+    if (Now_Private != NULL) {
+        Object_Exchange_keep_new_Player(play);
+        mSM_Object_Exchange_keep_new_Menu(play);
+    }
+#endif
 }
 
 static void Scene_Proc_Ctrl_Actor_Ptr(GAME_PLAY* play, Scene_Word_u* scene_data) {

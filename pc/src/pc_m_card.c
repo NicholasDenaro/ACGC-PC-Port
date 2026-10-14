@@ -295,6 +295,11 @@ static int pc_save_write_gci(void) {
     return pc_save_write_gci_to(PC_GCI_PATH, PC_GCI_TMP_PATH);
 }
 
+int pc_save_force_write(void) {
+    pc_save_ready = 1;
+    return pc_save_write_gci();
+}
+
 static int pc_save_write_gci_to(const char* gci_path, const char* tmp_path) {
     FILE* fp;
     u8* file_data;

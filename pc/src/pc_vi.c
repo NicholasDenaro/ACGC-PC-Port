@@ -1,6 +1,9 @@
 /* pc_vi.c - video interface → SDL window swap + frame pacing */
 #include "pc_platform.h"
 #include "pc_profiler.h"
+#ifdef TARGET_SERVER
+#include "server/server_runner.h"
+#endif
 
 #define VI_TVMODE_NTSC_INT    0
 #define VI_TVMODE_NTSC_DS     1
@@ -19,6 +22,10 @@ static void (*vi_pre_callback)(u32) = NULL;
 static void (*vi_post_callback)(u32) = NULL;
 
 void VIInit(void) {
+#ifdef TARGET_SERVER
+    printf("[VI] Server mode: headless 30 Hz tick runner active\n");
+    return;
+#endif
     if (g_frame_limiter > 0) {
         printf("[VI] frame limit=%luus (%lu Hz)\n",
                (u32)((1.0 / (double)g_frame_limiter) * 1000000), (unsigned long)g_frame_limiter);
@@ -34,6 +41,55 @@ void VISetNextFrameBuffer(void* fb) { (void)fb; }
 void VIFlush(void) {}
 
 void VIWaitForRetrace(void) {
+#ifdef TARGET_SERVER
+    extern volatile int g_server_running;
+    extern void server_runner_update_stats(double tick_duration_ms);
+    extern void server_runner_print_status(void);
+    extern ServerConfig g_server_config;
+    if (!g_server_running || !g_pc_running) {
+        g_pc_running = 0;
+        return;
+    }
+
+    if (!pc_platform_poll_events()) {
+        g_pc_running = 0;
+        return;
+    }
+
+    if (!perf_freq) perf_freq = SDL_GetPerformanceFrequency();
+
+    Uint64 now = SDL_GetPerformanceCounter();
+    if (frame_start_time) {
+        double tick_ms = (double)(now - frame_start_time) * 1000.0 / (double)perf_freq;
+        server_runner_update_stats(tick_ms);
+    }
+
+    /* Target tickrate server pacing (default 30 Hz -> ~33333 us) */
+    uint32_t rate = g_server_config.tickrate > 0 ? g_server_config.tickrate : 30;
+    const Uint64 target_pace_us = 1000000 / rate;
+    if (frame_start_time) {
+        Uint64 elapsed_us = (now - frame_start_time) * 1000000 / perf_freq;
+        while (elapsed_us < target_pace_us) {
+            Uint64 remain_us = target_pace_us - elapsed_us;
+            if (remain_us > 2000) {
+                SDL_Delay(1);
+            }
+            now = SDL_GetPerformanceCounter();
+            elapsed_us = (now - frame_start_time) * 1000000 / perf_freq;
+        }
+    }
+
+    frame_start_time = SDL_GetPerformanceCounter();
+    retrace_count++;
+    pc_frame_counter++;
+
+    if (pc_frame_counter == 1) {
+        printf("[SERVER] First simulation tick completed! Server running at %u Hz.\n", rate);
+    } else if (pc_frame_counter % 300 == 0) {
+        server_runner_print_status();
+    }
+    return;
+#endif
     if (!perf_freq) perf_freq = SDL_GetPerformanceFrequency();
 
     /* --- frame time diagnostic --- */

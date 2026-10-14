@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 # Options
 option(PC_CONSOLE "Show console window (disables -mwindows, useful for debugging)" OFF)
+option(BUILD_SERVER "Build authoritative dedicated server (AnimalCrossingServer)" ON)
 
 # =============================================================================
 # 32-bit enforcement (required: JSystem casts pointers to u32)
@@ -483,6 +484,57 @@ endif()
 # Use -DPC_CONSOLE=ON to keep the console visible for debugging
 if(WIN32 AND NOT PC_CONSOLE)
     target_link_options(ac_pc PRIVATE -mwindows)
+endif()
+
+# =============================================================================
+# Build dedicated server executable (BUILD_SERVER)
+# =============================================================================
+if(BUILD_SERVER)
+    set(PC_SERVER_SOURCES ${PC_SOURCES})
+    list(FILTER PC_SERVER_SOURCES EXCLUDE REGEX "pc_main\\.c$")
+    list(APPEND PC_SERVER_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_main.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_runner.c
+    )
+
+    add_executable(ac_server
+        ${PC_SERVER_SOURCES}
+        ${FIXNES_SOURCES}
+        ${GAME_C_SOURCES}
+        ${GAME_CXX_SOURCES}
+        ${RC_FILE}
+    )
+
+    target_compile_definitions(ac_server PRIVATE
+        TARGET_SERVER
+        HEADLESS
+    )
+
+    if(TARGET SDL2::SDL2)
+        target_link_libraries(ac_server glad SDL2::SDL2)
+    else()
+        list(FILTER SDL2_LIBRARIES EXCLUDE REGEX "SDL2main")
+        target_link_libraries(ac_server glad ${SDL2_LIBRARIES})
+    endif()
+
+    if(WIN32)
+        target_link_libraries(ac_server opengl32 winmm imm32 version setupapi)
+    else()
+        find_package(OpenGL REQUIRED)
+        target_link_libraries(ac_server OpenGL::GL dl pthread m)
+    endif()
+
+    set_target_properties(ac_server PROPERTIES
+        OUTPUT_NAME "AnimalCrossingServer"
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+    if(MINGW)
+        target_link_options(ac_server PRIVATE -static-libgcc -static-libstdc++ -Wl,-Bstatic,--whole-archive "${WINPTHREAD_STRIPPED}" -Wl,-Bdynamic,--no-whole-archive)
+    endif()
+    # Note: ac_server explicitly does NOT have -mwindows so console logging is active.
+
+    install(TARGETS ac_server RUNTIME DESTINATION bin)
 endif()
 
 # =============================================================================

@@ -385,10 +385,16 @@ static void graph_main(GRAPH* this, GAME* game) {
     game_main(game);
 #endif
     PC_DIAG(10, "graph_main: game_main returned, frame_counter=%d\n", this->frame_counter);
-#ifdef TARGET_PC
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
     pc_pause_menu_draw(game);
 #endif
     GRAPH_SET_DOING_POINT(this, GAME_MAIN_FINISHED);
+#ifdef TARGET_SERVER
+    /* Headless server does not submit display lists to GPU, but paces at 30 Hz */
+    VIWaitForRetrace();
+    skip_frame = 0;
+    this->frame_counter++;
+#else
     if (ResetStatus < IRQ_RESET_DELAY) {
         if (skip_frame < GETREG(SREG, 3)) {
             skip_frame++;
@@ -418,8 +424,10 @@ static void graph_main(GRAPH* this, GAME* game) {
             }
         }
     }
+#endif
 
     PC_DIAG(10, "graph2: before audio+reset, frame_counter=%d\n", this->frame_counter);
+#ifndef TARGET_SERVER
     if (GETREG(SREG, 20) < 2) {
 #ifdef TARGET_PC
         Uint64 pc_prof_t = pc_profiler_begin_timer();
@@ -429,6 +437,7 @@ static void graph_main(GRAPH* this, GAME* game) {
         graph_audio_gameframe(this, game);
 #endif
     }
+#endif
 
     reset_check(this, game);
     PC_DIAG(10, "graph2: reset_check done\n");

@@ -943,7 +943,9 @@ extern void mRF_CheckBeastRoad() {
         mCoBG_Collision_u* collision_data = mFI_GetBkNum2ColTop(block_x, block_z);
         u8 type = mFI_BkNum2BlockType(block_x, block_z);
 
-        mRF_BlockInf2CheckBeastRoad(type, collision_data);
+        if (collision_data != NULL) {
+          mRF_BlockInf2CheckBeastRoad(type, collision_data);
+        }
       }
     }
   }
