@@ -229,6 +229,24 @@ PLAYER_ACTOR* Actor_find_nearest_player(ServerZone* zone, xyz_t actor_pos) {
 }
 ```
 
+#### 3.4.1 Player Onboarding & Part-Time Job (Tutorial) Bypass
+In vanilla single-player, every new character arriving by train must complete Tom Nook's Part-Time Job (`FirstJob` / `arbeit`). During this sequence:
+- `mEv_CheckFirstJob()` returns `TRUE` (`mEv_SAVED_FIRSTJOB_PLR0` flag set).
+- Tom Nook is replaced by the tutorial-only actor `SP_NPC_RCN_GUIDE`.
+- His shop is locked to standard commerce (no buying or selling).
+- Villagers are locked outside near their homes, overriding their normal schedules and routines.
+- Background music is forced to the tutorial chime (`BGM_FIRST_JOB`).
+- Players are locked into the Work Uniform (`ITM_CLOTH016`) and prevented from wading or leaving town.
+
+In a persistent multiplayer world, forcing players through this tutorial breaks shared town state, locks commercial facilities, and restricts other players. Therefore, the server automatically bypasses the Part-Time Job during player onboarding:
+1. **Clear Tutorial Event Flags**: Call `mEv_ClearPersonalEventFlag(player_no)`, ensuring `mEv_CheckFirstJob() == FALSE` and clearing `FIRSTJOB`, `FIRSTINTRO`, `HRAWAIT`, `HRATALK`, `FJOPENQUEST`, and `GATEWAY`.
+2. **House Assignment & Furniture**: Assign an available house slot (`homes[house_idx]`) to the player (`mHS_set_use(player_no, house_idx)`), cataloging starter furniture (radio `FTR_SUM_CASSE01`, default wallpaper/flooring).
+3. **Mortgage & Initial Loan**: Set `priv->inventory.loan = 17000` (18,400 Bells initial loan minus 1,400 Bells chore credit, identical to post-tutorial vanilla state).
+4. **Starter Inventory & Clothes**: Grant starter bells (1,000 Bells) and civilian clothing (`mPr_GetRandomCloth()`, never `ITM_CLOTH016`).
+5. **Clear Errands**: Call `mQst_ClearErrand(priv->errands, mPr_ERRAND_QUEST_NUM)`.
+6. **Enable Free Navigation**: Set `g_mPlib_wade_disabled = FALSE` and `mCoBG_ChangeBlockBgCheckMode(0)`.
+7. **Normal Shop Operation**: Tom Nook's shop operates with `SP_NPC_SHOP_MASTER`, enabling full buying, selling, and catalogue orders immediately.
+
 ---
 
 ### 3.5 Networking & Spatial Interest Management

@@ -11,12 +11,12 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | **Phase 1** | Headless Build Target & Dedicated Server Daemon | 4 | 4 | Implemented |
 | **Phase 2** | Procedural Map Generation & World Initialization (Save Bootstrap) | 4 | 4 | Implemented |
 | **Phase 3** | Simulation Unpausing & Input Isolation | 0 | 4 | Not Implemented |
-| **Phase 4** | Multi-Player Entity Decoupling | 0 | 4 | Not Implemented |
+| **Phase 4** | Multi-Player Entity Decoupling | 0 | 5 | Not Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 0 | 5 | Not Implemented |
 | **Phase 6** | Network Transport Layer (ENet / UDP) | 0 | 4 | Not Implemented |
 | **Phase 7** | World State Replication & Spatial Management | 0 | 5 | Not Implemented |
 | **Phase 8** | World Persistence & Save Journaling | 0 | 3 | Not Implemented |
-| **Total** | | **8** | **33** | **24% Complete** |
+| **Total** | | **8** | **34** | **24% Complete** |
 
 ---
 
@@ -83,26 +83,26 @@ This task tracker outlines all implementation milestones defined in [Specificati
 - [ ] **Task 3.1: Isolate Submenu Pausing from World Simulation**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_play.c`, `src/game/m_submenu.c`
-  - **Description**: In `Game_play_move_fbdemo_not_move()`, decouple `Actor_info_call_actor` and `CollisionCheck_OC` from `play->submenu.process_status == mSM_PROCESS_WAIT`. Allow actor logic to continue updating while a client has their inventory, letter, or design submenus open.
-  - **Acceptance Criteria**: Opening pockets on a client does not pause other entities, villagers, fish, or time.
+  - **Description**: In `Game_play_move_fbdemo_not_move()`, decouple `Actor_info_call_actor` and `CollisionCheck_OC` from `play->submenu.process_status == mSM_PROCESS_WAIT`. Allow actor logic to continue updating while a player has their inventory, letter, or design submenus open.
+  - **Acceptance Criteria (Testable in Client)**: Launch `./pc/build32/bin/AnimalCrossing.exe` and open pockets/inventory next to a river or walking villager. River water, tree sway, wind, and nearby villagers must continue animating and walking in real-time while the menu is open, instead of freezing.
 
 - [ ] **Task 3.2: Convert Global Dialogue Pausing to Per-Entity State**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_demo.c`, `src/actor/npc/ac_npc.c`, `include/m_demo.h`
   - **Description**: Deprecate global `CAMERA2_PROCESS_LOCK` and scene-wide pause during `mDemo_Request(mDemo_TYPE_TALK, ...)`. Replace with an entity-specific `is_busy` flag and `talking_player_id` assigned to the interacting NPC.
-  - **Acceptance Criteria**: While one player is talking to a villager, other players can run around, catch bugs, or talk to other villagers simultaneously.
+  - **Acceptance Criteria (Testable in Client)**: Initiate dialogue with a villager or inspect a signboard. Background environmental effects, river animations, and other non-engaged villagers in the acre must continue moving normally rather than locking the entire scene.
 
 - [ ] **Task 3.3: Intercept Multi-Player Dialogue Contention**
   - **State**: `Not Implemented`
   - **Files**: `src/actor/npc/ac_npc_talk.c`, `src/game/m_demo.c`
-  - **Description**: If Player $B$ attempts to talk to an NPC already engaged in dialogue with Player $A$, return an immediate polite rejection message ("Excuse me, I'm talking with [Player A] right now!") without hijacking Player $B$'s camera or movement.
-  - **Acceptance Criteria**: Two players attempting to talk to the same villager do not deadlock or desync the dialogue state machine.
+  - **Description**: If Player $B$ attempts to talk to an NPC already engaged in dialogue with Player $A$, return an immediate polite rejection message ("Excuse me, I'm talking with someone right now!") without hijacking Player $B$'s camera or movement.
+  - **Acceptance Criteria (Testable via State Check)**: Attempting to trigger dialogue on an already-busy NPC returns a non-blocking busy response and never locks the interacting entity's controls or camera.
 
 - [ ] **Task 3.4: Eliminate Acre Transition Lock**
   - **State**: `Not Implemented`
   - **Files**: `src/actor/ac_set_manager.c`, `src/game/m_camera2.c`
   - **Description**: Remove the camera pause and actor deallocation trigger when crossing acre coordinate seams (`x % 16 == 0`, `z % 16 == 0`).
-  - **Acceptance Criteria**: Players cross acre boundaries seamlessly without screen freezes.
+  - **Acceptance Criteria (Testable in Client)**: Walking across acre boundaries in the client proceeds seamlessly without screen pauses or camera freeze stutters.
 
 ---
 
@@ -112,25 +112,36 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **State**: `Not Implemented`
   - **Files**: `include/server/server_player.h`, `pc/src/server/server_player.c`
   - **Description**: Create the `ConnectedClient` registry (supporting up to 8 concurrent players). Each entry holds client ID, `PLAYER_ACTOR` instance, connection state, zone ID, and `Private_c` player data.
-  - **Acceptance Criteria**: Multiple players can be registered, allocated, and tracked concurrently in memory.
+  - **Acceptance Criteria (Testable via Simulated Player)**: Server supports adding a simulated/dummy player (`--spawn-dummy-player` or test harness). The server logs confirm both Player 1 and Player 2 are allocated, tracked, and simulated concurrently in memory.
 
 - [ ] **Task 4.2: Decouple `Common_Get(now_private)` and `player_no`**
   - **State**: `Not Implemented`
   - **Files**: `include/m_common_data.h`, `src/game/m_player.c`, `src/game/m_player_lib.c`
   - **Description**: Refactor functions relying on global `now_private` or `player_no` to accept an explicit `PLAYER_ACTOR*` or `client_id` context parameter.
-  - **Acceptance Criteria**: Operating on Player 2's inventory or bells does not overwrite Player 1's memory.
+  - **Acceptance Criteria (Testable via Memory Isolation)**: Modifying bells, pockets, or cloth for Player 2 does not alter or corrupt Player 1's memory space.
 
 - [ ] **Task 4.3: Refactor Actor Distance & Nearest-Player Perception**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_actor.c`, `include/m_actor.h`
   - **Description**: In `Actor_info_call_actor()`, replace the single `player_actor` distance calculation with `Actor_find_nearest_player()`. Actors must measure `player_distance_xz` and `player_angle_y` against the closest player residing in the same zone.
-  - **Acceptance Criteria**: Insects, fish, and villagers react dynamically to whichever player is closest to them.
+  - **Acceptance Criteria (Testable via Distance Check)**: When two players are in the world, insects, fish, and villagers react dynamically to whichever player is physically closer to them.
 
 - [ ] **Task 4.4: Multi-Player Actor-to-Actor Hitbox Collision**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_collision_obj.c`, `src/game/m_player.c`
   - **Description**: Enable collision checks between multiple `PLAYER_ACTOR` instances so players cannot clip through each other.
-  - **Acceptance Criteria**: Players bump into each other and properly block movement pathways.
+  - **Acceptance Criteria (Testable in Game/Simulation)**: Player 1 running into the dummy player bumps into their physical collision cylinder and is stopped from walking through them.
+
+- [ ] **Task 4.5: Player Onboarding & Part-Time Job (Tutorial) Bypass**
+  - **State**: `Not Implemented`
+  - **Files**: `src/game/m_event.c`, `src/game/m_start_data_init.c`, `pc/src/server/server_player.c`
+  - **Description**: Automatically skip Tom Nook's Part-Time Job (`FirstJob` / `arbeit`) upon onboarding new players. Clear tutorial event flags via `mEv_ClearPersonalEventFlag(player_no)`, assign an available home slot with default starter items (tape deck, wallpaper, flooring), set mortgage to post-tutorial 17,000 Bells (`mPlayer_DEBT0 - 1400`), provide starter bells and random civilian clothes, clear errand queues, and set Tom Nook's shop to normal commerce (`SP_NPC_SHOP_MASTER`).
+  - **Acceptance Criteria (Testable via State Check & In-Game)**: When a new player character is initialized in multiplayer:
+    1. `mEv_CheckFirstJob()` evaluates to `FALSE`.
+    2. Hourly town BGM plays instead of `BGM_FIRST_JOB`.
+    3. Entering Tom Nook's shop presents standard buying/selling rather than chore dialogues.
+    4. Villagers adhere to normal wandering/indoor schedules rather than waiting outside for deliveries.
+    5. Player has home ownership with a starter radio and an active 17,000 Bell mortgage.
 
 ---
 
@@ -139,32 +150,32 @@ This task tracker outlines all implementation milestones defined in [Specificati
 - [ ] **Task 5.1: Server Zone Data Structure & Manager**
   - **State**: `Not Implemented`
   - **Files**: `include/server/server_zone.h`, `pc/src/server/server_zone.c`
-  - **Description**: Implement `ServerZone` management. Allocate Zone 0 as the permanent 30-acre outdoor town, and a pool of up to 16 dynamic room zones (Nook's shop, Able Sisters, Museum, Post Office, Police Station, villager houses).
-  - **Acceptance Criteria**: The server can instantiate and track multiple independent simulation contexts simultaneously.
+  - **Description**: Implement `ServerZone` management. Allocate Zone 0 as the permanent 30-acre outdoor town, and a pool of dynamic room zones (Nook's shop, Able Sisters, Museum, Post Office, Police Station, villager houses).
+  - **Acceptance Criteria (Testable via Server Logs)**: Server instantiates and maintains Zone 0 (outdoors) alongside active indoor room zones simultaneously without crashing.
 
 - [ ] **Task 5.2: Expand Memory Arenas for Concurrent Zones**
   - **State**: `Not Implemented`
   - **Files**: `pc/src/pc_os.c`, `src/gamealloc.c`
   - **Description**: Increase the Dolphin OS memory arena allocation (`pc_os.c`) from 32MB to 256MB+ to allow concurrent storage of 30 acres of outdoor actors plus indoor room actors.
-  - **Acceptance Criteria**: Server allocates memory for all outdoor acres and active rooms without running out of arena heap space.
+  - **Acceptance Criteria (Testable Heap Inspection)**: Memory diagnostics confirm sufficient headroom (>128MB free) while outdoor acres and multiple interior rooms are concurrently allocated.
 
 - [ ] **Task 5.3: Persistent 30-Acre Outdoor Simulation**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_field_make.c`, `src/game/m_field_info.c`, `src/actor/ac_set_manager.c`
   - **Description**: Prevent outdoor actors and foreground items from unloading when players enter buildings. Outdoor field simulation must remain active in Zone 0.
-  - **Acceptance Criteria**: While all players are inside houses or shops, outdoor weeds, flowers, and weather timers continue ticking uninterrupted.
+  - **Acceptance Criteria (Testable Concurrent Ticking)**: When a player enters a house, server logs confirm Zone 0 (outdoor weather, tree growth, villager wandering) continues ticking in the background.
 
 - [ ] **Task 5.4: Dynamic Room Spawning & Dormancy Lifecycle**
   - **State**: `Not Implemented`
   - **Files**: `pc/src/server/server_zone.c`, `src/game/m_scene.c`
   - **Description**: When a player interacts with a building door (`door_data`), check if the target room zone is already active. If not, instantiate it from its scene template (`src/data/scene/`). When the last player leaves a room, serialize changes and mark the zone dormant.
-  - **Acceptance Criteria**: Rooms are only simulated while occupied; entering a room already occupied by another player joins that room seamlessly.
+  - **Acceptance Criteria (Testable Room Joining)**: Entering an already-occupied room joins the existing room zone rather than creating a duplicate instance.
 
 - [ ] **Task 5.5: Doorway Transition Handshake**
   - **State**: `Not Implemented`
   - **Files**: `src/game/m_scene.c`, `include/server/server_network.h`
   - **Description**: Replace the client-side `goto_other_scene()` with a server request (`PKT_C2S_INTERACT_REQ` -> `ACTION_ENTER_DOOR`). The server transfers the player entity between zones and replies with `PKT_S2C_ZONE_ENTER`.
-  - **Acceptance Criteria**: Moving between outdoors and indoors updates the player's zone membership cleanly without client or server desync.
+  - **Acceptance Criteria (Testable Zone Transfer)**: Moving through doors updates the player's zone membership cleanly without client or server desync.
 
 ---
 
