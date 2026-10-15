@@ -80,9 +80,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
 
 ### Phase 3: Simulation Unpausing & Input Isolation
 
-- [ ] **Task 3.1: Isolate Submenu Pausing from World Simulation**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_play.c`, `src/game/m_submenu.c`
+- [x] **Task 3.1: Isolate Submenu Pausing from World Simulation**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_play.c`, `src/game/m_submenu.c`, `src/game/m_player_controller.c_inc`, `src/game/m_player_other_func.c_inc`, `src/game/m_player.c`
   - **Description**: In `Game_play_move_fbdemo_not_move()`, decouple `Actor_info_call_actor` and `CollisionCheck_OC` from `play->submenu.process_status == mSM_PROCESS_WAIT`. Allow actor logic to continue updating while a player has their inventory, letter, or design submenus open.
   - **Acceptance Criteria (Testable in Client)**: Launch `./pc/build32/bin/AnimalCrossing.exe` and open pockets/inventory next to a river or walking villager. River water, tree sway, wind, and nearby villagers must continue animating and walking in real-time while the menu is open, instead of freezing.
 
@@ -132,9 +132,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Enable collision checks between multiple `PLAYER_ACTOR` instances so players cannot clip through each other.
   - **Acceptance Criteria (Testable in Game/Simulation)**: Player 1 running into the dummy player bumps into their physical collision cylinder and is stopped from walking through them.
 
-- [ ] **Task 4.5: Player Onboarding & Part-Time Job (Tutorial) Bypass**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_event.c`, `src/game/m_start_data_init.c`, `pc/src/server/server_player.c`
+- [x] **Task 4.5: Player Onboarding & Part-Time Job (Tutorial) Bypass**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_event.c`, `src/game/m_start_data_init.c`, `src/game/m_play.c`, `pc/src/pc_m_card.c`, `src/game/m_card.c`, `pc/src/pc_settings.c`
   - **Description**: Automatically skip Tom Nook's Part-Time Job (`FirstJob` / `arbeit`) upon onboarding new players. Clear tutorial event flags via `mEv_ClearPersonalEventFlag(player_no)`, assign an available home slot with default starter items (tape deck, wallpaper, flooring), set mortgage to post-tutorial 17,000 Bells (`mPlayer_DEBT0 - 1400`), provide starter bells and random civilian clothes, clear errand queues, and set Tom Nook's shop to normal commerce (`SP_NPC_SHOP_MASTER`).
   - **Acceptance Criteria (Testable via State Check & In-Game)**: When a new player character is initialized in multiplayer:
     1. `mEv_CheckFirstJob()` evaluates to `FALSE`.

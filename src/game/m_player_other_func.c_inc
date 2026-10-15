@@ -229,7 +229,7 @@ static void Player_actor_check_forward(ACTOR* actor, GAME* game) {
 
     Player_actor_check_nextgoto(actor, game);
 
-    if (chkTrigger(BUTTON_A)) {
+    if (chkTrigger(BUTTON_A) && !Player_actor_is_submenu_active()) {
         player->a_btn_pressed = TRUE;
     } else {
         player->a_btn_pressed = FALSE;

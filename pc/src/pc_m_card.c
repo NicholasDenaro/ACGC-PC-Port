@@ -29,6 +29,7 @@
 #include "m_cockroach.h"
 #include "m_all_grow_ovl.h"
 #include "m_home.h"
+#include "m_house.h"
 #include "lb_rtc.h"
 #include "game.h"
 
@@ -246,16 +247,13 @@ static u16 pc_get_land_copy_protect(void) {
 
 /* mCD_CheckResetCode: TRUE if no reset code armed (birthday clears it) */
 static int pc_check_reset_code(Private_c* priv) {
-    if (priv->state_flags & mPr_FLAG_BIRTHDAY_ACTIVE) {
-        priv->reset_code = 0;
-    }
-    return priv->reset_code == 0;
+    priv->reset_code = 0;
+    return 1;
 }
 
-/* mCD_SetResetCode: arm a nonzero code; still set at next load = reset */
+/* mCD_SetResetCode: arm a nonzero code; permanently disabled to prevent Resetti */
 static void pc_set_reset_code(Private_c* priv) {
-    priv->reset_code = (u32)RANDOM_F(USHT_MAX_S);
-    priv->reset_code++;
+    priv->reset_code = 0;
 }
 
 /* Money rock / Wisp / Copy Protect. save_mode mirrors GC SaveHome _04:
@@ -268,16 +266,14 @@ static void pc_save_pre_write_side_effects(int save_mode) {
     mCkRh_SavePlayTime(Common_Get(player_no));
 
     if (priv != NULL) {
+        priv->reset_code = 0;
+        priv->reset_count = 0;
         if (save_mode == 0) {
-            priv->reset_code = 0;
-
             for (i = 0; i < mPr_POCKETS_SLOT_COUNT; i++) {
                 if (ITEM_IS_WISP(priv->inventory.pockets[i])) {
                     mPr_SetPossessionItem(priv, i, EMPTY_NO, mPr_ITEM_COND_NORMAL);
                 }
             }
-        } else if (pc_check_reset_code(priv)) {
-            pc_set_reset_code(priv);
         }
     }
 
@@ -455,7 +451,6 @@ static int pc_save_read_gci(const char* path) {
     CARDDir dir_hdr;
     u8* file_data;
     Save_t* save_src;
-    u32 offset;
     long file_size;
 
     fp = fopen(path, "rb");
@@ -573,7 +568,6 @@ static int pc_save_read_gci_to_keep(const char* path) {
     CARDDir dir_hdr;
     u8* file_data;
     Save_t* save_src;
-    u32 offset;
 
     fp = fopen(path, "rb");
     if (!fp) return FALSE;
@@ -833,35 +827,61 @@ int mCD_InitGameStart_bg(int player_no, int card_private_idx, int start_cond, s3
             l_mcd_keep_startCond = start_cond;
             pc_save_ready = 1;
 
-            /* Reset detection (Resetti): check if previous session ended without saving */
+            /* Reset detection (Resetti): permanently disabled on PC */
             if (Now_Private != NULL && start_cond != mCD_START_COND_INCOMING_FOREIGNER
                 && start_cond != mCD_START_COND_OUTGOING_FOREIGNER) {
+                int h;
+                int b;
+                int u;
+
                 Common_Set(reset_flag, FALSE);
-                if (Now_Private->reset_code != 0) {
-                    /* Birthday clears reset penalty (matches original) */
-                    if (Now_Private->state_flags & mPr_FLAG_BIRTHDAY_ACTIVE) {
-                        Now_Private->reset_code = 0;
-                    } else if (!ZURUMODE2_ENABLED() && !g_pc_settings.disable_resetti) {
-                        Common_Set(reset_flag, TRUE);
-                        Now_Private->reset_count++;
-                        OSReport("[PC] Reset detected! reset_count=%d — Resetti will appear\n",
-                                 Now_Private->reset_count);
+                Now_Private->reset_code = 0;
+                Now_Private->reset_count = 0;
+
+                /* Sanitize uninitialized or corrupt player/town metadata */
+                if (mPr_NullCheckPlayerName(Now_Private->player_ID.player_name)) {
+                    static const u8 default_player_name[PLAYER_NAME_LEN] = { 'P', 'l', 'a', 'y', 'e', 'r', CHAR_SPACE, CHAR_SPACE };
+                    mPr_CopyPlayerName(Now_Private->player_ID.player_name, (u8*)default_player_name);
+                    Now_Private->exists = TRUE;
+                    Now_Private->player_ID.land_id = Save_Get(land_info).id;
+                    mLd_CopyLandName(Now_Private->player_ID.land_name, Save_Get(land_info).name);
+                }
+                if (mLd_CheckCmpLandName(Save_Get(land_info).name, (u8*)"        ") ||
+                    Save_Get(land_info).name[0] == 0 || (u8)Save_Get(land_info).name[0] == 0xFF) {
+                    static const u8 default_town_name[LAND_NAME_SIZE] = { 'F', 'o', 'r', 'e', 's', 't', CHAR_SPACE, CHAR_SPACE };
+                    mLd_CopyLandName(Save_Get(land_info).name, (u8*)default_town_name);
+                    memcpy(&Save_Get(island).landinfo, Save_GetPointer(land_info), sizeof(mLd_land_info_c));
+                }
+
+                /* Ensure House 0 is assigned and owned by Player 0 to allow Gyroid saving */
+                if (mPr_NullCheckPersonalID(&Save_Get(homes[0]).ownerID)) {
+                    mHS_set_use(0, 0);
+                    mHm_SetNowHome();
+                    Save_Get(homes[0]).flags.has_saved = TRUE;
+                    mEv_ClearPersonalEventFlag(0);
+                    mEv_UnSetFirstIntro();
+                    mEv_UnSetFirstJob();
+                }
+
+                /* Clear all cockroaches in all houses */
+                for (h = 0; h < PLAYER_NUM; h++) {
+                    Save_Get(homes[h]).goki.num = 0;
+                    if (Save_Get(homes[h]).goki.time.year == 0) {
+                        lbRTC_TimeCopy(&Save_Get(homes[h]).goki.time, Common_GetPointer(time.rtc_time));
                     }
                 }
-                /* Arm reset code: if player quits without saving, next load detects it */
-                pc_set_reset_code(Now_Private);
 
-                /* GC writes the save (armed code included) back to the card
-                 * here (bg_write_main/bg_write_bk). Persist to disk or the
-                 * armed code never survives a quit and Resetti can't trigger.
-                 * Cond 1 only - matches GC (new players aren't saved yet). */
-                if (start_cond == mCD_START_COND_1) {
-                    u16 copy_protect = pc_get_land_copy_protect();
-                    Common_Set(copy_protect, copy_protect);
-                    Save_Set(copy_protect, copy_protect);
-                    Save_Set(travel_hard_time, lbRTC_HardTime());
-                    if (!pc_save_write_gci()) {
-                        OSReport("[PC] InitGameStart: reset-code persist failed\n");
+                /* If save had Year 0 timestamps causing weed explosion, repair timestamps and clear weeds */
+                if (Save_Get(last_grow_time).year == 0 || Save_Get(all_grow_renew_time).year == 0) {
+                    lbRTC_TimeCopy(Save_GetPointer(last_grow_time), Common_GetPointer(time.rtc_time));
+                    lbRTC_TimeCopy(Save_GetPointer(all_grow_renew_time), Common_GetPointer(time.rtc_time));
+                    for (b = 0; b < FG_BLOCK_TOTAL_NUM; b++) {
+                        mActor_name_t* items = Save_Get(fg[0])[b].items[0];
+                        for (u = 0; u < UT_TOTAL_NUM; u++) {
+                            if (IS_ITEM_GRASS(items[u])) {
+                                items[u] = EMPTY_NO;
+                            }
+                        }
                     }
                 }
             }

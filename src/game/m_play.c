@@ -46,6 +46,14 @@
 #ifdef TARGET_SERVER
 #include "m_start_data_init.h"
 #include "m_flashrom.h"
+#include "m_house.h"
+#include "m_home.h"
+#include "m_land.h"
+#include "m_private.h"
+#include "m_cockroach.h"
+#include "m_post_office.h"
+#include "m_kabu_manager.h"
+#include "m_font.h"
 #endif
 
 #define Game_play_HYRAL_SIZE 0x3E800 // 256,000 bytes
@@ -442,13 +450,73 @@ extern void play_init(GAME* game) {
 
 #ifdef TARGET_SERVER
     printf("[SERVER] play_init: checking town map and save data...\n");
+    Common_Set(time.rtc_enabled, TRUE);
+    lbRTC_GetTime(Common_GetPointer(time.rtc_time));
+    mTM_time_init();
+
     if (!mFRm_CheckSaveData()) {
         printf("[SERVER] No existing town map found in save data.\n");
         printf("[SERVER] Bootstrapping procedural map generation (mSDI_StartInitBefore)...\n");
         mFI_ClearFieldData();
         if (mSDI_StartInitBefore(game, 0, mSDI_INIT_MODE_NEW, mSDI_MALLOC_FLAG_GAME) == TRUE) {
+            int h;
+            Private_c* priv0;
+            static const u8 default_town_name[LAND_NAME_SIZE] = { 'F', 'o', 'r', 'e', 's', 't', CHAR_SPACE, CHAR_SPACE };
+            static const u8 default_player_name[PLAYER_NAME_LEN] = { 'P', 'l', 'a', 'y', 'e', 'r', CHAR_SPACE, CHAR_SPACE };
+
             mSDI_StartInitAfter(game, FALSE, mSDI_MALLOC_FLAG_GAME);
             printf("[SERVER] Procedural map generation complete!\n");
+
+            /* Default town and player onboarding */
+            mLd_CopyLandName(Save_Get(land_info).name, (u8*)default_town_name);
+            bcopy(Save_GetPointer(land_info), &Save_Get(island).landinfo, sizeof(mLd_land_info_c));
+
+            priv0 = Save_GetPointer(private_data[0]);
+            priv0->exists = TRUE;
+            priv0->player_ID.land_id = Save_Get(land_info).id;
+            mLd_CopyLandName(priv0->player_ID.land_name, Save_Get(land_info).name);
+            mPr_CopyPlayerName(priv0->player_ID.player_name, (u8*)default_player_name);
+            priv0->reset_code = 0;
+            priv0->reset_count = 0;
+            Common_Set(now_private, priv0);
+            Common_Set(player_no, 0);
+
+            /* Assign House 0 to Player 0 */
+            mHS_set_use(0, 0);
+            mHm_SetNowHome();
+            Save_Get(homes[0]).flags.has_saved = TRUE;
+
+            /* Catalog starter items */
+            mPr_SetItemCollectBit(priv0->cloth.item);
+            mPr_SetItemCollectBit(FTR_START(FTR_SUM_CASSE01));
+            mPr_SetItemCollectBit(ITM_CARPET_START + Save_Get(homes[0]).floors[0].wall_floor.flooring_idx);
+            mPr_SetItemCollectBit(ITM_WALL_START + Save_Get(homes[0]).floors[0].wall_floor.wallpaper_idx);
+
+            /* Bypass Part-Time Job (Arbeit) / Intro demo */
+            mEv_ClearPersonalEventFlag(0);
+            mEv_UnSetFirstIntro();
+            mEv_UnSetFirstJob();
+            priv0->inventory.loan = 17000;
+            mTM_off_renew_time(1);
+            Common_Set(complete_payment_type, mPlayer_COMPLETE_PAYMENT_TYPE_ARBEIT);
+
+            /* Initialize RTC timestamps to current real time so no time travel weeds/cockroaches spawn */
+            lbRTC_TimeCopy(Save_GetPointer(last_grow_time), Common_GetPointer(time.rtc_time));
+            lbRTC_TimeCopy(Save_GetPointer(all_grow_renew_time), Common_GetPointer(time.rtc_time));
+            lbRTC_TimeCopy(Save_GetPointer(treasure_buried_time), Common_GetPointer(time.rtc_time));
+            lbRTC_TimeCopy(Save_GetPointer(treasure_checked_time), Common_GetPointer(time.rtc_time));
+            lbRTC_TimeCopy(Save_GetPointer(saved_auto_nwrite_time), Common_GetPointer(time.rtc_time));
+            mTM_set_renew_time(Save_GetPointer(renew_time), Common_GetPointer(time.rtc_time));
+            mTM_set_season();
+            Kabu_decide_price_schedule();
+            mPO_post_office_init();
+
+            for (h = 0; h < PLAYER_NUM; h++) {
+                Save_Get(homes[h]).goki.num = 0;
+                Save_Get(homes[h]).goki.pad = 0;
+                lbRTC_TimeCopy(&Save_Get(homes[h]).goki.time, Common_GetPointer(time.rtc_time));
+            }
+
             {
                 extern int pc_save_force_write(void);
                 if (pc_save_force_write()) {
@@ -457,6 +525,55 @@ extern void play_init(GAME* game) {
             }
         } else {
             printf("[SERVER ERROR] Procedural map generation failed!\n");
+        }
+    } else {
+        /* Existing save data loaded: sanitize corrupted/uninitialized fields */
+        Private_c* priv0 = Save_GetPointer(private_data[0]);
+        int h;
+        if (mPr_NullCheckPlayerName(priv0->player_ID.player_name)) {
+            static const u8 default_player_name[PLAYER_NAME_LEN] = { 'P', 'l', 'a', 'y', 'e', 'r', CHAR_SPACE, CHAR_SPACE };
+            mPr_CopyPlayerName(priv0->player_ID.player_name, (u8*)default_player_name);
+            priv0->exists = TRUE;
+            priv0->player_ID.land_id = Save_Get(land_info).id;
+            mLd_CopyLandName(priv0->player_ID.land_name, Save_Get(land_info).name);
+        }
+        if (mLd_CheckCmpLandName(Save_Get(land_info).name, (u8*)"        ") ||
+            Save_Get(land_info).name[0] == 0 || (u8)Save_Get(land_info).name[0] == 0xFF) {
+            static const u8 default_town_name[LAND_NAME_SIZE] = { 'F', 'o', 'r', 'e', 's', 't', CHAR_SPACE, CHAR_SPACE };
+            mLd_CopyLandName(Save_Get(land_info).name, (u8*)default_town_name);
+            bcopy(Save_GetPointer(land_info), &Save_Get(island).landinfo, sizeof(mLd_land_info_c));
+        }
+        if (mPr_NullCheckPersonalID(&Save_Get(homes[0]).ownerID)) {
+            mHS_set_use(0, 0);
+            mHm_SetNowHome();
+            Save_Get(homes[0]).flags.has_saved = TRUE;
+            mEv_ClearPersonalEventFlag(0);
+            mEv_UnSetFirstIntro();
+            mEv_UnSetFirstJob();
+        }
+        priv0->reset_code = 0;
+        priv0->reset_count = 0;
+        Common_Set(reset_flag, FALSE);
+
+        /* Fix year 0 timestamps and weed explosion from previous bug */
+        if (Save_Get(last_grow_time).year == 0 || Save_Get(all_grow_renew_time).year == 0) {
+            int b, u;
+            lbRTC_TimeCopy(Save_GetPointer(last_grow_time), Common_GetPointer(time.rtc_time));
+            lbRTC_TimeCopy(Save_GetPointer(all_grow_renew_time), Common_GetPointer(time.rtc_time));
+            for (b = 0; b < FG_BLOCK_TOTAL_NUM; b++) {
+                mActor_name_t* items = Save_Get(fg[0])[b].items[0];
+                for (u = 0; u < UT_TOTAL_NUM; u++) {
+                    if (IS_ITEM_GRASS(items[u])) {
+                        items[u] = EMPTY_NO;
+                    }
+                }
+            }
+        }
+        for (h = 0; h < PLAYER_NUM; h++) {
+            Save_Get(homes[h]).goki.num = 0;
+            if (Save_Get(homes[h]).goki.time.year == 0) {
+                lbRTC_TimeCopy(&Save_Get(homes[h]).goki.time, Common_GetPointer(time.rtc_time));
+            }
         }
     }
     if (Common_Get(now_private) == NULL) {
@@ -544,12 +661,10 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
 
     mSM_submenu_ctrl(play);
 
-    if (play->submenu.process_status == mSM_PROCESS_WAIT) {
-        game->doing_point = 2;
-        mDemo_Main(play);
-        game->doing_point = 3;
-        mEv_run(&play->event);
-    }
+    game->doing_point = 2;
+    mDemo_Main(play);
+    game->doing_point = 3;
+    mEv_run(&play->event);
 
     game->doing_point = 4;
     mDemo_stock_clear();
@@ -558,26 +673,26 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
     game->doing_point = 6;
     mSM_submenu_move(&play->submenu);
 
+    play->game_frame++;
     if (play->submenu.process_status == mSM_PROCESS_WAIT) {
-        play->game_frame++;
         mVibctl_clr_force_stop(2);
-        game->doing_point = 7;
-        CollisionCheck_OC(game, &play->collision_check);
-        game->doing_point = 8;
-        CollisionCheck_clear(game, &play->collision_check);
-        game->doing_point = 9;
-        game->doing_point = 0;
-        game->doing_point_specific = 0x90;
-        Actor_info_call_actor(play, &play->actor_info);
-        game->doing_point = 0;
-        game->doing_point_specific = 0x91;
-        game->doing_point = 1;
-        mCoBG_CalcTimerDecalCircle();
-        game->doing_point = 2;
-        mMsg_Main(game);
     } else {
         mVibctl_set_force_stop(2);
     }
+    game->doing_point = 7;
+    CollisionCheck_OC(game, &play->collision_check);
+    game->doing_point = 8;
+    CollisionCheck_clear(game, &play->collision_check);
+    game->doing_point = 9;
+    game->doing_point = 0;
+    game->doing_point_specific = 0x90;
+    Actor_info_call_actor(play, &play->actor_info);
+    game->doing_point = 0;
+    game->doing_point_specific = 0x91;
+    game->doing_point = 1;
+    mCoBG_CalcTimerDecalCircle();
+    game->doing_point = 2;
+    mMsg_Main(game);
 
     fbdemo_fade_move(&play->color_fade, game_GameFrame);
 }
@@ -620,20 +735,18 @@ static void Game_play_move(GAME* game) {
         }
     }
 
-    if (play->submenu.process_status == mSM_PROCESS_WAIT) {
-        evw_anime_add_scroll_phase(&play->game);
-        game->doing_point = 0;
-        game->doing_point_specific = 0x92;
-        game->doing_point = 1;
-        Game_play_camera_proc(play);
-        game->doing_point = 2;
-        mPO_business_proc(play);
-        game->doing_point = 3;
-        mTRC_move(game);
-        game->doing_point = 4;
-        Balloon_move(play);
-        mEnv_ManagePointLight(play, &play->kankyo, &play->global_light);
-    }
+    evw_anime_add_scroll_phase(&play->game);
+    game->doing_point = 0;
+    game->doing_point_specific = 0x92;
+    game->doing_point = 1;
+    Game_play_camera_proc(play);
+    game->doing_point = 2;
+    mPO_business_proc(play);
+    game->doing_point = 3;
+    mTRC_move(game);
+    game->doing_point = 4;
+    Balloon_move(play);
+    mEnv_ManagePointLight(play, &play->kankyo, &play->global_light);
 
     game->doing_point = 0;
     game->doing_point_specific = 0x93;
@@ -772,14 +885,10 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         play->submenu.mode = mSM_MODE_IDLE;
     }
 
+#ifndef TARGET_PC
     if (play->submenu.mode == mSM_MODE_PRERENDER_DONE) {
         poly = NOW_POLY_OPA_DISP;
 
-#ifdef TARGET_PC
-        /* The prerendered background is a fullscreen textured rect that goes
-         * through ortho projection — enable stretch so it fills widescreen. */
-        gDPNoOpTag(poly++, PC_NOOP_WIDESCREEN_STRETCH);
-#endif
         gDPPipeSync(poly++);
         rect_disp = gfx_rect_moji(poly++);
         gDPSetOtherMode(rect_disp++,
@@ -790,14 +899,11 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         gDPSetTile_Dolphin(rect_disp++, G_DOLPHIN_TLUT_DEFAULT_MODE, 0, 0, 0, 0, 0, 0);
         gSPTextureRectangle(rect_disp++, 0, 0, ((2*SCREEN_WIDTH) - 1) << 2, ((2*SCREEN_HEIGHT) - 1) << 2, G_TX_RENDERTILE, 0, 0, (256) << G_TEXTURE_IMAGE_FRAC,
                             (256) << G_TEXTURE_IMAGE_FRAC);
-#ifdef TARGET_PC
-        /* Disable stretch so the inventory overlay UI gets 4:3 correction. */
-        gDPNoOpTag(rect_disp++, PC_NOOP_WIDESCREEN_STRETCH_OFF);
-#endif
 
         SET_POLY_OPA_DISP(rect_disp);
         return 1;
     }
+#endif
 
     if ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 85) != 0)) {
         PC_DIAG(3, "makeBumpTexture: before Actor_info_draw_actor\n");
@@ -811,6 +917,25 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         Debug_Display_output(play);
     }
 
+#ifdef TARGET_PC
+    if (play->submenu.mode == mSM_MODE_PRERENDER_INIT) {
+        play->submenu.mode = mSM_MODE_PRERENDER_DONE;
+    }
+    if (play->fb_mode == FBDEMO_MODE_CREATE) {
+        old_fb = NOW_POLY_OPA_DISP;
+        fb_disp = gfxopen(old_fb);
+
+        gSPDisplayList(NEXT_LIGHT_DISP, fb_disp);
+        copy_efb_to_texture(&fb_disp, &prbuf);
+        gSPEndDisplayList(fb_disp++);
+
+        gfxclose(old_fb, fb_disp);
+
+        SET_POLY_OPA_DISP(fb_disp);
+        play->fb_mode = FBDEMO_MODE_INIT;
+        return 1;
+    }
+#else
     if ((play->submenu.mode == mSM_MODE_PRERENDER_INIT) || (play->fb_mode == FBDEMO_MODE_CREATE)) {
         old_fb = NOW_POLY_OPA_DISP;
         fb_disp = gfxopen(old_fb);
@@ -831,6 +956,7 @@ static int makeBumpTexture(GAME_PLAY* play, GRAPH* graph1, GRAPH* graph2) {
         }
         return 1;
     }
+#endif
 
     CLOSE_DISP(graph1);
 

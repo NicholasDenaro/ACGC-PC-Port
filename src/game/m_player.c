@@ -1572,6 +1572,10 @@ static void Player_actor_main_Demo_get_golden_axe_wait(ACTOR*, GAME*);
             return;
         }
 
+        if (Player_actor_is_submenu_active()) {
+            return;
+        }
+
         if (Player_actor_Check_is_demo_mode(main_index) != 0) {
             return;
         }

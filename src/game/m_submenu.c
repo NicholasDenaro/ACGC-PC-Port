@@ -103,7 +103,11 @@ extern int mSM_CHECK_LAST_FISH_GET(int idx) {
 }
 
 extern int SubmenuArea_IsPlayer() {
+#ifdef TARGET_PC
+    return TRUE;
+#else
     return SubmenuArea_visit == &SubmenuArea_dlftbl[mSM_DLF_PLAYER_ACTOR];
+#endif
 }
 
 static void mSM_load_player_anime(GAME_PLAY* play) {
@@ -423,10 +427,16 @@ extern void mSM_submenu_move(Submenu* submenu) {
 }
 
 extern void mSM_submenu_draw(Submenu* submenu, GAME* game) {
+#ifdef TARGET_PC
+    if (submenu->mode >= mSM_MODE_PRERENDER_DONE && submenu->process_status == mSM_PROCESS_PLAY) {
+        (*submenu->draw_proc)(submenu, game);
+    }
+#else
     if (submenu->mode >= mSM_MODE_PRERENDER_DONE && submenu->process_status == mSM_PROCESS_PLAY &&
         SubmenuArea_visit == &SubmenuArea_dlftbl[mSM_DLF_SUBMENU_OVL]) {
         (*submenu->draw_proc)(submenu, game);
     }
+#endif
 }
 
 static int mSM_check_item_for_furniture(int slot_no, int param_2) {

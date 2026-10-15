@@ -3290,12 +3290,20 @@ static int mCD_CheckResetCode(Private_c* priv) {
 }
 
 static void mCD_SetResetCode(Private_c* priv) {
+#ifdef TARGET_PC
+    priv->reset_code = 0;
+#else
     priv->reset_code = (u32)RANDOM_F(USHT_MAX_S);
     priv->reset_code++;
+#endif
 }
 
 static void mCD_SetResetInfo(Private_c* priv) {
     Common_Set(reset_flag, FALSE);
+#ifdef TARGET_PC
+    priv->reset_code = 0;
+    priv->reset_count = 0;
+#else
     if (mCD_CheckResetCode(priv) == FALSE) {
 
         /* No reset penalty if zurumode 2 is enabled */
@@ -3305,6 +3313,7 @@ static void mCD_SetResetInfo(Private_c* priv) {
 
         priv->reset_count++;
     }
+#endif
 }
 
 static u16 mCD_get_land_copyProtect(void) {

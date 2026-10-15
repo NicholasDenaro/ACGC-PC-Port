@@ -1,4 +1,13 @@
+static inline int Player_actor_is_submenu_active(void) {
+    GAME_PLAY* play = (GAME_PLAY*)gamePT;
+    return (play != NULL && play->submenu.process_status != mSM_PROCESS_WAIT);
+}
+
 static int Player_actor_CheckController_forPickup(GAME* game) {
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
+
     if (mEv_IsTitleDemo()) {
         mPlayer_Controller_Data_c* data = mPlib_Get_controller_data_for_title_demo_p();
         ACTOR* actorx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
@@ -17,6 +26,10 @@ static int Player_actor_CheckController_forAxe(GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
 
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
+
     if (mPlayer_ITEM_IS_AXE(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
             return mPlib_Get_controller_data_for_title_demo_p()->trigger_btn_a;
@@ -31,6 +44,10 @@ static int Player_actor_CheckController_forNet(GAME* game) {
     ACTOR* actorx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
+
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
 
     if (mPlayer_ITEM_IS_NET(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
@@ -47,6 +64,10 @@ static int Player_actor_CheckController_forRod(GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
 
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
+
     if (mPlayer_ITEM_IS_ROD(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
             return mPlib_Get_controller_data_for_title_demo_p()->trigger_btn_a;
@@ -61,6 +82,10 @@ static int Player_actor_CheckController_forScoop(GAME* game) {
     ACTOR* actorx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
+
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
 
     if (mPlayer_ITEM_IS_SHOVEL(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
@@ -77,6 +102,10 @@ static int Player_actor_CheckController_forUmbrella(GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
 
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
+
     if (mPlayer_ITEM_IS_UMBRELLA(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
             return mPlib_Get_controller_data_for_title_demo_p()->trigger_btn_a;
@@ -91,6 +120,10 @@ static int Player_actor_CheckController_forFan(GAME* game, int type) {
     ACTOR* actorx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
+
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
 
     if (mPlayer_ITEM_IS_FAN(kind) != FALSE) {
         if (mEv_IsTitleDemo()) {
@@ -116,6 +149,10 @@ static int Player_actor_CheckController_forShake_tree(GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     s8 kind = Player_actor_Get_ItemKind(actorx, player->now_main_index);
 
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
+
 #ifdef PC_ENHANCEMENTS
     /* net/rod no longer block tree shaking */
     if (!mPlayer_ITEM_KIND_CHECK(kind, 0, mPlayer_ITEM_KIND_NUM) ||
@@ -135,25 +172,40 @@ static int Player_actor_CheckController_forShake_tree(GAME* game) {
 }
 
 static f32 Player_actor_CheckController_forStruggle_pitfall(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (chkTrigger(BUTTON_A) != 0) ? 1.0f : 0.0f;
 }
 
 static int Player_actor_CheckController_forDush(void) {
+    if (Player_actor_is_submenu_active()) {
+        return FALSE;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->btn_b
                                       : mPlib_CheckButtonOnly_forDush();
 }
 
 static f32 Player_actor_GetController_move_percentX(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->mcon.move_pX
                                       : gamePT->mcon.move_pX;
 }
 
 static f32 Player_actor_GetController_move_percentY(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->mcon.move_pY
                                       : gamePT->mcon.move_pY;
 }
 
 static f32 Player_actor_GetController_move_percentR(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->mcon.move_pR
                                       : gamePT->mcon.move_pR;
 }
@@ -169,17 +221,23 @@ static s16 Player_actor_GetController_old_move_angle(void) {
 }
 
 static f32 Player_actor_GetController_recognize_percentR(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->mcon.adjusted_pR
                                       : gamePT->mcon.adjusted_pR;
 }
 
 static f32 Player_actor_GetController_old_recognize_percentR(void) {
+    if (Player_actor_is_submenu_active()) {
+        return 0.0f;
+    }
     return (mEv_IsTitleDemo()) ? mPlib_Get_controller_data_for_title_demo_p()->mcon.last_adjusted_pR
                                       : gamePT->mcon.last_adjusted_pR;
 }
 
 static int Player_actor_CheckController_forRadio_exercise(GAME* game) {
-    if (mEv_IsTitleDemo()) {
+    if (Player_actor_is_submenu_active() || mEv_IsTitleDemo()) {
         return -1;
     }
 
