@@ -9,7 +9,11 @@
 extern "C" {
 #endif
 
+#ifdef TARGET_PC
+#define aGYO_MAX_GYOEI 10
+#else
 #define aGYO_MAX_GYOEI 2
+#endif
 #define aGYO_EXIST_MAX 4
 
 enum {

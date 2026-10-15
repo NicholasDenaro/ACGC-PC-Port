@@ -401,7 +401,12 @@ static void aIGK_let_escape_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     insect->tools_actor.actor_class.shape_info.rotation.x = 0;
     insect->tools_actor.actor_class.position_speed.y = 0.0f;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)insect);
+    if (player == NULL) player = GET_PLAYER_ACTOR_GAME(game);
+#else
     player = GET_PLAYER_ACTOR_GAME(game);
+#endif
     if (player != NULL) {
         s16 angl = player->actor_class.shape_info.rotation.y + aIGK_RANDOM_ANGLE2();
 

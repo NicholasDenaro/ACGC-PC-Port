@@ -38,7 +38,11 @@ void server_player_unregister(uint32_t client_id);
 int server_player_count(void);
 PLAYER_ACTOR* server_player_spawn_actor(GAME_PLAY* play, int slot, xyz_t pos, s_xyz angle);
 int server_spawn_dummy_player(GAME_PLAY* play, const char* name, xyz_t pos);
+int server_spawn_dummy_player_north(void);
+int server_is_dummy_player_alive(void);
 void server_player_tick(GAME_PLAY* play);
+Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor);
+Private_c* server_player_get_private_by_slot(int slot);
 
 #ifdef __cplusplus
 }

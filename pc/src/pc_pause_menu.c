@@ -3,6 +3,7 @@
 #include "pc_settings_menu.h"
 #include "pc_menu_util.h"
 #include "pc_text_draw.h"
+#include "server/server_player.h"
 
 #include "m_font.h"
 #include "m_rcp.h"
@@ -29,11 +30,11 @@ typedef enum {
     PAGE_CONFIRM_QUIT = 2,
 } PauseMenuPage;
 
-#define MAIN_ITEM_COUNT     3
+#define MAIN_ITEM_COUNT     4
 #define CONFIRM_ITEM_COUNT  2
 
 static PauseMenuPage cur_page = PAGE_MAIN;
-static int main_sel = 0;    /* 0=Resume, 1=Settings, 2=Quit Game */
+static int main_sel = 0;    /* 0=Resume, 1=Settings, 2=Spawn Dummy, 3=Quit Game */
 static int confirm_sel = 0; /* 0=No (default), 1=Yes */
 
 void pc_pause_menu_toggle(void) {
@@ -59,7 +60,11 @@ static void main_activate(void) {
             cur_page = PAGE_SETTINGS;
             pc_settings_menu_enter();
             break;
-        case 2: /* Quit Game -> confirm page (default to No) */
+        case 2: /* Spawn Dummy */
+            server_spawn_dummy_player_north();
+            pc_pause_menu_toggle();
+            break;
+        case 3: /* Quit Game -> confirm page (default to No) */
             cur_page = PAGE_CONFIRM_QUIT;
             confirm_sel = 0;
             break;
@@ -208,11 +213,12 @@ int pc_pause_menu_handle_event(const SDL_Event* e) {
 /* Drawing */
 
 static void draw_main_page(struct game_s* game) {
-    static const char* items[MAIN_ITEM_COUNT] = { "Resume", "Settings", "Quit Game" };
+    const char* dummy_str = server_is_dummy_player_alive() ? "Respawn Dummy" : "Spawn Dummy";
+    const char* items[MAIN_ITEM_COUNT] = { "Resume", "Settings", dummy_str, "Quit Game" };
 
-    pc_menu_draw_centered(game, "- Paused -", 80.0f, 255, 255, 255, 255, 1.0f);
+    pc_menu_draw_centered(game, "- Paused -", 70.0f, 255, 255, 255, 255, 1.0f);
 
-    f32 y = 110.0f;
+    f32 y = 100.0f;
     f32 line_h = 18.0f;
     for (int i = 0; i < MAIN_ITEM_COUNT; i++) {
         int r, g, b, a;

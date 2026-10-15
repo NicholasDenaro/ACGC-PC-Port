@@ -10,13 +10,13 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | :--- | :--- | :---: | :---: | :--- |
 | **Phase 1** | Headless Build Target & Dedicated Server Daemon | 4 | 4 | Implemented |
 | **Phase 2** | Procedural Map Generation & World Initialization (Save Bootstrap) | 4 | 4 | Implemented |
-| **Phase 3** | Simulation Unpausing & Input Isolation | 0 | 4 | Not Implemented |
-| **Phase 4** | Multi-Player Entity Decoupling | 0 | 5 | Not Implemented |
+| **Phase 3** | Simulation Unpausing & Input Isolation | 4 | 4 | Implemented |
+| **Phase 4** | Multi-Player Entity Decoupling | 5 | 5 | Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 0 | 5 | Not Implemented |
 | **Phase 6** | Network Transport Layer (ENet / UDP) | 0 | 4 | Not Implemented |
 | **Phase 7** | World State Replication & Spatial Management | 0 | 5 | Not Implemented |
 | **Phase 8** | World Persistence & Save Journaling | 0 | 3 | Not Implemented |
-| **Total** | | **8** | **34** | **24% Complete** |
+| **Total** | | **17** | **34** | **50% Complete** |
 
 ---
 
@@ -114,15 +114,15 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Create the `ConnectedClient` registry (supporting up to 8 concurrent players). Each entry holds client ID, `PLAYER_ACTOR` instance, connection state, zone ID, and `Private_c` player data.
   - **Acceptance Criteria (Testable via Simulated Player)**: Server supports adding a simulated/dummy player (`--spawn-dummy-player` or test harness). The server logs confirm both Player 1 and Player 2 are allocated, tracked, and simulated concurrently in memory.
 
-- [ ] **Task 4.2: Decouple `Common_Get(now_private)` and `player_no`**
-  - **State**: `Not Implemented`
-  - **Files**: `include/m_common_data.h`, `src/game/m_player.c`, `src/game/m_player_lib.c`
-  - **Description**: Refactor functions relying on global `now_private` or `player_no` to accept an explicit `PLAYER_ACTOR*` or `client_id` context parameter.
+- [x] **Task 4.2: Decouple `Common_Get(now_private)` and `player_no`**
+  - **State**: `Implemented`
+  - **Files**: `include/server/server_player.h`, `pc/include/server/server_player.h`, `pc/src/server/server_player.c`, `src/game/m_player_sound.c_inc`, `src/game/m_player_main_dash.c_inc`, `src/game/m_player_main_pull_net.c_inc`
+  - **Description**: Refactor functions relying on global `now_private` or `player_no` to accept an explicit `PLAYER_ACTOR*` or `client_id` context parameter via `server_player_get_private_by_actor()` and `server_player_get_private_by_slot()`.
   - **Acceptance Criteria (Testable via Memory Isolation)**: Modifying bells, pockets, or cloth for Player 2 does not alter or corrupt Player 1's memory space.
 
-- [ ] **Task 4.3: Refactor Actor Distance & Nearest-Player Perception**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_actor.c`, `include/m_actor.h`
+- [x] **Task 4.3: Refactor Actor Distance & Nearest-Player Perception**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_actor.c`, `include/m_actor.h`, `src/actor/ac_insect_move.c_inc`, `src/actor/ac_gyoei_move.c_inc`, `src/actor/ac_ins_batta.c`, `src/actor/ac_ins_chou.c`, `src/actor/ac_ins_dango.c`
   - **Description**: In `Actor_info_call_actor()`, replace the single `player_actor` distance calculation with `Actor_find_nearest_player()`. Actors must measure `player_distance_xz` and `player_angle_y` against the closest player residing in the same zone.
   - **Acceptance Criteria (Testable via Distance Check)**: When two players are in the world, insects, fish, and villagers react dynamically to whichever player is physically closer to them.
 

@@ -3,6 +3,7 @@
 #include "pc_keybindings.h"
 #include "pc_menu_util.h"
 #include "pc_text_draw.h"
+#include "server/server_player.h"
 
 #include "graph.h"
 #include "m_font.h"
@@ -26,6 +27,7 @@ enum {
     ITEM_SHOP_VISITOR,
     ITEM_BORDERLESS_ACRES,
     ITEM_NES_ASPECT,
+    ITEM_SPAWN_DUMMY,
     ITEM_MASTER_VOLUME,
     ITEM_STICK_DEADZONE,
     ITEM_CSTICK_DEADZONE,
@@ -55,6 +57,7 @@ static const Item tab_gameplay_items[] = {
     { "Shop upgrade",     ITEM_SHOP_VISITOR,     0 },
     { "Borderless acres", ITEM_BORDERLESS_ACRES, 0 },
     { "NES aspect",       ITEM_NES_ASPECT,       0 },
+    { "Dummy player",     ITEM_SPAWN_DUMMY,      0 },
 };
 
 static const Item tab_audio_items[] = {
@@ -316,6 +319,9 @@ static void item_cycle(int id, int dir) {
         case ITEM_NES_ASPECT:
             s_pending.nes_aspect = !s_pending.nes_aspect;
             break;
+        case ITEM_SPAWN_DUMMY:
+            server_spawn_dummy_player_north();
+            break;
         case ITEM_MASTER_VOLUME: {
             int v = s_pending.master_volume + (dir > 0 ? 10 : -10);
             if (v < 0)   v = 0;
@@ -386,6 +392,13 @@ static void item_format(int id, char* buf, size_t n) {
         case ITEM_NES_ASPECT:
             snprintf(buf, n, "%s", s_pending.nes_aspect ? "< 4:3 >" : "< Stretch >");
             break;
+        case ITEM_SPAWN_DUMMY:
+            if (server_is_dummy_player_alive()) {
+                snprintf(buf, n, "[ Respawn North ]");
+            } else {
+                snprintf(buf, n, "[ Spawn North ]");
+            }
+            break;
         case ITEM_MASTER_VOLUME:
             snprintf(buf, n, "< %d%% >", s_pending.master_volume);
             break;
@@ -419,6 +432,7 @@ static int item_changed(int id) {
         case ITEM_SHOP_VISITOR: return s_pending.disable_shop_visitor_req != g_pc_settings.disable_shop_visitor_req;
         case ITEM_BORDERLESS_ACRES: return s_pending.borderless_acres != g_pc_settings.borderless_acres;
         case ITEM_NES_ASPECT:    return s_pending.nes_aspect    != g_pc_settings.nes_aspect;
+        case ITEM_SPAWN_DUMMY:   return 0;
         case ITEM_MASTER_VOLUME: return s_pending.master_volume != g_pc_settings.master_volume;
         case ITEM_STICK_DEADZONE:  return s_pending.stick_deadzone  != g_pc_settings.stick_deadzone;
         case ITEM_CSTICK_DEADZONE: return s_pending.cstick_deadzone != g_pc_settings.cstick_deadzone;
@@ -633,6 +647,7 @@ int pc_settings_menu_confirm(void) {
     } else if (s_sel < cur_item_count()) {
         int id = s_tabs[s_tab].items[s_sel].id;
         if (id == ITEM_BINDINGS) bind_enter_page();
+        else if (id == ITEM_SPAWN_DUMMY) server_spawn_dummy_player_north();
         else                     item_cycle(id, +1);
     } else if (s_sel == idx_apply()) {
         apply_pending();

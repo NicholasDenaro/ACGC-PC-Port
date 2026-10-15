@@ -128,7 +128,12 @@ static void aIAB_let_escape_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     insect->tools_actor.actor_class.speed = 4.0f;
     insect->tools_actor.actor_class.shape_info.rotation.x = 0;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, (ACTOR*)insect);
+    if (player == NULL) player = GET_PLAYER_ACTOR(play);
+#else
     player = GET_PLAYER_ACTOR(play);
+#endif
     if (player != NULL) {
         s16 angleY = player->actor_class.shape_info.rotation.y + aIAB_RANDOM_ANGLE();
 

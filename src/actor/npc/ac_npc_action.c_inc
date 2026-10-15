@@ -157,7 +157,11 @@ static void aNPC_set_feel_info(NPC_ACTOR* nactorx, int feel, int timer) {
 static void aNPC_set_act_obj(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     switch (nactorx->action.act_obj) {
         case aNPC_ACT_OBJ_PLAYER:
+#ifdef TARGET_PC
+            nactorx->movement.target = (ACTOR*)Actor_find_nearest_player(play, (ACTOR*)nactorx);
+#else
             nactorx->movement.target = GET_PLAYER_ACTOR_ACTOR(play);
+#endif
             break;
         case aNPC_ACT_OBJ_TARGET_NPC:
             nactorx->movement.target =

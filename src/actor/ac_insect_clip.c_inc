@@ -111,7 +111,7 @@ static int aINS_chk_live_insect(int bx, int bz, GAME* game) {
     } else {
         int i;
 
-        for (i = 0; i < aINS_ACTOR_NUM - 1; i++) {
+        for (i = 0; i < aINS_AMBIENT_NUM; i++) {
             if (insect->exist_flag == TRUE && insect->tools_actor.actor_class.block_x == bx &&
                 insect->tools_actor.actor_class.block_z == bz) {
                 res = TRUE;
@@ -182,16 +182,18 @@ static int aINS_searchRegistSpace(int make_type) {
     if (make_type == aINS_MAKE_NEW) {
         int i;
 
-        for (i = 0; i < aINS_ACTOR_NUM - 1; i++) {
-            if (insect->exist_flag == FALSE) {
+        for (i = 0; i < aINS_AMBIENT_NUM; i++) {
+            if (insect[i].exist_flag == FALSE) {
                 return i;
             }
-
-            insect++;
         }
     } else { /* aINS_MAKE_EXIST -- spawn physical actor? */
-        if (insect[aINS_ACTOR_NUM - 1].exist_flag == FALSE) {
-            return aINS_ACTOR_NUM - 1;
+        int i;
+
+        for (i = aINS_AMBIENT_NUM; i < aINS_ACTOR_NUM; i++) {
+            if (insect[i].exist_flag == FALSE) {
+                return i;
+            }
         }
     }
 
@@ -229,8 +231,12 @@ static void aINS_setupActor(ACTOR* actorx, aINS_Init_c* init) {
     insect->ut_x = -1;
     insect->ut_z = -1;
 
+    int bx = play->block_table.block_x;
+    int bz = play->block_table.block_z;
+    mFI_Wpos2BlockNum(&bx, &bz, init->position);
+
     Actor_init_actor_class(actorx, &Dummy_Profile, NULL, play, -1, init->position.x, init->position.y, init->position.z,
-                           0, 0, 0, play->block_table.block_x, play->block_table.block_z, -1, EMPTY_NO,
+                           0, 0, 0, bx, bz, -1, EMPTY_NO,
                            init->extra_data);
     actorx->world = actorx->home;
     actorx->shape_info.rotation = actorx->world.angle;

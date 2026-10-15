@@ -82,7 +82,12 @@ extern void aIKR_actor_init(ACTOR* actorx, GAME* game) {
  * @param game Pointer to the game context.
  */
 static void aIKR_set_avoid_player_angl(ACTOR* actorx, GAME* game) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, actorx);
+    ACTOR* playerx = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#else
     ACTOR* playerx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#endif
 
     if (playerx != NULL) {
         actorx->shape_info.rotation.y = actorx->world.angle.y = playerx->shape_info.rotation.y + (s16)RANDOM_CENTER_F(DEG2SHORT_ANGLE2(120.0f));

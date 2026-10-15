@@ -4,7 +4,11 @@ static int aNPC_check_uzai_cross(NPC_ACTOR* nactorx, GAME_PLAY* play) {
     if (nactorx->actor_class.player_distance_xz < mFI_UNIT_BASE_SIZE_F &&
         ABS(nactorx->actor_class.player_distance_y) < mFI_UNIT_BASE_SIZE_F) {
         if (!F32_IS_ZERO(gamePT->mcon.adjusted_pR)) {
+#ifdef TARGET_PC
+            ACTOR* playerx = (ACTOR*)Actor_find_nearest_player(play, (ACTOR*)nactorx);
+#else
             ACTOR* playerx = GET_PLAYER_ACTOR_ACTOR(play);
+#endif
 
             if (playerx != NULL) {
                 s16 npc_angleY = nactorx->actor_class.player_angle_y + DEG2SHORT_ANGLE2(180.0f);

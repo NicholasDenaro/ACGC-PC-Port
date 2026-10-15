@@ -320,7 +320,14 @@ static int aGKK_search_Uki(aGYO_CTRL_ACTOR* gyo, GAME* game) {
 }
 
 static int aGKK_player_near(aGYO_CTRL_ACTOR* gyo, GAME* game) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)gyo);
+    ACTOR* playerx = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+    int main_idx = (near_p != NULL) ? near_p->now_main_index : mPlib_get_player_actor_main_index(game);
+#else
     ACTOR* playerx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+    int main_idx = mPlib_get_player_actor_main_index(game);
+#endif
     f32 dist;
     s16 target_angle;
     xyz_t pos;
@@ -331,7 +338,7 @@ static int aGKK_player_near(aGYO_CTRL_ACTOR* gyo, GAME* game) {
 
     if (
         // clang-format off
-        ((dist < 110.0f && mPlib_get_player_actor_main_index(game) == mPlayer_INDEX_DASH) ||
+        ((dist < 110.0f && main_idx == mPlayer_INDEX_DASH) ||
         (dist < 150.0f && (
             mPlib_Check_HitAxe(&pos) ||
             mPlib_Check_StopNet(&pos) ||

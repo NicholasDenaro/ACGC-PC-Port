@@ -74,8 +74,12 @@ static void aGYO_setupActor(aGYO_Init_c* init_data, int idx) {
     ctrl->range = 40.0f;
     ctrl->col_flags |= 1;
 
+    int bx = play->block_table.block_x;
+    int bz = play->block_table.block_z;
+    mFI_Wpos2BlockNum(&bx, &bz, init_data->position);
+
     Actor_init_actor_class((ACTOR*)ctrl, &Dummy_Profile, NULL, play, -1, init_data->position.x, init_data->position.y,
-                           init_data->position.z, 0, 0, 0, play->block_table.block_x, play->block_table.block_z, -1,
+                           init_data->position.z, 0, 0, 0, bx, bz, -1,
                            EMPTY_NO, 0);
     Shape_Info_init((ACTOR*)ctrl, 0.0f, &mAc_ActorShadowCircle, 5.0f, 5.0f);
     ctrl->tools_class.actor_class.shape_info.shadow_alpha_change_rate = 0.6f;

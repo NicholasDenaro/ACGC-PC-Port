@@ -291,7 +291,14 @@ static void aIDG_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     insect->speed_step = 0.3f;
     insect->_1E0 = 1.0f;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, (ACTOR*)insect);
+    if (player == NULL) {
+        player = get_player_actor_withoutCheck(play);
+    }
+#else
     player = get_player_actor_withoutCheck(play);
+#endif
     if (player != NULL) {
         angle = player->actor_class.shape_info.rotation.y + (s16)(21845.0f * (fqrand() - 0.5f));
         insect->tools_actor.actor_class.world.angle.y = angle;

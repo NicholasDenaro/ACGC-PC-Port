@@ -31,7 +31,11 @@ static void aNPC_act_react_tool_surprise2(NPC_ACTOR* nactorx, GAME_PLAY* play) {
 }
 
 static void aNPC_act_react_tool_look_player(NPC_ACTOR* nactorx, GAME_PLAY* play) {
+#ifdef TARGET_PC
+    ACTOR* playerx = (ACTOR*)Actor_find_nearest_player(play, (ACTOR*)nactorx);
+#else
     ACTOR* playerx = GET_PLAYER_ACTOR_ACTOR(play);
+#endif
 
     if (playerx != NULL) {
         aNPC_set_head_request(nactorx, 4, aNPC_HEAD_TARGET_ACTOR, playerx, NULL);

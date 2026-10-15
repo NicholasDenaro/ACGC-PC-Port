@@ -630,7 +630,12 @@ static void aITB_rest_on_notice(ACTOR* actorx, GAME* game) {
  * @param game Pointer to the game context.
  */
 static void aITB_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)insect);
+    ACTOR* playerx = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#else
     ACTOR* playerx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#endif
 
     if (playerx != NULL) {
         insect->tools_actor.actor_class.world.angle.y = search_position_angleY(&playerx->world.position, &insect->tools_actor.actor_class.world.position);

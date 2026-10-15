@@ -3,6 +3,7 @@
 #include "m_lib.h"
 #include "m_field_info.h"
 #include "m_player_lib.h"
+#include "m_common_data.h"
 #include "libultra/libultra.h"
 #include "ac_set_ovl_insect.h"
 #include "ac_set_ovl_gyoei.h"
@@ -144,6 +145,49 @@ static int aSetMgr_move_check_set(GAME_PLAY* play, SET_MANAGER* set_manager) {
     set_manager->next_move_proc = aSetMgr_MOVE_move_check_wait;
     wading = TRUE;
   }
+#ifdef TARGET_PC
+  else {
+    /* Periodic multiplayer reseed:
+     * Check active player acres every 300 frames (~5s) in round-robin fashion so that
+     * players who stay in an acre still experience natural fish and insect spawns.
+     */
+    static int reseed_timer = 0;
+    static int player_turn = 0;
+
+    reseed_timer++;
+    if (reseed_timer >= 300) {
+      reseed_timer = 0;
+
+      int num_players = 0;
+      ACTOR* plist[PLAYER_NUM];
+      ACTOR* p = play->actor_info.list[ACTOR_PART_PLAYER].actor;
+      while (p != NULL && num_players < PLAYER_NUM) {
+        plist[num_players++] = p;
+        p = p->next_actor;
+      }
+
+      if (num_players > 0) {
+        player_turn = player_turn % num_players;
+        ACTOR* target_p = plist[player_turn];
+        player_turn = (player_turn + 1) % num_players;
+
+        int bx, bz;
+        if (mFI_Wpos2BlockNum(&bx, &bz, target_p->world.position)) {
+          if (bx >= 1 && bx <= FG_BLOCK_X_NUM && bz >= 1 && bz <= FG_BLOCK_Z_NUM) {
+            u32 block_kind = mFI_BkNum2BlockKind(bx, bz);
+            if (block_kind != 0) {
+              set_manager->player_pos.next_bx = bx;
+              set_manager->player_pos.next_bz = bz;
+              set_manager->next_move_proc = aSetMgr_MOVE_move_set;
+              set_manager->set_ovl_type = aSetMgr_OVERLAY_BEGIN;
+              wading = TRUE;
+            }
+          }
+        }
+      }
+    }
+  }
+#endif
 
   return wading;
 }

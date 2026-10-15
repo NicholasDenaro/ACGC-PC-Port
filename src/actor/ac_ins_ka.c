@@ -120,7 +120,12 @@ static void aIKA_avoid(ACTOR* actorx, GAME* game) {
 static void aIKA_fly(ACTOR* actorx, GAME* game) {
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
     GAME_PLAY* play = (GAME_PLAY*)game;
+#ifdef TARGET_PC
+    PLAYER_ACTOR* player = Actor_find_nearest_player(play, actorx);
+    if (player == NULL) player = GET_PLAYER_ACTOR(play);
+#else
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR(play);
+#endif
 
     aIKA_BGcheck(insect);
 
@@ -209,7 +214,12 @@ static void aIKA_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     actorx->shape_info.rotation.x = 0;
     aIKA_SPEED(insect) = actorx->position_speed.y;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, actorx);
+    if (player == NULL) player = GET_PLAYER_ACTOR(play);
+#else
     player = GET_PLAYER_ACTOR(play);
+#endif
     if (player != NULL) {
         s16 rnd_angle = player->actor_class.shape_info.rotation.y + aIKA_RANDOM_ANGLE();
 

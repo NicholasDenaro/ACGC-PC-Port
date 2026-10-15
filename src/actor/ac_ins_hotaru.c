@@ -380,7 +380,12 @@ static void aIHT_avoid_init_sub(aINS_INSECT_ACTOR* insect, GAME* game) {
     insect->tools_actor.actor_class.shape_info.rotation.x = 0;
 
     if (insect->insect_flags.bit_1 == FALSE) {
+#ifdef TARGET_PC
+        PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)insect);
+        ACTOR* playerx = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#else
         ACTOR* playerx = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#endif
 
         if (playerx != NULL) {
             insect->tools_actor.actor_class.world.angle.y = playerx->shape_info.rotation.y + (s16)RANDOM_CENTER_F(DEG2SHORT_ANGLE2(120.0f));

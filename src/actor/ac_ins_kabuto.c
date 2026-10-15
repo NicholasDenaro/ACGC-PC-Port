@@ -216,7 +216,12 @@ static void aIKB_avoid(ACTOR* actorx, GAME* game) {
 static void aIKB_wait(ACTOR* actorx, GAME* game) {
     static s16 angle_table[] = { DEG2SHORT_ANGLE2(175.78125f), DEG2SHORT_ANGLE2(-175.78125f) };
     aINS_INSECT_ACTOR* insect = (aINS_INSECT_ACTOR*)actorx;
+#ifdef TARGET_PC
+    PLAYER_ACTOR* player = Actor_find_nearest_player((GAME_PLAY*)game, actorx);
+    if (player == NULL) player = GET_PLAYER_ACTOR_GAME(game);
+#else
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
+#endif
 
     actorx->player_angle_y = search_position_angleY(&actorx->world.position, &player->actor_class.world.position);
     if (aIKB_check_patience(insect) == TRUE) {
@@ -255,7 +260,12 @@ static void aIKB_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     insect->tools_actor.actor_class.speed = 4.0f;
     insect->tools_actor.actor_class.shape_info.rotation.x = 0;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)insect);
+    if (player == NULL) player = GET_PLAYER_ACTOR_GAME(game);
+#else
     player = GET_PLAYER_ACTOR_GAME(game);
+#endif
     if (player != NULL) {
         s16 angle = player->actor_class.shape_info.rotation.y + aIKB_RANDOM_ANGLE();
 

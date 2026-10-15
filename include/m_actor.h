@@ -1186,6 +1186,7 @@ extern int Actor_draw_actor_no_culling_check2(ACTOR* actor, xyz_t* camera_pos, f
 extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player_data);
 extern void Actor_info_dt(Actor_info* actor_info, GAME_PLAY* play);
 extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info);
+extern struct player_actor_s* Actor_find_nearest_player(GAME_PLAY* play, ACTOR* actor);
 extern void Actor_info_draw_actor(GAME_PLAY* play, Actor_info* actor_info);
 extern void Actor_free_overlay_area(ACTOR_DLFTBL* dlftbl);
 extern void Actor_get_overlay_area(ACTOR_DLFTBL* dlftbl, int unused, size_t alloc_size);

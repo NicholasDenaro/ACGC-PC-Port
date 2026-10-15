@@ -233,7 +233,14 @@ static void Player_actor_sound_coin_gasagoso(ACTOR* actor) {
 }
 
 static void Player_actor_sound_araiiki(ACTOR* actor) {
-    s8 gender = Common_Get(now_private)->gender;
+    s8 gender;
+#ifdef TARGET_PC
+    extern Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor);
+    Private_c* priv = server_player_get_private_by_actor((PLAYER_ACTOR*)actor);
+    gender = (priv != NULL) ? priv->gender : Common_Get(now_private)->gender;
+#else
+    gender = Common_Get(now_private)->gender;
+#endif
 
     Player_actor_set_sound_common2(actor, (gender == 0) ? (u16)NA_SE_ARAIIKI_BOY : (u16)NA_SE_ARAIIKI_GIRL);
 }

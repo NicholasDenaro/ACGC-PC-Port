@@ -117,6 +117,18 @@ static void Player_actor_Pull_net_demo_ct(ACTOR* actor) {
             player->item_net_has_catch = TRUE;
         }
         if (idx == aINS_INSECT_TYPE_SPIRIT) {
+#ifdef TARGET_PC
+            extern Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor);
+            Private_c* pull_priv = server_player_get_private_by_actor(player);
+            int item_idx = (pull_priv != NULL) ?
+                mPr_GetPossessionItemIdxKindWithCond(pull_priv, ITM_SPIRIT0, ITM_SPIRIT4, FALSE) : -1;
+
+            if (item_idx == -1) {
+                msg_no = 0x2F03;
+            } else {
+                msg_no = pull_priv->inventory.pockets[item_idx] + 0x1DC;
+            }
+#else
             int item_idx = mPr_GetPossessionItemIdxKindWithCond(Save_GetPointer(private_data[Common_Get(player_no)]),
                                                                 ITM_SPIRIT0, ITM_SPIRIT4, FALSE);
 
@@ -125,6 +137,7 @@ static void Player_actor_Pull_net_demo_ct(ACTOR* actor) {
             } else {
                 msg_no = Common_Get(now_private)->inventory.pockets[item_idx] + 0x1DC;
             }
+#endif
         } else if (main_index == mPlayer_INDEX_PULL_NET) {
             u8 str[mIN_ITEM_NAME_LEN];
             mActor_name_t item;

@@ -33,13 +33,37 @@ static void aGYO_cull_check(ACTOR* actorx, GAME_PLAY* play) {
     Skin_Matrix_PrjMulVector(&play->projection_matrix, &actorx->world.position, &actorx->camera_position, &actorx->camera_w);
     if (!Actor_draw_actor_no_culling_check(actorx)) {
         f32 dist;
+#ifdef TARGET_PC
+        PLAYER_ACTOR* near_p = Actor_find_nearest_player(play, actorx);
+        ACTOR* playerx = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_ACTOR(play);
+#else
         ACTOR* playerx = GET_PLAYER_ACTOR_ACTOR(play);
+#endif
 
         actorx->state_bitfield &= ~ACTOR_STATE_NO_CULL;
         dist = search_position_distance(&actorx->world.position, &playerx->world.position);
+#ifdef TARGET_PC
+        int in_player_acre = FALSE;
+        ACTOR* p = play->actor_info.list[ACTOR_PART_PLAYER].actor;
+        while (p != NULL) {
+            int p_bx, p_bz;
+            if (mFI_Wpos2BlockNum(&p_bx, &p_bz, p->world.position)) {
+                if (actorx->block_x == p_bx && actorx->block_z == p_bz) {
+                    in_player_acre = TRUE;
+                    break;
+                }
+            }
+            p = p->next_actor;
+        }
+
+        if (dist > 600.0f && !in_player_acre) {
+            aGYO_destruct(actorx, (GAME*)play);
+        }
+#else
         if (dist > 600.0f && (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z)) {
             aGYO_destruct(actorx, (GAME*)play);
         }
+#endif
     } else {
         actorx->state_bitfield |= ACTOR_STATE_NO_CULL;
     }

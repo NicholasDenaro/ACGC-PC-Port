@@ -12,6 +12,7 @@
 #include "m_land.h"
 #include "m_private.h"
 #include "m_event.h"
+#include "m_field_info.h"
 #include "m_scene_table.h"
 #include <stdio.h>
 #include <string.h>
@@ -244,13 +245,53 @@ int server_spawn_dummy_player(GAME_PLAY* play, const char* name, xyz_t pos) {
     if (pos.x == 0.0f && pos.z == 0.0f) {
         PLAYER_ACTOR* p1 = get_player_actor_withoutCheck(play);
         if (p1 != NULL && (fabsf(p1->actor_class.world.position.x) > 1.0f || fabsf(p1->actor_class.world.position.z) > 1.0f)) {
-            pos.x = p1->actor_class.world.position.x + 80.0f;
+            pos.x = p1->actor_class.world.position.x;
             pos.y = p1->actor_class.world.position.y;
-            pos.z = p1->actor_class.world.position.z + 80.0f;
+            pos.z = p1->actor_class.world.position.z - 80.0f;
         } else {
             pos.x = 800.0f;
             pos.y = 0.0f;
             pos.z = 800.0f;
+        }
+    }
+
+    /* Snap ground Y */
+    f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(pos, 0.0f);
+    if (ground_y > -1000.0f && ground_y < 10000.0f) {
+        pos.y = ground_y;
+    }
+
+    /* If dummy actor already exists in the scene, teleport it */
+    if (client->player_actor != NULL) {
+        int exists = 0;
+        for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
+            if (a == (ACTOR*)client->player_actor) {
+                exists = 1;
+                break;
+            }
+        }
+        if (exists) {
+            PLAYER_ACTOR* pa = client->player_actor;
+            pa->actor_class.world.position = pos;
+            pa->actor_class.last_world_position = pos;
+            pa->actor_class.eye.position = pos;
+            pa->actor_class.position_speed = (xyz_t){0.0f, 0.0f, 0.0f};
+            pa->actor_class.speed = 0.0f;
+            pa->actor_class.shape_info.rotation.y = 0;
+            pa->actor_class.world.angle.y = 0;
+            int bx = 0, bz = 0;
+            mFI_Wpos2BlockNum(&bx, &bz, pos);
+            pa->actor_class.block_x = (s8)bx;
+            pa->actor_class.block_z = (s8)bz;
+
+            client->predicted_pos = pos;
+            client->predicted_angle = (s_xyz){0, 0, 0};
+
+            printf("[SERVER] Teleported existing Dummy Player (Slot %d) to (%.1f, %.1f, %.1f).\n",
+                   slot, pos.x, pos.y, pos.z);
+            return slot;
+        } else {
+            client->player_actor = NULL;
         }
     }
 
@@ -390,4 +431,80 @@ void server_player_tick(GAME_PLAY* play) {
         }
     }
 }
+
+Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor) {
+    if (actor == NULL) {
+        return Common_Get(now_private);
+    }
+    if (actor->player_no > 0 && actor->player_no < MAX_SERVER_CLIENTS) {
+        if (g_server_clients[actor->player_no].is_connected) {
+            return &g_server_clients[actor->player_no].private_data;
+        }
+    }
+    return Common_Get(now_private);
+}
+
+Private_c* server_player_get_private_by_slot(int slot) {
+    if (slot > 0 && slot < MAX_SERVER_CLIENTS) {
+        if (g_server_clients[slot].is_connected) {
+            return &g_server_clients[slot].private_data;
+        }
+    }
+    return Common_Get(now_private);
+}
+
+int server_is_dummy_player_alive(void) {
+    if (!g_server_clients[1].is_connected) {
+        return 0;
+    }
+    return (g_server_clients[1].player_actor != NULL);
+}
+
+int server_spawn_dummy_player_north(void) {
+    extern struct game_s* gamePT;
+    GAME_PLAY* play = (GAME_PLAY*)gamePT;
+    if (play == NULL) {
+        return -1;
+    }
+
+    if (mEv_CheckTitleDemo() != mEv_TITLEDEMO_NONE) {
+        return -1;
+    }
+
+    switch (play->scene_id) {
+        case SCENE_TITLE_DEMO:
+        case SCENE_START_DEMO:
+        case SCENE_START_DEMO2:
+        case SCENE_START_DEMO3:
+        case SCENE_PLAYERSELECT:
+        case SCENE_PLAYERSELECT_2:
+        case SCENE_PLAYERSELECT_3:
+        case SCENE_PLAYERSELECT_SAVE:
+            return -1;
+        default:
+            break;
+    }
+
+    PLAYER_ACTOR* p1 = get_player_actor_withoutCheck(play);
+    if (p1 == NULL) {
+        return -1;
+    }
+
+    xyz_t pos = p1->actor_class.world.position;
+    pos.z -= 80.0f; /* 80 units North (-Z) */
+
+    f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(pos, 0.0f);
+    if (ground_y > -1000.0f && ground_y < 10000.0f) {
+        pos.y = ground_y;
+    }
+
+#ifndef TARGET_SERVER
+    extern int g_pc_spawn_dummy_player;
+    g_pc_spawn_dummy_player = 1;
+#endif
+
+    return server_spawn_dummy_player(play, "Dummy", pos);
+}
+
+
 

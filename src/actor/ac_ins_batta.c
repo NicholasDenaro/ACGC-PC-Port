@@ -463,7 +463,14 @@ static void aIBT_avoid_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     
     s16 angle;
     PLAYER_ACTOR* player;
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, (ACTOR*)insect);
+    if (player == NULL) {
+        player = get_player_actor_withoutCheck(play);
+    }
+#else
     player = get_player_actor_withoutCheck(play);
+#endif
     insect->tools_actor.actor_class.gravity = 0.2f;
     insect->timer = 0;
     if (player != NULL) {
@@ -482,7 +489,14 @@ static void aIBT_let_escape_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     s16 chkAngle;
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, (ACTOR*)insect);
+    if (player == NULL) {
+        player = get_player_actor_withoutCheck(play);
+    }
+#else
     player = get_player_actor_withoutCheck(play);
+#endif
     insect->life_time = 0;
     insect->alpha_time = 80;
     insect->tools_actor.actor_class.gravity = 0.2f;

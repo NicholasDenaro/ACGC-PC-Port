@@ -190,8 +190,15 @@ static void Player_actor_request_proc_index_fromDash_common(ACTOR* actor, GAME* 
         Player_actor_request_main_run_all(game, -5.0f, 0, mPlayer_REQUEST_PRIORITY_1);
     }
 
+#ifdef TARGET_PC
+    extern Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor);
+    Private_c* dash_priv = server_player_get_private_by_actor(player);
+    if (mEv_IsNotTitleDemo() &&
+        (dash_priv != NULL && dash_priv->destiny.type == 3 && Player_actor_Check_FlatPlace(actor))) {
+#else
     if (mEv_IsNotTitleDemo() &&
         (Common_Get(now_private)->destiny.type == 3 && Player_actor_Check_FlatPlace(actor))) {
+#endif
         if (player->actor_class.speed / 7.5f >= 0.75f && !((int)(RANDOM_F(32768) * 2.0f) % 600)) {
             Player_actor_request_main_tumble(game, mPlayer_REQUEST_PRIORITY_6);
         }

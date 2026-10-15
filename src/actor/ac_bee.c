@@ -82,7 +82,12 @@ static void aBEE_anime_proc(BEE_ACTOR* bee) {
 }
 
 static void aBEE_fly_move_common(BEE_ACTOR* bee, GAME* game) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, (ACTOR*)bee);
+    ACTOR* player = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#else
     ACTOR* player = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#endif
     f32 speed;
     f32 angle = fabsf(90.0f - bee->start_frame) * 7.5f;
     int speed_angle;
@@ -143,7 +148,12 @@ static void aBEE_calc_fly_angle(ACTOR* actorx) {
 
 static void aBEE_appear(ACTOR* actorx, GAME* game) {
     BEE_ACTOR* bee = (BEE_ACTOR*)actorx;
+#ifdef TARGET_PC
+    PLAYER_ACTOR* near_p = Actor_find_nearest_player((GAME_PLAY*)game, actorx);
+    ACTOR* player = (near_p != NULL) ? (ACTOR*)near_p : GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#else
     ACTOR* player = GET_PLAYER_ACTOR_GAME_ACTOR(game);
+#endif
     f32 dt = (f32)game->graph->dt_num_60fps_frames;
 
     if (player != NULL) {

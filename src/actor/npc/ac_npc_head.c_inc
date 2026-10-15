@@ -31,7 +31,11 @@ static ACTOR* aNPC_check_look_player(NPC_ACTOR* nactorx, GAME_PLAY* play) {
 
         angleY = nactorx->actor_class.player_angle_y - actor_angleY;
         if (ABS(angleY) < DEG2SHORT_ANGLE2(67.5f)) {
+#ifdef TARGET_PC
+            playerx = (ACTOR*)Actor_find_nearest_player(play, (ACTOR*)nactorx);
+#else
             playerx = GET_PLAYER_ACTOR_ACTOR(play);
+#endif
         }
     }
 

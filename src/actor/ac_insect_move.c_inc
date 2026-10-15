@@ -273,12 +273,34 @@ static void aINS_cull_check(ACTOR* actorx, GAME* game) {
                 actorx->state_bitfield &= ~ACTOR_STATE_NO_CULL;
             }
 
+#ifdef TARGET_PC
+            PLAYER_ACTOR* near_p = Actor_find_nearest_player(play, actorx);
+            f32 dist = (near_p != NULL) ? search_position_distance(&actorx->world.position, &((ACTOR*)near_p)->world.position) : actorx->player_distance_xz;
+            int in_player_acre = FALSE;
+            ACTOR* p = play->actor_info.list[ACTOR_PART_PLAYER].actor;
+            while (p != NULL) {
+                int p_bx, p_bz;
+                if (mFI_Wpos2BlockNum(&p_bx, &p_bz, p->world.position)) {
+                    if (actorx->block_x == p_bx && actorx->block_z == p_bz) {
+                        in_player_acre = TRUE;
+                        break;
+                    }
+                }
+                p = p->next_actor;
+            }
+
+            /* Despawn if players are more than 15 units away and not in any player acre and has not caught it */
+            if (dist > 600.0f && !in_player_acre && (ACTOR*)mPlib_Get_item_net_catch_label() != actorx) {
+                aINS_destruct(actorx, game);
+            }
+#else
             /* Despawn if player is more than 15 units away and in another acre and has not caught it */
             if (actorx->player_distance_xz > 600.0f &&
                 (actorx->block_x != play->block_table.block_x || actorx->block_z != play->block_table.block_z) &&
                 (ACTOR*)mPlib_Get_item_net_catch_label() != actorx) {
                 aINS_destruct(actorx, game);
             }
+#endif
         }
     } else {
         /* Don't cull if the actor is still visible on the camera */
@@ -379,7 +401,15 @@ static void aINS_actor_move(ACTOR* actorx, GAME* game) {
                     (*insect->move_proc)(actorx);
                 }
 
+#ifdef TARGET_PC
+                PLAYER_ACTOR* near_player = Actor_find_nearest_player(play, actorx);
+                if (near_player == NULL) {
+                    near_player = player;
+                }
+                aINS_set_player_info(actorx, near_player);
+#else
                 aINS_set_player_info(actorx, player);
+#endif
                 aINS_BGcheck(actorx);
                 aINS_calc_patience(actorx, game);
                 aINS_calc_life_time(insect, game);

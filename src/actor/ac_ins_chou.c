@@ -545,7 +545,14 @@ static void aICH_let_escape_init(aINS_INSECT_ACTOR* insect, GAME* game) {
     
     insect->tools_actor.actor_class.home.position.y = insect->tools_actor.actor_class.world.position.y;
     insect->tools_actor.actor_class.speed = 1.5f;
+#ifdef TARGET_PC
+    player = Actor_find_nearest_player(play, (ACTOR*)insect);
+    if (player == NULL) {
+        player = get_player_actor_withoutCheck(play);
+    }
+#else
     player = get_player_actor_withoutCheck(play);
+#endif
     
     if (player != NULL) {
         s16 angle = player->actor_class.shape_info.rotation.y + (s16)(21845.0f * (fqrand() - 0.5f));

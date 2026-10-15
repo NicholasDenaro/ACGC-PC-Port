@@ -441,6 +441,34 @@ extern void Actor_info_dt(Actor_info* actor_info, GAME_PLAY* play) {
     actor_dlftbls_cleanup();
 }
 
+extern PLAYER_ACTOR* Actor_find_nearest_player(GAME_PLAY* play, ACTOR* actor) {
+    if (play == NULL) {
+        return NULL;
+    }
+
+    ACTOR* p = play->actor_info.list[ACTOR_PART_PLAYER].actor;
+    ACTOR* nearest = NULL;
+    f32 min_dist_sq = FLT_MAX;
+
+    while (p != NULL) {
+        /* Do not match a player actor against itself */
+        if (p != actor) {
+            f32 dx = actor->world.position.x - p->world.position.x;
+            f32 dy = actor->world.position.y - p->world.position.y;
+            f32 dz = actor->world.position.z - p->world.position.z;
+            f32 dist_sq = dx * dx + dy * dy + dz * dz;
+
+            if (dist_sq < min_dist_sq) {
+                min_dist_sq = dist_sq;
+                nearest = p;
+            }
+        }
+        p = p->next_actor;
+    }
+
+    return (PLAYER_ACTOR*)nearest;
+}
+
 extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
     // GAME* game = (GAME*)play;
     PLAYER_ACTOR* player_actor = get_player_actor_withoutCheck(play);
@@ -491,6 +519,27 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
                 } else {
                     play->game.doing_point_specific = 160;
                     xyz_t_move(&actor->last_world_position, &actor->world.position);
+#ifdef TARGET_PC
+                    PLAYER_ACTOR* target_player = Actor_find_nearest_player(play, actor);
+                    if (target_player == NULL) {
+                        target_player = (actor->part == ACTOR_PART_PLAYER) ? (PLAYER_ACTOR*)actor : player_actor;
+                    }
+
+                    if (target_player != NULL) {
+                        actor->player_distance_xz =
+                            search_position_distanceXZ(&actor->world.position, &target_player->actor_class.world.position);
+                        actor->player_distance_y = target_player->actor_class.world.position.y - actor->world.position.y;
+                        actor->player_distance = actor->player_distance_xz * actor->player_distance_xz +
+                                                 actor->player_distance_y * actor->player_distance_y;
+                        actor->player_angle_y =
+                            search_position_angleY(&actor->world.position, &target_player->actor_class.world.position);
+                    } else {
+                        actor->player_distance_xz = FLT_MAX;
+                        actor->player_distance_y = FLT_MAX;
+                        actor->player_distance = FLT_MAX;
+                        actor->player_angle_y = 0;
+                    }
+#else
                     actor->player_distance_xz =
                         search_position_distanceXZ(&actor->world.position, &player_actor->actor_class.world.position);
                     actor->player_distance_y = player_actor->actor_class.world.position.y - actor->world.position.y;
@@ -498,6 +547,7 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
                                              actor->player_distance_y * actor->player_distance_y;
                     actor->player_angle_y =
                         search_position_angleY(&actor->world.position, &player_actor->actor_class.world.position);
+#endif
                     actor->state_bitfield &= ~ACTOR_STATE_24;
 
                     if ((actor->state_bitfield & (ACTOR_STATE_NO_MOVE_WHILE_CULLED | ACTOR_STATE_NO_CULL)) ||
