@@ -126,8 +126,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: In `Actor_info_call_actor()`, replace the single `player_actor` distance calculation with `Actor_find_nearest_player()`. Actors must measure `player_distance_xz` and `player_angle_y` against the closest player residing in the same zone.
   - **Acceptance Criteria (Testable via Distance Check)**: When two players are in the world, insects, fish, and villagers react dynamically to whichever player is physically closer to them.
 
-- [ ] **Task 4.4: Multi-Player Actor-to-Actor Hitbox Collision**
-  - **State**: `Not Implemented`
+- [x] **Task 4.4: Multi-Player Actor-to-Actor Hitbox Collision**
+  - **State**: `Implemented`
   - **Files**: `src/game/m_collision_obj.c`, `src/game/m_player.c`
   - **Description**: Enable collision checks between multiple `PLAYER_ACTOR` instances so players cannot clip through each other.
   - **Acceptance Criteria (Testable in Game/Simulation)**: Player 1 running into the dummy player bumps into their physical collision cylinder and is stopped from walking through them.
