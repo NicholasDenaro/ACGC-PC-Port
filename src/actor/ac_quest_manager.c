@@ -14,6 +14,7 @@
 #include "libultra/libultra.h"
 #include "m_malloc.h"
 #include "zurumode.h"
+#include "m_demo.h"
 
 enum {
     aQMgr_MODE_NORMAL,
@@ -486,6 +487,12 @@ static int aQMgr_actor_talk_request(ACTOR* client) {
     int res = FALSE;
 
     if (client != NULL && l_quest_manager_mode == aQMgr_MODE_NORMAL) {
+#ifdef TARGET_PC
+        if (mDemo_IsActorBusy(client) && mDemo_GetActorTalkingPlayer(client) != Common_Get(player_no)) {
+            printf("[NPC TALK] Excuse me, I'm talking with someone right now!\n");
+            return FALSE;
+        }
+#endif
         if (mDemo_Check(mDemo_TYPE_TALK, client) == FALSE) {
             mDemo_Request(mDemo_TYPE_TALK, client, &aQMgr_set_talk_info);
         }

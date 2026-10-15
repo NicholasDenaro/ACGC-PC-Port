@@ -517,6 +517,10 @@ static void aNPC_setup_talk_start(NPC_ACTOR* nactorx, GAME* game) {
     nactorx->condition_info.greeting_flag = FALSE;
     nactorx->condition_info.talk_condition = aNPC_TALK_TYPE_START;
     nactorx->condition_info.talk_demo_flg_save = nactorx->condition_info.demo_flg;
+#ifdef TARGET_PC
+    nactorx->is_busy = TRUE;
+    nactorx->talking_player_id = Common_Get(player_no);
+#endif
 }
 
 static void aNPC_setup_talk_end(NPC_ACTOR* nactorx) {
@@ -533,6 +537,10 @@ static void aNPC_setup_talk_end(NPC_ACTOR* nactorx) {
     nactorx->condition_info.demo_flg = nactorx->condition_info.talk_demo_flg_save;
 #ifdef aNPC_NPC2
     nactorx->talk_info.melody_inst = 0;
+#endif
+#ifdef TARGET_PC
+    nactorx->is_busy = FALSE;
+    nactorx->talking_player_id = 0;
 #endif
 }
 
@@ -643,6 +651,12 @@ static void aNPC_talk_request_normal_npc(ACTOR* actorx, GAME* game) {
 
 static void aNPC_talk_request_check(ACTOR* actorx, GAME* game) {
     NPC_ACTOR* nactorx = (NPC_ACTOR*)actorx;
+
+#ifdef TARGET_PC
+    if (nactorx->is_busy && nactorx->talking_player_id != Common_Get(player_no)) {
+        return;
+    }
+#endif
 
     if ((nactorx->condition_info.demo_flg & aNPC_COND_DEMO_SKIP_TALK_CHECK) == 0 &&
         nactorx->condition_info.talk_condition == aNPC_TALK_TYPE_NONE && !nactorx->condition_info.hide_flg) {

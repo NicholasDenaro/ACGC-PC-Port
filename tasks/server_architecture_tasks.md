@@ -86,21 +86,21 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: In `Game_play_move_fbdemo_not_move()`, decouple `Actor_info_call_actor` and `CollisionCheck_OC` from `play->submenu.process_status == mSM_PROCESS_WAIT`. Allow actor logic to continue updating while a player has their inventory, letter, or design submenus open.
   - **Acceptance Criteria (Testable in Client)**: Launch `./pc/build32/bin/AnimalCrossing.exe` and open pockets/inventory next to a river or walking villager. River water, tree sway, wind, and nearby villagers must continue animating and walking in real-time while the menu is open, instead of freezing.
 
-- [ ] **Task 3.2: Convert Global Dialogue Pausing to Per-Entity State**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_demo.c`, `src/actor/npc/ac_npc.c`, `include/m_demo.h`
+- [x] **Task 3.2: Convert Global Dialogue Pausing to Per-Entity State**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_demo.c`, `src/actor/npc/ac_npc.c`, `include/m_demo.h`, `include/ac_npc.h`, `src/actor/npc/ac_npc_talk.c_inc`
   - **Description**: Deprecate global `CAMERA2_PROCESS_LOCK` and scene-wide pause during `mDemo_Request(mDemo_TYPE_TALK, ...)`. Replace with an entity-specific `is_busy` flag and `talking_player_id` assigned to the interacting NPC.
   - **Acceptance Criteria (Testable in Client)**: Initiate dialogue with a villager or inspect a signboard. Background environmental effects, river animations, and other non-engaged villagers in the acre must continue moving normally rather than locking the entire scene.
 
-- [ ] **Task 3.3: Intercept Multi-Player Dialogue Contention**
-  - **State**: `Not Implemented`
-  - **Files**: `src/actor/npc/ac_npc_talk.c`, `src/game/m_demo.c`
+- [x] **Task 3.3: Intercept Multi-Player Dialogue Contention**
+  - **State**: `Implemented`
+  - **Files**: `src/actor/npc/ac_npc_talk.c_inc`, `src/game/m_demo.c`, `src/actor/ac_quest_manager.c`
   - **Description**: If Player $B$ attempts to talk to an NPC already engaged in dialogue with Player $A$, return an immediate polite rejection message ("Excuse me, I'm talking with someone right now!") without hijacking Player $B$'s camera or movement.
   - **Acceptance Criteria (Testable via State Check)**: Attempting to trigger dialogue on an already-busy NPC returns a non-blocking busy response and never locks the interacting entity's controls or camera.
 
-- [ ] **Task 3.4: Eliminate Acre Transition Lock**
-  - **State**: `Not Implemented`
-  - **Files**: `src/actor/ac_set_manager.c`, `src/game/m_camera2.c`
+- [x] **Task 3.4: Eliminate Acre Transition Lock**
+  - **State**: `Implemented`
+  - **Files**: `src/actor/ac_set_manager.c`, `src/game/m_camera2.c`, `src/actor/ac_birth_control.c`, `src/game/m_actor.c`, `pc/src/server/server_main.c`
   - **Description**: Remove the camera pause and actor deallocation trigger when crossing acre coordinate seams (`x % 16 == 0`, `z % 16 == 0`).
   - **Acceptance Criteria (Testable in Client)**: Walking across acre boundaries in the client proceeds seamlessly without screen pauses or camera freeze stutters.
 

@@ -160,6 +160,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    pc_settings_load();
     pc_disc_init();
     if (!pc_assets_init()) {
         fprintf(stderr, "[SERVER ERROR] No game data found.\n");

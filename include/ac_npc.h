@@ -983,6 +983,8 @@ struct npc_actor_s {
 #ifdef TARGET_PC
     f32 uzai_step_accum;
     f32 fatigue_accum;
+    u8 is_busy;
+    u32 talking_player_id;
 #endif
     aNPC_hand_c left_hand;
     aNPC_hand_c right_hand;

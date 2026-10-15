@@ -33,13 +33,16 @@ static int aSetMgr_get_player_block(int* bx, int* bz, GAME_PLAY* play) {
  * @return TRUE/FALSE successfully updated next acre
  **/
 static int aSetMgr_renewal_player_next_pos(int* next_bx, int* next_bz) {
-  int wade_end_pos_res;
-  int wpos_2_blocknum_res;
+  int wade_end_pos_res = FALSE;
+  int wpos_2_blocknum_res = FALSE;
   xyz_t endpos = { 0.0f, 0.0f, 0.0f };
   GAME_PLAY* play = (GAME_PLAY*)gamePT;
+  PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
 
-  wade_end_pos_res = get_player_actor_withoutCheck(play)->Get_WadeEndPos_proc((GAME*)play, &endpos); // maybe make this a macro like GET_PLAYER_ACTOR() ?
-  wpos_2_blocknum_res = mFI_Wpos2BlockNum(next_bx, next_bz, endpos);
+  if (player != NULL && player->Get_WadeEndPos_proc != NULL) {
+    wade_end_pos_res = player->Get_WadeEndPos_proc((GAME*)play, &endpos);
+    wpos_2_blocknum_res = mFI_Wpos2BlockNum(next_bx, next_bz, endpos);
+  }
   return wpos_2_blocknum_res | wade_end_pos_res;
 }
 
@@ -132,6 +135,12 @@ static int aSetMgr_move_check_set(GAME_PLAY* play, SET_MANAGER* set_manager) {
   /* update the next acre position if player is starting acre transition state */
   if (aSetMgr_check_player_wade_start() == TRUE) {
     aSetMgr_renewal_player_next_pos(&set_manager->player_pos.next_bx, &set_manager->player_pos.next_bz);
+    if (g_mPlib_wade_disabled) {
+      if (set_manager->player_pos.next_bx <= 0 || set_manager->player_pos.next_bz <= 0) {
+        set_manager->player_pos.next_bx = set_manager->player_pos.now_bx;
+        set_manager->player_pos.next_bz = set_manager->player_pos.now_bz;
+      }
+    }
     set_manager->next_move_proc = aSetMgr_MOVE_move_check_wait;
     wading = TRUE;
   }

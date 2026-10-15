@@ -207,8 +207,26 @@ extern int mDemo_Check_ListenAble();
 extern int mDemo_Check_DiffAngle_forTalk(s16 diff_angle);
 extern void mDemo_KeepCamera(int camera_type);
 
+#ifdef TARGET_PC
+#define mDemo_CAN_ACTOR_TALK(actor) (!mDemo_Check(mDemo_TYPE_SPEAK, (actor)) && !mDemo_Check(mDemo_TYPE_TALK, (actor)) && !mDemo_IsActorBusy(actor))
+#else
 #define mDemo_CAN_ACTOR_TALK(actor) (!mDemo_Check(mDemo_TYPE_SPEAK, (actor)) && !mDemo_Check(mDemo_TYPE_TALK, (actor)))
+#endif
 #define mDemo_IS_ACTOR_TALKING(actor) (mDemo_Check(mDemo_TYPE_SPEAK, (actor)) == TRUE || mDemo_Check(mDemo_TYPE_TALK, (actor)) == TRUE)
+
+#ifdef TARGET_PC
+typedef struct {
+    u32 interacting_player_id;
+    u16 current_msg_id;
+    u8 branch_choice;
+    f32 timeout_timer;
+} ActorTalkSession;
+
+extern int mDemo_IsActorBusy(ACTOR* actor);
+extern void mDemo_SetActorBusy(ACTOR* actor, u32 player_id);
+extern void mDemo_ClearActorBusy(ACTOR* actor);
+extern u32 mDemo_GetActorTalkingPlayer(ACTOR* actor);
+#endif
 
 #ifdef __cplusplus
 }

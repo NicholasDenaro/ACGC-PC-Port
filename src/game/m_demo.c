@@ -7,6 +7,53 @@
 #include "m_bgm.h"
 #include "m_event.h"
 #include "_mem.h"
+#ifdef TARGET_PC
+#include "ac_npc.h"
+
+int mDemo_IsActorBusy(ACTOR* actor) {
+    if (actor == NULL) {
+        return FALSE;
+    }
+    if (actor->part == ACTOR_PART_NPC) {
+        return ((NPC_ACTOR*)actor)->is_busy;
+    }
+    return (actor->state_bitfield & ACTOR_STATE_IN_DEMO) != 0;
+}
+
+void mDemo_SetActorBusy(ACTOR* actor, u32 player_id) {
+    if (actor == NULL) {
+        return;
+    }
+    actor->state_bitfield |= ACTOR_STATE_IN_DEMO;
+    if (actor->part == ACTOR_PART_NPC) {
+        NPC_ACTOR* npc = (NPC_ACTOR*)actor;
+        npc->is_busy = TRUE;
+        npc->talking_player_id = player_id;
+    }
+}
+
+void mDemo_ClearActorBusy(ACTOR* actor) {
+    if (actor == NULL) {
+        return;
+    }
+    actor->state_bitfield &= ~ACTOR_STATE_IN_DEMO;
+    if (actor->part == ACTOR_PART_NPC) {
+        NPC_ACTOR* npc = (NPC_ACTOR*)actor;
+        npc->is_busy = FALSE;
+        npc->talking_player_id = 0;
+    }
+}
+
+u32 mDemo_GetActorTalkingPlayer(ACTOR* actor) {
+    if (actor == NULL) {
+        return 0;
+    }
+    if (actor->part == ACTOR_PART_NPC) {
+        return ((NPC_ACTOR*)actor)->talking_player_id;
+    }
+    return 0;
+}
+#endif
 
 /* Z-X */
 static f32 direct_vector[mDemo_DIRECT_NUM][2] = { { -1.0f, 0.0f },      { -F_SQRT2, F_SQRT2 }, { 0.0f, 1.0f },
@@ -437,7 +484,11 @@ static int wait_talk_start() {
             int msg_no = demo->data.talk.msg_no; // pulled out here, probably for debug or something?
 
             player->actor_class.state_bitfield |= ACTOR_STATE_IN_DEMO;
+#ifdef TARGET_PC
+            mDemo_SetActorBusy(demo->current.actor, Common_Get(player_no));
+#else
             demo->current.actor->state_bitfield |= ACTOR_STATE_IN_DEMO;
+#endif
             demo->data.talk.actor_saved_weight = demo->current.actor->status_data.weight;
             demo->current.actor->status_data.weight = 255;
             mMsg_request_main_appear(msg_win, demo->current.actor, demo->data.talk.display_name,
@@ -931,7 +982,11 @@ static void main_proc() {
         player->actor_class.state_bitfield &= ~ACTOR_STATE_IN_DEMO;
 
         if (demo->current.actor != NULL) {
+#ifdef TARGET_PC
+            mDemo_ClearActorBusy(demo->current.actor);
+#else
             demo->current.actor->state_bitfield &= ~ACTOR_STATE_IN_DEMO;
+#endif
         }
 
         demo->camera_type = CAMERA2_PROCESS_NORMAL;
@@ -975,6 +1030,14 @@ extern void mDemo_stock_clear() {
 extern int mDemo_Request(int type, ACTOR* actor, mDemo_REQUEST_PROC req_proc) {
     f32 weight = 1.0f;
     int request_num = demo->request_num;
+
+#ifdef TARGET_PC
+    if (actor != NULL && mDemo_IsActorBusy(actor)) {
+        if (mDemo_GetActorTalkingPlayer(actor) != Common_Get(player_no)) {
+            return FALSE;
+        }
+    }
+#endif
 
     if (request_num < mDemo_REQUEST_NUM) {
         if (type >= demo->priority_type) {
@@ -1029,6 +1092,9 @@ extern int mDemo_Check_and_Go(int type, ACTOR* actor) {
 
 extern int mDemo_End(ACTOR* actor) {
     if (actor == demo->current.actor) {
+#ifdef TARGET_PC
+        mDemo_ClearActorBusy(actor);
+#endif
         demo->state = mDemo_STATE_STOP;
         return TRUE;
     }
