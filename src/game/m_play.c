@@ -686,6 +686,12 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
     game->doing_point = 9;
     game->doing_point = 0;
     game->doing_point_specific = 0x90;
+#ifdef TARGET_PC
+    {
+        extern void server_player_tick(GAME_PLAY* play);
+        server_player_tick(play);
+    }
+#endif
     Actor_info_call_actor(play, &play->actor_info);
     game->doing_point = 0;
     game->doing_point_specific = 0x91;

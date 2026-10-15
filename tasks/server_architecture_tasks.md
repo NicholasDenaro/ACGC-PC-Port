@@ -108,9 +108,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
 
 ### Phase 4: Multi-Player Entity Decoupling
 
-- [ ] **Task 4.1: Player Entity Registry & Connection Table**
-  - **State**: `Not Implemented`
-  - **Files**: `include/server/server_player.h`, `pc/src/server/server_player.c`
+- [x] **Task 4.1: Player Entity Registry & Connection Table**
+  - **State**: `Implemented`
+  - **Files**: `include/server/server_player.h`, `pc/include/server/server_player.h`, `pc/src/server/server_player.c`, `pc/src/server/server_main.c`, `pc/src/pc_main.c`, `src/game/m_play.c`, `src/game/m_player.c`, `src/game/m_player_main_wait.c_inc`, `include/m_player.h`
   - **Description**: Create the `ConnectedClient` registry (supporting up to 8 concurrent players). Each entry holds client ID, `PLAYER_ACTOR` instance, connection state, zone ID, and `Private_c` player data.
   - **Acceptance Criteria (Testable via Simulated Player)**: Server supports adding a simulated/dummy player (`--spawn-dummy-player` or test harness). The server logs confirm both Player 1 and Player 2 are allocated, tracked, and simulated concurrently in memory.
 

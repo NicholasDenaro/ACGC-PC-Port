@@ -97,6 +97,7 @@ static void print_usage(const char* prog) {
     printf("  --seed <u32>        RNG seed for new town map generation\n");
     printf("  --town-name <name>  Custom town name for new town\n");
     printf("  --save-dir <path>   Directory containing save files (default: 'save')\n");
+    printf("  --spawn-dummy-player Spawn a simulated player into the world for testing\n");
     printf("  -v, --verbose       Enable verbose diagnostic output\n");
     printf("  -h, --help          Show this help message\n");
 }
@@ -123,6 +124,8 @@ int main(int argc, char** argv) {
             g_server_config.town_name = argv[++i];
         } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
             g_server_config.save_dir = argv[++i];
+        } else if (strcmp(argv[i], "--spawn-dummy-player") == 0) {
+            g_server_config.spawn_dummy_player = true;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             g_server_config.verbose = true;
             g_pc_verbose = 1;

@@ -20,6 +20,7 @@ typedef struct {
     const char* save_dir;
     const char* town_name;
     bool verbose;
+    bool spawn_dummy_player;
 } ServerConfig;
 
 typedef struct {

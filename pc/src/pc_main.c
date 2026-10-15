@@ -35,6 +35,7 @@ int           g_pc_weather_intensity_override = mEnv_WEATHER_INTENSITY_HEAVY;
 int           g_pc_window_w = PC_SCREEN_WIDTH;
 int           g_pc_window_h = PC_SCREEN_HEIGHT;
 int           g_pc_widescreen_stretch = 0;
+int           g_pc_spawn_dummy_player = 0;
 
 /* exe image range -- used by seg2k0 to distinguish pointers from segment addresses */
 unsigned int pc_image_base = 0;
@@ -328,6 +329,9 @@ int main(int argc, char* argv[]) {
                     i++;
                 }
             }
+        } else if (strcmp(argv[i], "--spawn-dummy-player") == 0) {
+            g_pc_spawn_dummy_player = 1;
+            g_pc_verbose = 1; /* enable console output to view dummy player logs */
         }
     }
 

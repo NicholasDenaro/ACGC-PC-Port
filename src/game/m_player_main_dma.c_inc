@@ -34,6 +34,19 @@ static void Player_actor_request_proc_index_fromDma(ACTOR* actorx, GAME* game) {
 
             actor->keyframe1 = *keyf;
 
+#ifdef TARGET_PC
+            if (actor->is_dummy || actor->player_no > 0) {
+                actor->requested_main_index = mPlayer_INDEX_WAIT;
+                actor->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_43;
+                actor->requested_main_index_changed = TRUE;
+                actor->requested_main_index_data.wait.morph_speed = -5.0f;
+                actor->requested_main_index_data.wait.flags = 0;
+                actor->requested_main_index_data.wait._04 = 0.0f;
+                Player_actor_change_proc_index(actorx, game);
+                return;
+            }
+#endif
+
             if ((type & 7) == 1) {
                 mPlib_request_main_outdoor_type1(game, 1, 0);
             } else if ((type & 7) == 2) {

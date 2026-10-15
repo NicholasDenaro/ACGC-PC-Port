@@ -18,6 +18,7 @@ void server_config_init_defaults(ServerConfig* config) {
     config->save_dir = "save";
     config->town_name = NULL;
     config->verbose = false;
+    config->spawn_dummy_player = false;
 }
 
 void server_runner_init(void) {

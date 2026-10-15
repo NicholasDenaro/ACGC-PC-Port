@@ -564,6 +564,20 @@ static void Actor_info_part_new(Actor_info* actor_info, ACTOR* actor, u8 part) {
     actor_info->total_num++;
     actor_info->list[part].num_actors++;
 
+#ifdef TARGET_PC
+    /* For ACTOR_PART_PLAYER, preserve Player 1 (the local/host player) as the list head */
+    if (part == ACTOR_PART_PLAYER && actor_info->list[part].actor != NULL) {
+        ACTOR* tail = actor_info->list[part].actor;
+        while (tail->next_actor != NULL) {
+            tail = tail->next_actor;
+        }
+        tail->next_actor = actor;
+        actor->prev_actor = tail;
+        actor->next_actor = NULL;
+        return;
+    }
+#endif
+
     next = actor_info->list[part].actor;
     if (next != NULL) {
         next->prev_actor = actor;

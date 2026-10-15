@@ -111,5 +111,14 @@ static void Player_actor_main_Wait(ACTOR* actor, GAME* game) {
     Player_actor_ObjCheck_Wait(actor, game);
     Player_actor_BGcheck_Wait(actor);
     Player_actor_Item_main(actor, game);
+#ifdef TARGET_PC
+    {
+        PLAYER_ACTOR* player = (PLAYER_ACTOR*)actor;
+        if (!player->is_dummy) {
+            Player_actor_request_proc_index_fromWait(actor, game);
+        }
+    }
+#else
     Player_actor_request_proc_index_fromWait(actor, game);
+#endif
 }

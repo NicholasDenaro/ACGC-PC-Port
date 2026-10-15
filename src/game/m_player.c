@@ -653,11 +653,29 @@ extern void Player_actor_ct(ACTOR* actorx, GAME* game) {
     mPlib_change_player_face(game);                   //
     Player_actor_ct_other_func1(actorx, game);        //
     Player_actor_set_eye_PositionAndAngle(actorx);    //
+#ifdef TARGET_PC
+    if (play->actor_info.list[ACTOR_PART_PLAYER].actor == NULL ||
+        play->actor_info.list[ACTOR_PART_PLAYER].actor == actorx) {
+        Camera2_request_main_normal(play, 1, 1);
+    }
+#else
     Camera2_request_main_normal(play, 1, 1);
+#endif
     Shape_Info_init(actorx, 0.0f, &mAc_ActorShadowCircle, 18.0f, 18.0f);
     actorx->shape_info.ofs_y = 200.0f;
     mPlib_Clear_change_data_from_submenu();       //
+#ifdef TARGET_PC
+    PLAYER_ACTOR* p_actor = (PLAYER_ACTOR*)actorx;
+    if (p_actor->player_no > 0 || p_actor->is_dummy) {
+        p_actor->requested_main_index = mPlayer_INDEX_DMA;
+        p_actor->requested_main_index_priority = 41;
+        p_actor->requested_main_index_changed = TRUE;
+    } else {
+        Player_actor_request_main_dma(game, 41);      //
+    }
+#else
     Player_actor_request_main_dma(game, 41);      //
+#endif
     Player_actor_change_proc_index(actorx, game); //
 }
 
@@ -665,7 +683,14 @@ extern void Player_actor_dt(ACTOR* actorx, GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
 
     Player_actor_dt_forCorect(actorx, game); //
+#ifdef TARGET_PC
+    GAME_PLAY* play = (GAME_PLAY*)game;
+    if (play->actor_info.list[ACTOR_PART_PLAYER].actor == actorx && actorx->next_actor == NULL) {
+        Common_Set(player_actor_exists, FALSE);
+    }
+#else
     Common_Set(player_actor_exists, FALSE);
+#endif
     mPlib_cancel_player_warp_forEvent();              //
     Player_actor_Reset_bee_chase(actorx);             //
     Player_actor_Check_player_sunburn_for_dt(actorx); //
@@ -1734,7 +1759,9 @@ extern void Player_actor_move(ACTOR* actorx, GAME* game) {
     Player_actor_move_other_func2(actorx, game); //
 
 #ifdef PC_ENHANCEMENTS
-    Player_actor_check_and_switch_tool(game);
+    if (!player->is_dummy && player->player_no == 0) {
+        Player_actor_check_and_switch_tool(game);
+    }
 #endif
 }
 

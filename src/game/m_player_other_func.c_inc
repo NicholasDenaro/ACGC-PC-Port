@@ -2,6 +2,14 @@
 static void Player_actor_ct_other_func1(ACTOR* actor, GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    PLAYER_ACTOR* p_actor = (PLAYER_ACTOR*)actor;
+    if (p_actor->player_no > 0 || p_actor->is_dummy) {
+        actor->unknown_b4 = 1;
+        return;
+    }
+#endif
+
     play->submenu.start_refuse = TRUE;
     actor->unknown_b4 = 1;
 

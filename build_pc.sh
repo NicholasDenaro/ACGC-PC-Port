@@ -26,14 +26,12 @@ BIN_DIR="$BUILD_DIR/bin"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-if [ ! -f Makefile ]; then
-    echo "=== Configuring CMake ==="
-    cmake .. -G "MinGW Makefiles"
-fi
+echo "=== Configuring CMake ==="
+cmake ..
 
 # --- Build ---
 echo "=== Building PC port ==="
-mingw32-make -j$(nproc)
+cmake --build . -j$(nproc)
 
 # --- Create runtime directories ---
 mkdir -p "$BIN_DIR/rom"

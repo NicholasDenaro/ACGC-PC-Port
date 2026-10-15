@@ -2308,6 +2308,9 @@ struct player_actor_s {
     /* 0x13A4 */ s8 update_scene_bg_mode;
 #ifdef TARGET_PC
     f32 sunburn_time_accum;
+    int player_no;
+    uint32_t client_id;
+    int is_dummy;
 #endif
 };
 
