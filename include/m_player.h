@@ -2320,6 +2320,7 @@ extern void Player_actor_move(ACTOR*, GAME*);
 extern void Player_actor_draw(ACTOR*, GAME*);
 #ifdef TARGET_PC
 extern void Player_actor_force_wait(ACTOR*, GAME*);
+extern void Player_actor_force_outdoor(ACTOR*, GAME*);
 #endif
 
 #ifdef __cplusplus

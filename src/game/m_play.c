@@ -782,7 +782,9 @@ extern void play_init(GAME* game) {
                 d_data = Common_GetPointer(structure_exit_door_data);
             }
 
-            if (d_data->next_scene_id != 0) {
+            int has_door = (d_data->next_scene_id != 0);
+
+            if (has_door) {
                 xyz_t exit_pos;
                 exit_pos.x = (f32)d_data->exit_position.x;
                 exit_pos.y = (f32)d_data->exit_position.y;
@@ -801,16 +803,6 @@ extern void play_init(GAME* game) {
                         (STRUCTURE_ACTOR*)Actor_info_fgName_search(&play->actor_info, door_name, ACTOR_PART_ITEM);
                 }
 
-                /* Step closer to the doorstep mat from the default out data */
-                f32 pull_closer = 20.0f;
-                exit_pos.x -= sin_s(exit_angle) * pull_closer;
-                exit_pos.z -= cos_s(exit_angle) * pull_closer;
-
-                /* For post office, door trigger is at (-40, +50); place player at (-44, +53) right on the mat */
-                if (door_name == POST_OFFICE && str_actor != NULL) {
-                    exit_pos.x = str_actor->actor_class.world.position.x - 44.0f;
-                    exit_pos.z = str_actor->actor_class.world.position.z + 53.0f;
-                }
                 exit_pos.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(exit_pos, 0.0f);
 
                 player_actor->actor_class.world.position = exit_pos;
@@ -854,12 +846,17 @@ extern void play_init(GAME* game) {
                 }
 
                 Common_Set(door_data.next_scene_id, 0);
+                Common_Set(structure_exit_door_data.next_scene_id, 0);
             }
 
             /* Reload player face and body skin texture & palette into object exchange bank */
             mPlib_change_player_face((GAME*)play);
 
-            Player_actor_force_wait((ACTOR*)player_actor, (GAME*)play);
+            if (has_door) {
+                Player_actor_force_outdoor((ACTOR*)player_actor, (GAME*)play);
+            } else {
+                Player_actor_force_wait((ACTOR*)player_actor, (GAME*)play);
+            }
             Camera2_request_main_normal(play, 1, 1);
         }
 

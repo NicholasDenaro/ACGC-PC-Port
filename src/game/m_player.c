@@ -1371,6 +1371,23 @@ extern void Player_actor_force_wait(ACTOR* actorx, GAME* game) {
     Player_actor_change_proc_index(actorx, game);
     player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_NONE;
 }
+
+extern void Player_actor_force_outdoor(ACTOR* actorx, GAME* game) {
+    PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
+    if (player == NULL) {
+        return;
+    }
+
+    player->actor_class.state_bitfield &= ~ACTOR_STATE_IN_DEMO;
+    player->requested_main_index = mPlayer_INDEX_OUTDOOR;
+    player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_43;
+    player->requested_main_index_changed = TRUE;
+    player->requested_main_index_data.outdoor.type = 0;
+    player->requested_main_index_data.outdoor.is_start_demo = 0;
+    Player_actor_change_proc_index(actorx, game);
+    player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_NONE;
+    player->main_data.outdoor.is_demo = TRUE;
+}
 #endif
 
 typedef void (*mPlayer_MAIN_PROC)(ACTOR*, GAME*);
