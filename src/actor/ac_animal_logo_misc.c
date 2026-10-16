@@ -12,6 +12,10 @@
 #include "m_scene_table.h"
 #include "libultra/libultra.h"
 #include "m_cpak.h"
+#include "m_card.h"
+#include "m_house.h"
+#include "m_quest.h"
+#include "m_bgm.h"
 
 extern void flash_rom_and_player_info_clear() {
     Save* save = Common_GetPointer(save);
@@ -102,7 +106,78 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
     mTD_rtc_reserve();
     mTM_clear_renew_is();
     mNpc_ClearAnimalInfo(mNpc_GetInAnimalP());
+#ifdef TARGET_PC
+    {
+        int player_exists = (mPr_NullCheckPlayerName(Save_Get(private_data[0]).player_ID.player_name) == FALSE) &&
+                            (Save_Get(private_data[0]).exists == TRUE);
+        if (g_pc_quick_start && player_exists && decide_next_scene_no() == SCENE_PLAYERSELECT_2) {
+            s32 result;
+            int arrange_idx;
+            static s16 homeX[] = { 2128, 2352, 2128, 2352 };
+            static s16 homeZ[] = { 1488, 1488, 1768, 1768 };
+            static u8 drt[] = { mSc_DIRECT_SOUTH_EAST, mSc_DIRECT_SOUTH_WEST, mSc_DIRECT_SOUTH_EAST, mSc_DIRECT_SOUTH_WEST };
+            Door_data_c door_data;
+            int has_map;
+
+            g_pc_quick_start = 0;
+            mCD_InitGameStart_bg(0, -1, mCD_START_COND_1, &result);
+
+            if (lbRTC_IsOverTime(&Save_Get(save_check).time, Common_GetPointer(time.rtc_time)) == lbRTC_LESS) {
+                Save_Set(cheated_flag, TRUE);
+                Save_Set(npc_force_go_home, TRUE);
+            }
+
+            arrange_idx = mHS_get_arrange_idx(0);
+            bzero(&door_data, sizeof(Door_data_c));
+            door_data.next_scene_id = SCENE_FG;
+            door_data.exit_orientation = drt[arrange_idx];
+            door_data.exit_type = 1;
+            door_data.extra_data = 1;
+            door_data.exit_position.x = homeX[arrange_idx];
+            door_data.exit_position.y = 0;
+            door_data.exit_position.z = homeZ[arrange_idx];
+            door_data.door_actor_name = HOUSE0 + arrange_idx;
+            door_data.wipe_type = WIPE_TYPE_TRIFORCE;
+
+            Common_Set(door_data, door_data);
+            Common_Get(door_data).next_scene_id = SCENE_FG + 1;
+            play->next_scene_no = SCENE_FG;
+
+            if (Now_Private != NULL) {
+                Now_Private->birthday_present_npc = EMPTY_NO;
+            }
+
+            has_map = TRUE;
+            if (mEv_CheckFirstJob() == TRUE) {
+                mQst_errand_c* fj_p = mQst_GetFirstJobData();
+                if (fj_p != NULL) {
+                    switch (fj_p->base.quest_kind) {
+                        case mQst_ERRAND_FIRSTJOB_CHANGE_CLOTH:
+                        case mQst_ERRAND_FIRSTJOB_PLANT_FLOWER:
+                        case mQst_ERRAND_FIRSTJOB_DELIVER_FTR:
+                        case mQst_ERRAND_FIRSTJOB_INTRODUCTIONS:
+                        case mQst_ERRAND_FIRSTJOB_START:
+                            has_map = FALSE;
+                            break;
+                    }
+                }
+            }
+            Common_Set(map_flag, has_map);
+            Common_Set(submenu_disabled, FALSE);
+            Common_Get(transition).wipe_type = WIPE_TYPE_TRIFORCE;
+            mBGMPsComp_make_ps_wipe(0x11C2);
+        } else {
+            g_pc_quick_start = 0;
+            play->next_scene_no = decide_next_scene_no();
+            Common_Set(door_data.next_scene_id, 0);
+            Common_Set(submenu_disabled, TRUE);
+        }
+    }
+#else
     play->next_scene_no = decide_next_scene_no();
+    Common_Set(door_data.next_scene_id, 0);
+    Common_Set(submenu_disabled, TRUE);
+#endif
 
     {
         int rtc_enabled = Common_Get(time.rtc_enabled);
@@ -113,6 +188,4 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
 
     mEv_ClearEventInfo();
     Common_Set(scene_from_title_demo, -1);
-    Common_Set(door_data.next_scene_id, 0);
-    Common_Set(submenu_disabled, TRUE);
 }

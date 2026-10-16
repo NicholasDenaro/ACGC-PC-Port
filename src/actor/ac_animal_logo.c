@@ -27,6 +27,7 @@
 #include "pc_menu_util.h"
 #include "main.h"
 #include <stdio.h>
+int g_pc_quick_start = 0;
 #endif
 
 #define G_CC_TITLE PRIMITIVE, ENVIRONMENT, TEXEL0, ENVIRONMENT, PRIMITIVE, 0, TEXEL0, 0
@@ -388,7 +389,7 @@ static void aAL_pc_game_start_wait(ANIMAL_LOGO_ACTOR* actor, GAME* game) {
     return;
   }
 
-  /* Main menu navigation (3 items: Start / Options / Quit) */
+  /* Main menu navigation (4 items: Start / Quick Start / Options / Quit) */
   if (actor->pc_cursor_cooldown <= 0.0f) {
     if (stick_y > 30 || (on_btn & BUTTON_DUP)) {
       if (actor->pc_menu_sel > 0) {
@@ -396,7 +397,7 @@ static void aAL_pc_game_start_wait(ANIMAL_LOGO_ACTOR* actor, GAME* game) {
         actor->pc_cursor_cooldown = 10.0f;
       }
     } else if (stick_y < -30 || (on_btn & BUTTON_DDOWN)) {
-      if (actor->pc_menu_sel < 2) {
+      if (actor->pc_menu_sel < 3) {
         actor->pc_menu_sel++;
         actor->pc_cursor_cooldown = 10.0f;
       }
@@ -410,15 +411,24 @@ static void aAL_pc_game_start_wait(ANIMAL_LOGO_ACTOR* actor, GAME* game) {
         if (mLd_CheckStartFlag() == TRUE &&
             aAL_wipe_end_check(game) == TRUE &&
             mTD_tdemo_button_ok_check()) {
+          g_pc_quick_start = 0;
           aAL_setupAction(actor, game, aAL_ACTION_FADE_OUT_START);
         }
         break;
-      case 1: /* Options */
+      case 1: /* Quick Start */
+        if (mLd_CheckStartFlag() == TRUE &&
+            aAL_wipe_end_check(game) == TRUE &&
+            mTD_tdemo_button_ok_check()) {
+          g_pc_quick_start = 1;
+          aAL_setupAction(actor, game, aAL_ACTION_FADE_OUT_START);
+        }
+        break;
+      case 2: /* Options */
         actor->pc_options_open = 1;
         actor->pc_cursor_cooldown = 10.0f;
         pc_settings_menu_enter();
         break;
-      case 2: /* Quit Game */
+      case 3: /* Quit Game */
         g_pc_running = 0;
         actor->pc_cursor_cooldown = 10.0f;
         break;
@@ -795,16 +805,16 @@ static void aAL_pc_menu_draw(ANIMAL_LOGO_ACTOR* actor, GAME* game) {
   static const u32 dim_g[5] = {  40,  50,  40,  50,  50 };
   static const u32 dim_b[5] = {  40,  30,  60,  70,  60 };
 
-  static const char* const labels[3] = { "Start Game", "Options", "Quit Game" }; // me when const
+  static const char* const labels[4] = { "Start Game", "Quick Start", "Options", "Quit Game" }; // me when const
 
-  f32 y_base = 135.0f;
-  f32 line_h = 18.0f;
+  f32 y_base = 126.0f;
+  f32 line_h = 16.0f;
   int sel = actor->pc_menu_sel;
 
   /* Hide the title's main menu items while the Options overlay is open, else
    * Start/Options/Quit bleed through the dimmed backdrop. */
   if (!actor->pc_options_open) {
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
       int on = (sel == i);
       pc_menu_draw_centered(game, labels[i], y_base + i * line_h,
         on ? sel_r[td] : dim_r[td],

@@ -91,6 +91,9 @@ extern ACTOR_PROFILE Animal_Logo_Profile;
 extern void flash_rom_and_player_info_clear();
 extern int decide_next_scene_no();
 extern void title_action_data_init_start_select(GAME_PLAY* play);
+#ifdef TARGET_PC
+extern int g_pc_quick_start;
+#endif
 
 #ifdef __cplusplus
 }
