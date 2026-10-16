@@ -116,19 +116,7 @@ static void Player_actor_main_Outdoor(ACTOR* actor, GAME* game) {
     if (Player_actor_Request_Demo_Outdoor(actor)) {
         int calc = Player_actor_CulcAnimation_Outdoor(actor, &frame_calc);
         arg1 = Player_actor_Movement_Outdoor(actor, calc);
-#ifdef TARGET_PC
-        static int s_logged_outdoor = 0;
-        if (s_logged_outdoor < 5 || arg1 != 0) {
-            FILE* flog = fopen("server_player.log", "a");
-            if (flog) {
-                fprintf(flog, "[OUTDOOR ANIM] frame=%.2f calc=%d arg1=%d pos=(%.1f, %.1f, %.1f) rot=0x%04X\n",
-                        frame_calc, calc, arg1, actor->world.position.x, actor->world.position.y,
-                        actor->world.position.z, (u16)actor->shape_info.rotation.y);
-                fclose(flog);
-            }
-            if (arg1 != 0) s_logged_outdoor = 0; else s_logged_outdoor++;
-        }
-#endif
+
         Player_actor_Reinput_force_position_angle(actor, game);
         Player_actor_recover_lean_angle(actor);
         Player_actor_set_eye_pattern_normal(actor);

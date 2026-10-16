@@ -1039,6 +1039,7 @@ typedef struct {
     mDemo_Set_OrderValue(mDemo_ORDER_NPC1, 2, (present))
 
 extern ACTOR_PROFILE Npc_Profile;
+extern void aNPC_reinit_cloth_data_area(struct object_exchange_s* exc);
 
 #ifdef __cplusplus
 }

@@ -41,8 +41,29 @@ int           g_pc_spawn_dummy_player = 0;
 unsigned int pc_image_base = 0;
 unsigned int pc_image_end  = 0;
 
+#ifdef _WIN32
+static LONG WINAPI pc_crash_filter(EXCEPTION_POINTERS* ep) {
+    FILE* flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[FATAL CRASH] ExceptionCode=0x%08X Address=%p\n",
+                (unsigned int)ep->ExceptionRecord->ExceptionCode,
+                ep->ExceptionRecord->ExceptionAddress);
+        if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION &&
+            ep->ExceptionRecord->NumberParameters >= 2) {
+            fprintf(flog, "  Access Violation: %s address %p\n",
+                    ep->ExceptionRecord->ExceptionInformation[0] == 1 ? "writing to" : "reading from",
+                    (void*)ep->ExceptionRecord->ExceptionInformation[1]);
+        }
+        fflush(flog);
+        fclose(flog);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+#endif
+
 void pc_platform_init(void) {
 #ifdef _WIN32
+    SetUnhandledExceptionFilter(pc_crash_filter);
     SetProcessDPIAware();
     SDL_SetHint(SDL_HINT_WINDOWS_INTRESOURCE_ICON, "1");
 #endif

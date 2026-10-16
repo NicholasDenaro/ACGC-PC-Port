@@ -757,6 +757,7 @@ extern void play_init(GAME* game) {
         play->current_scene_data = outdoor->scene_data;
         server_set_active_zone_context(play, outdoor);
         server_zone_add_player(outdoor, 0);
+        aNPC_reinit_cloth_data_area(&play->object_exchange);
 
         flog = fopen("server_player.log", "a");
         if (flog) {
@@ -766,6 +767,8 @@ extern void play_init(GAME* game) {
 
         PLAYER_ACTOR* player_actor = get_player_actor_withoutCheck(play);
         if (player_actor != NULL) {
+            Common_Set(player_actor_exists, TRUE);
+            mPlib_Clear_change_data_from_submenu();
             static const s16 angle_table[mSc_DIRECT_NUM] = {
                 DEG2SHORT_ANGLE(0.0f),    /* 0x0000 - SOUTH */
                 DEG2SHORT_ANGLE(45.0f),   /* 0x2000 - SOUTH_EAST */

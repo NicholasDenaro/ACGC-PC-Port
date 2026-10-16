@@ -1,5 +1,6 @@
 static void aNPC_dma_cloth_data(ACTOR* actorx) {
     NPC_CONTROL_ACTOR* ctrl = (NPC_CONTROL_ACTOR*)actorx;
+    if (ctrl == NULL) return;
     aNPC_cloth_c* cloth = ctrl->cloth;
     int i;
 
@@ -9,14 +10,16 @@ static void aNPC_dma_cloth_data(ACTOR* actorx) {
                 cloth->cloth_item = ITM_CLOTH000;
             }
 
-            mSc_background_dmacopy_controller(&cloth->texture_bank);
-            mSc_background_dmacopy_controller(&cloth->palette_bank);
-            if (cloth->texture_bank.state == 0 && cloth->palette_bank.state == 0) {
+            if (cloth->texture_bank.ram_start != NULL && cloth->palette_bank.ram_start != NULL) {
+                mSc_background_dmacopy_controller(&cloth->texture_bank);
+                mSc_background_dmacopy_controller(&cloth->palette_bank);
+                if (cloth->texture_bank.state == 0 && cloth->palette_bank.state == 0) {
 #ifdef TARGET_PC
-                /* Palette from ARAM is BE u16 (RGB5A3). Byte-swap to native LE. */
-                pc_bswap16_array(cloth->palette_bank.ram_start, aNPC_CLOTH_PAL_SIZE / (int)sizeof(u16));
+                    /* Palette from ARAM is BE u16 (RGB5A3). Byte-swap to native LE. */
+                    pc_bswap16_array(cloth->palette_bank.ram_start, aNPC_CLOTH_PAL_SIZE / (int)sizeof(u16));
 #endif
-                cloth->dma_flag = FALSE;
+                    cloth->dma_flag = FALSE;
+                }
             }
         }
 
@@ -48,6 +51,7 @@ static void aNPC_dma_cloth_pal_data_fg(aNPC_cloth_c* cloth) {
 
 static void aNPC_dma_cloth_data_fg(void) {
     NPC_CONTROL_ACTOR* ctrl = (NPC_CONTROL_ACTOR*)aNPC_ctrlActor;
+    if (ctrl == NULL) return;
     aNPC_cloth_c* cloth = ctrl->cloth;
     int i;
 
@@ -57,21 +61,23 @@ static void aNPC_dma_cloth_data_fg(void) {
                 cloth->cloth_item = ITM_CLOTH000;
             }
 
-            aNPC_dma_cloth_tex_data_fg(cloth);
-            aNPC_dma_cloth_pal_data_fg(cloth);
+            if (cloth->texture_bank.ram_start != NULL && cloth->palette_bank.ram_start != NULL) {
+                aNPC_dma_cloth_tex_data_fg(cloth);
+                aNPC_dma_cloth_pal_data_fg(cloth);
 #ifdef TARGET_PC
-            /* Palette from ARAM is BE u16 (RGB5A3). Byte-swap to native LE. */
-            {
-                u16* pal = (u16*)cloth->palette_bank.ram_start;
-                int pi;
-                for (pi = 0; pi < aNPC_CLOTH_PAL_SIZE / (int)sizeof(u16); pi++) {
-                    pal[pi] = __builtin_bswap16(pal[pi]);
+                /* Palette from ARAM is BE u16 (RGB5A3). Byte-swap to native LE. */
+                {
+                    u16* pal = (u16*)cloth->palette_bank.ram_start;
+                    int pi;
+                    for (pi = 0; pi < aNPC_CLOTH_PAL_SIZE / (int)sizeof(u16); pi++) {
+                        pal[pi] = __builtin_bswap16(pal[pi]);
+                    }
                 }
-            }
 #endif
-            cloth->dma_flag = FALSE;
-            cloth->texture_bank.state = 0;
-            cloth->palette_bank.state = 0;
+                cloth->dma_flag = FALSE;
+                cloth->texture_bank.state = 0;
+                cloth->palette_bank.state = 0;
+            }
         }
 
         cloth++;
@@ -258,6 +264,14 @@ static void aNPC_keep_cloth_data_area(Object_Exchange_c* exc) {
         cloth++;
     }
 }
+
+#ifndef aNPC_NPC2
+extern void aNPC_reinit_cloth_data_area(Object_Exchange_c* exc) {
+    if (aNPC_ctrlActor != NULL && exc != NULL) {
+        aNPC_keep_cloth_data_area(exc);
+    }
+}
+#endif
 
 static void aNPC_rebuild_cloth_data(void) {
     aNPC_reset_trans_condition_cloth_data();

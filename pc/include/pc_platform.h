@@ -93,6 +93,7 @@ void pc_platform_update_window_size(void);
  *   ON (0xAC5701) -> 1, OFF (0xAC5700) -> 2. emu64 reads these during DL processing. */
 #define PC_NOOP_WIDESCREEN_STRETCH     0xAC5701u
 #define PC_NOOP_WIDESCREEN_STRETCH_OFF 0xAC5700u
+#define PC_NOOP_WIDESCREEN_NORMAL      0xAC5702u
 extern int g_pc_widescreen_stretch;
 
 /* --- Functions --- */

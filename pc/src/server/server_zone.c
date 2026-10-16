@@ -10,6 +10,7 @@
 #include "m_common_data.h"
 #include "m_event.h"
 #include "dolphin/os.h"
+#include "m_player_lib.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -259,6 +260,9 @@ void server_set_active_zone_context(GAME_PLAY* play, ServerZone* zone) {
     Common_Get(clip) = zone->clip;
     Common_Set(field_type, zone->field_type);
     Save_Set(scene_no, zone->scene_id);
+    if (get_player_actor_withoutCheck(play) != NULL) {
+        Common_Set(player_actor_exists, TRUE);
+    }
 }
 
 void server_restore_zone_context(GAME_PLAY* play) {

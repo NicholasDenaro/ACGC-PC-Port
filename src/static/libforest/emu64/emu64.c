@@ -4412,6 +4412,10 @@ void emu64::dl_G_NOOP() {
                 g_pc_widescreen_stretch = 2; /* pillarbox mode for UI */
                 break;
             }
+            if (this->gfx.words.w1 == PC_NOOP_WIDESCREEN_NORMAL) {
+                g_pc_widescreen_stretch = 0; /* hor+ mode */
+                break;
+            }
 #endif
             if (this->gfx.words.w1 == 0) {
                 EMU64_LOG("gsDPNoOp(),");

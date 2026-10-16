@@ -1410,8 +1410,22 @@ void GXSetScissor(u32 left, u32 top, u32 wd, u32 ht) {
     {
         float sx = (float)g_pc_window_w / (float)PC_GC_WIDTH;
         float sy = (float)g_pc_window_h / (float)PC_GC_HEIGHT;
-        gl_x = (int)(left * sx);
-        gl_w = (int)(wd * sx);
+        float adj_left = (float)left;
+        float adj_wd = (float)wd;
+
+        /* UI mode: remap sub-scissors to match aspect-corrected content */
+        if (g_pc_widescreen_stretch == 2 && g_aspect_active) {
+            int is_full = (left < 1 && top < 1 &&
+                           wd > (u32)(PC_GC_WIDTH - 1) &&
+                           ht > (u32)(PC_GC_HEIGHT - 1));
+            if (!is_full) {
+                adj_left = g_aspect_offset + (float)left * g_aspect_factor;
+                adj_wd = (float)wd * g_aspect_factor;
+            }
+        }
+
+        gl_x = (int)(adj_left * sx);
+        gl_w = (int)(adj_wd * sx);
         gl_h = (int)(ht * sy);
         gl_y = g_pc_window_h - (int)(top * sy) - gl_h;
     }

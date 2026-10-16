@@ -1,5 +1,9 @@
 #include "m_submenu_ovl.h"
 
+#ifdef TARGET_PC
+#include "pc_platform.h"
+#endif
+
 #include "m_font.h"
 #include "m_play.h"
 #include "m_trademark.h"
@@ -66,6 +70,31 @@ static void mSM_setup_view(Submenu* submenu, GRAPH* graph, int init_flag) {
 
     OPEN_POLY_OPA_DISP(graph);
 
+#ifdef TARGET_PC
+    /* PC: always ensure viewport and scissor are set, even on init_flag == TRUE */
+    {
+        View* view;
+
+        if (submenu->mode != mSM_MODE_OTHER) {
+            view = &((GAME_PLAY*)gamePT)->view;
+        } else {
+            view = &((GAME_TRADEMARK*)gamePT)->view;
+        }
+
+        gDPPipeSync(POLY_OPA_DISP++);
+        gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, view->screen.l, view->screen.top, view->screen.r,
+                      view->screen.bottom);
+        /* Copy viewport into GRAPH_ALLOC buffer to avoid seg2k0 collision.
+           GAME_PLAY is heap-allocated and its address can land in the N64
+           segment range 0x03-0x0F, causing emu64 to misidentify the pointer. */
+        {
+            Vp* vp_copy = (Vp*)GRAPH_ALLOC_TYPE(graph, Vp, 1);
+            *vp_copy = view->viewport;
+            gSPViewport(POLY_OPA_DISP++, vp_copy);
+        }
+        gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, 640, 480);
+    }
+#else
     if (init_flag == FALSE) {
         View* view;
 
@@ -78,20 +107,10 @@ static void mSM_setup_view(Submenu* submenu, GRAPH* graph, int init_flag) {
         gDPPipeSync(POLY_OPA_DISP++);
         gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, view->screen.l, view->screen.top, view->screen.r,
                       view->screen.bottom);
-#ifdef TARGET_PC
-        /* Copy viewport into GRAPH_ALLOC buffer to avoid seg2k0 collision.
-           GAME_PLAY is heap-allocated and its address can land in the N64
-           segment range 0x03-0x0F, causing emu64 to misidentify the pointer. */
-        {
-            Vp* vp_copy = (Vp*)GRAPH_ALLOC_TYPE(graph, Vp, 1);
-            *vp_copy = view->viewport;
-            gSPViewport(POLY_OPA_DISP++, vp_copy);
-        }
-#else
         gSPViewport(POLY_OPA_DISP++, &view->viewport);
-#endif
         gDPSetScissor(POLY_OPA_DISP++, G_SC_NON_INTERLACE, 0, 0, 640, 480);
     }
+#endif
 
     gSPMatrix(POLY_OPA_DISP++, mtx, G_MTX_NOPUSH | G_MTX_LOAD | G_MTX_PROJECTION);
 
@@ -2394,8 +2413,18 @@ static void mSM_menu_ovl_move(Submenu* submenu) {
 }
 
 static void mSM_menu_ovl_draw(Submenu* submenu, GAME* game) {
+#ifdef TARGET_PC
+    OPEN_POLY_OPA_DISP(game->graph);
+    gDPNoOpTag(POLY_OPA_DISP++, PC_NOOP_WIDESCREEN_STRETCH_OFF);
+    CLOSE_POLY_OPA_DISP(game->graph);
+#endif
     mSM_setup_view(submenu, game->graph, TRUE);
     mSM_draw_with_move_interpolation(submenu, game);
+#ifdef TARGET_PC
+    OPEN_POLY_OPA_DISP(game->graph);
+    gDPNoOpTag(POLY_OPA_DISP++, PC_NOOP_WIDESCREEN_NORMAL);
+    CLOSE_POLY_OPA_DISP(game->graph);
+#endif
 }
 
 extern void mSM_menu_ovl_init(Submenu* submenu) {
