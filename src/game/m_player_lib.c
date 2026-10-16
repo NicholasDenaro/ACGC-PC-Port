@@ -2258,8 +2258,13 @@ extern int mPlib_request_main_door_type2(GAME* game, const xyz_t* pos_p, s16 ang
 }
 
 extern int mPlib_request_main_outdoor_type1(GAME* game, int is_start_demo, int door_type) {
+#ifdef TARGET_PC
+    return GET_PLAYER_ACTOR_GAME(game)->request_main_outdoor_all_proc(game, door_type, is_start_demo,
+                                                                      mPlayer_REQUEST_PRIORITY_43);
+#else
     return GET_PLAYER_ACTOR_GAME(game)->request_main_outdoor_all_proc(game, is_start_demo, door_type,
                                                                       mPlayer_REQUEST_PRIORITY_43);
+#endif
 }
 
 extern int mPlib_request_main_wash_car_type1(GAME* game, const xyz_t* car_pos_p, const xyz_t* ret_pos_p,

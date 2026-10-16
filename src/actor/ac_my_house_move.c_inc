@@ -108,7 +108,11 @@ static void aMHS_setup_animation(STRUCTURE_ACTOR* my_house, f32 speed) {
         }
     };
 
+#ifdef TARGET_PC
+    static f32 start_idx[mHm_HOMESIZE_NUM - 1] = { 1.0f, 1.0f, 1.0f, 1.0f };
+#else
     static f32 start_idx[mHm_HOMESIZE_NUM - 1] = { 1.0f, 25.0f, 1.0f, 1.0f };
+#endif
     static f32 end_idx[mHm_HOMESIZE_NUM - 1] = { 51.0f, 51.0f, 51.0f, 51.0f };
 
     int type = (int)my_house->arg2_f;

@@ -1382,7 +1382,7 @@ extern void Player_actor_force_outdoor(ACTOR* actorx, GAME* game) {
     player->requested_main_index = mPlayer_INDEX_OUTDOOR;
     player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_43;
     player->requested_main_index_changed = TRUE;
-    player->requested_main_index_data.outdoor.type = 0;
+    player->requested_main_index_data.outdoor.type = 1;
     player->requested_main_index_data.outdoor.is_start_demo = 0;
     Player_actor_change_proc_index(actorx, game);
     player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_NONE;

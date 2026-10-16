@@ -34,11 +34,22 @@ static void Player_actor_setup_main_Outdoor(ACTOR* actor, GAME* game) {
         anim_frame = 1.0f;
     }
 
+#ifdef TARGET_PC
+    cKF_SkeletonInfo_R_Animation_Set_base_shape_trs(&player->keyframe0, 0.0f, 1000.0f, 0.0f, 0, 0, 0);
+    cKF_SkeletonInfo_R_AnimationMove_ct_base(&actor->world.position, &actor->world.position,
+                                             actor->shape_info.rotation.y, actor->world.angle.y,
+                                             0.0f, &player->keyframe0, cKF_ANIMATION_TRANS_XZ);
+#endif
+
     Player_actor_InitAnimation_Base2(actor, game, anim_idx, anim_idx, anim_frame, anim_frame, 0.5f, 0.0f, 0, 0);
     Player_actor_setup_main_Base(actor, game);
 }
 
 static void Player_actor_settle_main_Outdoor(ACTOR* actor, GAME* game) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* player = (PLAYER_ACTOR*)actor;
+    cKF_SkeletonInfo_R_AnimationMove_dt(&player->keyframe0);
+#endif
     mDemo_End(actor);
 }
 
@@ -47,13 +58,25 @@ static int Player_actor_CulcAnimation_Outdoor(ACTOR* actor, f32* calc_frame) {
 }
 
 static int Player_actor_Movement_Outdoor(ACTOR* actor, int calc) {
+#ifdef TARGET_PC
+    PLAYER_ACTOR* player = (PLAYER_ACTOR*)actor;
+    cKF_SkeletonInfo_R_AnimationMove_base(&actor->world.position, NULL, &actor->scale,
+                                          actor->world.angle.y, &player->keyframe0);
+    actor->world.position.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(actor->world.position, 0.0f);
+    Player_actor_Set_force_shadow_position_fromWorldPosition(actor);
+#else
     Player_actor_Set_force_shadow_position_fromAnimePosition(actor);
+#endif
     Player_actor_Movement_Base_Stop(actor, FALSE);
     return calc;
 }
 
 static void Player_actor_ObjCheck_Outdoor(ACTOR* actor, GAME* game) {
+#ifdef TARGET_PC
+    Player_actor_Excute_Corect_forStand(actor, game);
+#else
     Player_actor_Excute_Corect_forOutdoor(actor, game);
+#endif
 }
 
 static void Player_actor_request_proc_index_fromOutdoor(GAME* game, int arg1) {
@@ -98,8 +121,9 @@ static void Player_actor_main_Outdoor(ACTOR* actor, GAME* game) {
         if (s_logged_outdoor < 5 || arg1 != 0) {
             FILE* flog = fopen("server_player.log", "a");
             if (flog) {
-                fprintf(flog, "[OUTDOOR ANIM] frame=%.2f calc=%d arg1=%d is_demo=%d\n",
-                        frame_calc, calc, arg1, ((PLAYER_ACTOR*)actor)->main_data.outdoor.is_demo);
+                fprintf(flog, "[OUTDOOR ANIM] frame=%.2f calc=%d arg1=%d pos=(%.1f, %.1f, %.1f) rot=0x%04X\n",
+                        frame_calc, calc, arg1, actor->world.position.x, actor->world.position.y,
+                        actor->world.position.z, (u16)actor->shape_info.rotation.y);
                 fclose(flog);
             }
             if (arg1 != 0) s_logged_outdoor = 0; else s_logged_outdoor++;

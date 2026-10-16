@@ -173,7 +173,11 @@ static void aHUS_setup_animation(HOUSE_ACTOR* house, f32 speed) {
         },
     };
 
+#ifdef TARGET_PC
+    static f32 start_idx[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+#else
     static f32 start_idx[] = { 1.0f, 25.0f, 1.0f, 1.0f };
+#endif
     static f32 end_idx[] = { 51.0f, 51.0f, 51.0f, 51.0f };
     int type;
     cKF_Animation_R_c* anim_p;

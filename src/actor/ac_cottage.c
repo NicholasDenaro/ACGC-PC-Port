@@ -824,8 +824,13 @@ static void Cottage_move_open_pl_out_init(STRUCTURE_ACTOR* cottage) {
 
     keyframe = &cottage->keyframe;
     cottage_data = Cottage_data_get(cottage);
+#ifdef TARGET_PC
+    cKF_SkeletonInfo_R_init(keyframe, keyframe->skeleton, cottage_data->out_anim, 1.0f, 51.0f, 1.0f, 0.5f, 0.0f,
+                            cKF_FRAMECONTROL_STOP, NULL);
+#else
     cKF_SkeletonInfo_R_init(keyframe, keyframe->skeleton, cottage_data->out_anim, 25.0f, 51.0f, 25.0f, 0.5f, 0.0f,
                             cKF_FRAMECONTROL_STOP, NULL);
+#endif
     cottage->action_proc = Cottage_move_open_out;
 }
 

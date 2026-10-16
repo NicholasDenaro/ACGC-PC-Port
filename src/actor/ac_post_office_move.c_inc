@@ -166,7 +166,11 @@ static void aPOFF_setup_animation(STRUCTURE_ACTOR* office, f32 speed) {
     };
     // clang-format on
 
+#ifdef TARGET_PC
+    static f32 start_idx[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+#else
     static f32 start_idx[] = { 1.0f, 25.0f, 1.0f, 1.0f };
+#endif
     static f32 end_idx[] = { 51.0f, 51.0f, 51.0f, 51.0f };
 
     int winter;
