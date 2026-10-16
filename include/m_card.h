@@ -322,6 +322,8 @@ extern int mCD_save_data_main_to_aram(void* src, u32 size, u32 idx);
 #ifdef TARGET_PC
 extern int pc_save_loaded;
 extern int pc_save_reload(void);
+extern int pc_can_save(void);
+extern int pc_save_on_exit(void);
 
 /* These structs are local to m_card.c in the original decomp, but the PC port
    needs them in pc_m_card.c and pc_save_bswap.c for foreigner/travel support. */

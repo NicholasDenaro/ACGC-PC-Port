@@ -27,6 +27,7 @@ enum {
     ITEM_SHOP_VISITOR,
     ITEM_BORDERLESS_ACRES,
     ITEM_NES_ASPECT,
+    ITEM_AUTOSAVE_ON_QUIT,
     ITEM_SPAWN_DUMMY,
     ITEM_MASTER_VOLUME,
     ITEM_STICK_DEADZONE,
@@ -57,6 +58,7 @@ static const Item tab_gameplay_items[] = {
     { "Shop upgrade",     ITEM_SHOP_VISITOR,     0 },
     { "Borderless acres", ITEM_BORDERLESS_ACRES, 0 },
     { "NES aspect",       ITEM_NES_ASPECT,       0 },
+    { "Auto-save on quit", ITEM_AUTOSAVE_ON_QUIT, 0 },
     { "Dummy player",     ITEM_SPAWN_DUMMY,      0 },
 };
 
@@ -258,6 +260,7 @@ static void recompute_dirty(void) {
         (s_pending.disable_shop_visitor_req != g_pc_settings.disable_shop_visitor_req) ||
         (s_pending.borderless_acres != g_pc_settings.borderless_acres) ||
         (s_pending.nes_aspect       != g_pc_settings.nes_aspect) ||
+        (s_pending.autosave_on_quit != g_pc_settings.autosave_on_quit) ||
         (s_pending.master_volume    != g_pc_settings.master_volume) ||
         (s_pending.stick_deadzone   != g_pc_settings.stick_deadzone) ||
         (s_pending.cstick_deadzone  != g_pc_settings.cstick_deadzone);
@@ -318,6 +321,9 @@ static void item_cycle(int id, int dir) {
             break;
         case ITEM_NES_ASPECT:
             s_pending.nes_aspect = !s_pending.nes_aspect;
+            break;
+        case ITEM_AUTOSAVE_ON_QUIT:
+            s_pending.autosave_on_quit = !s_pending.autosave_on_quit;
             break;
         case ITEM_SPAWN_DUMMY:
             server_spawn_dummy_player_north();
@@ -392,6 +398,9 @@ static void item_format(int id, char* buf, size_t n) {
         case ITEM_NES_ASPECT:
             snprintf(buf, n, "%s", s_pending.nes_aspect ? "< 4:3 >" : "< Stretch >");
             break;
+        case ITEM_AUTOSAVE_ON_QUIT:
+            snprintf(buf, n, "%s", s_pending.autosave_on_quit ? "< Enabled >" : "< Disabled >");
+            break;
         case ITEM_SPAWN_DUMMY:
             if (server_is_dummy_player_alive()) {
                 snprintf(buf, n, "[ Respawn North ]");
@@ -432,6 +441,7 @@ static int item_changed(int id) {
         case ITEM_SHOP_VISITOR: return s_pending.disable_shop_visitor_req != g_pc_settings.disable_shop_visitor_req;
         case ITEM_BORDERLESS_ACRES: return s_pending.borderless_acres != g_pc_settings.borderless_acres;
         case ITEM_NES_ASPECT:    return s_pending.nes_aspect    != g_pc_settings.nes_aspect;
+        case ITEM_AUTOSAVE_ON_QUIT: return s_pending.autosave_on_quit != g_pc_settings.autosave_on_quit;
         case ITEM_SPAWN_DUMMY:   return 0;
         case ITEM_MASTER_VOLUME: return s_pending.master_volume != g_pc_settings.master_volume;
         case ITEM_STICK_DEADZONE:  return s_pending.stick_deadzone  != g_pc_settings.stick_deadzone;

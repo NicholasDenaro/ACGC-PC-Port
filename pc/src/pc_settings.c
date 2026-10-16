@@ -20,6 +20,7 @@ PCSettings g_pc_settings = {
     .master_volume = 100,
     .stick_deadzone = 12,
     .cstick_deadzone = 12,
+    .autosave_on_quit = 1,
 };
 
 static const char* SETTINGS_FILE = "settings.ini";
@@ -61,6 +62,9 @@ static const char* DEFAULT_SETTINGS =
     "\n"
     "# NES emulator aspect ratio: 0 = stretch to fullscreen, 1 = 4:3 pillarbox\n"
     "nes_aspect = 1\n"
+    "\n"
+    "# Auto-save when closing window or quitting: 0 = off, 1 = on\n"
+    "autosave_on_quit = 1\n"
     "\n"
     "[Audio]\n"
     "# Master output volume as a percentage (0-100)\n"
@@ -114,6 +118,8 @@ static void apply_setting(const char* key, const char* value) {
         if (val == 0 || val == 1) g_pc_settings.borderless_acres = val;
     } else if (strcmp(key, "nes_aspect") == 0) {
         if (val == 0 || val == 1) g_pc_settings.nes_aspect = val;
+    } else if (strcmp(key, "autosave_on_quit") == 0) {
+        if (val == 0 || val == 1) g_pc_settings.autosave_on_quit = val;
     } else if (strcmp(key, "master_volume") == 0) {
         if (val >= 0 && val <= 100) g_pc_settings.master_volume = val;
     } else if (strcmp(key, "stick_deadzone") == 0) {
@@ -199,6 +205,9 @@ void pc_settings_save(void) {
     fprintf(f, "\n");
     fprintf(f, "# NES emulator aspect ratio: 0 = stretch to fullscreen, 1 = 4:3 pillarbox\n");
     fprintf(f, "nes_aspect = %d\n", g_pc_settings.nes_aspect);
+    fprintf(f, "\n");
+    fprintf(f, "# Auto-save when closing window or quitting: 0 = off, 1 = on\n");
+    fprintf(f, "autosave_on_quit = %d\n", g_pc_settings.autosave_on_quit);
     fprintf(f, "\n");
     fprintf(f, "[Audio]\n");
     fprintf(f, "# Master output volume as a percentage (0-100)\n");

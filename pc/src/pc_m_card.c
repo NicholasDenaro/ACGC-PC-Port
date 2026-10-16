@@ -959,6 +959,60 @@ int mCD_SaveHome_bg(int param_1, int* chan) {
     return mCD_TRANS_ERR_NONE;
 }
 
+int pc_can_save(void) {
+    int scene;
+
+    if (!pc_save_ready) {
+        return FALSE;
+    }
+    if (mEv_IsTitleDemo()) {
+        return FALSE;
+    }
+    if (Now_Private == NULL || Now_Private->exists == FALSE) {
+        return FALSE;
+    }
+    if (mPr_NullCheckPlayerName(Now_Private->player_ID.player_name)) {
+        return FALSE;
+    }
+
+    scene = Save_Get(scene_no);
+    if (scene == SCENE_START_DEMO || scene == SCENE_START_DEMO2 || scene == SCENE_START_DEMO3 ||
+        scene == SCENE_PLAYERSELECT || scene == SCENE_PLAYERSELECT_2 || scene == SCENE_PLAYERSELECT_3 ||
+        scene == SCENE_PLAYERSELECT_SAVE || scene == SCENE_TITLE_DEMO) {
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
+int pc_save_on_exit(void) {
+    static int s_saved = 0;
+    int res;
+
+    if (s_saved) {
+        return TRUE;
+    }
+
+    if (!g_pc_settings.autosave_on_quit) {
+        return TRUE;
+    }
+
+    if (!pc_can_save()) {
+        return TRUE;
+    }
+
+    s_saved = 1;
+    OSReport("[PC] Auto-saving game on exit...\n");
+    res = mCD_SaveHome_bg(0, NULL);
+    if (res == mCD_TRANS_ERR_NONE) {
+        OSReport("[PC] Auto-save on exit completed successfully!\n");
+        return TRUE;
+    } else {
+        OSReport("[PC] Auto-save on exit failed (error=%d)\n", res);
+        return FALSE;
+    }
+}
+
 /* --- Travel / Station functions --- */
 
 /* Read a GCI's Save_t into `out` (byte-swapped). Returns TRUE on success. */

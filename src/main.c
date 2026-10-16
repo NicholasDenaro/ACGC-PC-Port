@@ -97,6 +97,7 @@ extern void mainproc(void* val) {
     graph_proc(val);
     OSReport("[PC] mainproc: graph_proc returned\n");
     {
+        pc_save_on_exit();
         extern void pc_platform_shutdown(void);
         pc_platform_shutdown();
         exit(0);

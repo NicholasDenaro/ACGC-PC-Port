@@ -505,6 +505,13 @@ extern void graph_proc(void* arg) {
             }
         }
 
+#ifdef TARGET_PC
+        if (!g_pc_running) {
+            extern int pc_save_on_exit(void);
+            pc_save_on_exit();
+        }
+#endif
+
         dlftbl = game_get_next_game_dlftbl(game);
         GRAPH_SET_DOING_POINT(__graph, GAME_18);
         GRAPH_SET_DOING_POINT(__graph, GAME_DT);

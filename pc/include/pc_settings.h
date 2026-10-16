@@ -21,6 +21,7 @@ typedef struct {
     int master_volume;    /* Applied at the PC audio output, 0-100 (default 100) */
     int stick_deadzone;   /* Gamepad main stick deadzone, percent 0-40 (default 12) */
     int cstick_deadzone;  /* Gamepad C-stick deadzone, percent 0-40 (default 12) */
+    int autosave_on_quit; /* Auto-save when closing the window or quitting: 0=off, 1=on (default 1) */
 } PCSettings;
 
 extern PCSettings g_pc_settings;
