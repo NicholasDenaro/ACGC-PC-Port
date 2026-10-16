@@ -97,6 +97,20 @@ The `acgc-tools` MCP server provides specialized tools tailored for this codebas
   call_mcp_tool(ServerName="acgc-tools", ToolName="get_game_status", Arguments={})
   ```
 
+### `find_files`
+- **When to use**: To locate files or directories matching a glob pattern or substring across the codebase without running terminal commands like `Get-ChildItem` or `find`.
+- **What it provides**: Recursively lists matching relative file and directory paths. Automatically skips excluded directories (`.git`, `build32`, `bin`, etc.).
+- **Parameters**:
+  - `pattern` (*string*, optional): Glob pattern or substring to match file or directory names (e.g., `"*.md"`, `"*phase*"`, `"*.h"`, `"settings.*"`). Defaults to `"*"`.
+  - `path` (*string*, optional): Subdirectory or path to search within (e.g., `"."`, `"src"`, `"pc"`, `"include"`). Defaults to repository root.
+  - `recursive` (*boolean*, optional): Whether to search subdirectories recursively. Defaults to `true`.
+  - `include_dirs` (*boolean*, optional): Whether to include matching directory paths in results. Defaults to `false`.
+  - `max_results` (*integer*, optional): Maximum number of matching paths to return. Defaults to `200`.
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="find_files", Arguments={"pattern": "*.md"})
+  ```
+
 ---
 
 ## 3. General Development Rules

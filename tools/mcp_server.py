@@ -384,6 +384,101 @@ def tool_search_code(
         "content": "\n".join(formatted_blocks).strip()
     }
 
+def tool_find_files(
+    pattern="*",
+    path=None,
+    recursive=True,
+    max_results=200,
+    include_dirs=False
+):
+    """Finds files and directories matching a pattern or glob across the repository."""
+    if not pattern:
+        pattern = "*"
+
+    # Determine base search path
+    if path:
+        target_path = os.path.abspath(os.path.join(PROJECT_ROOT, path.replace("\\", "/")))
+    else:
+        target_path = PROJECT_ROOT
+
+    if not os.path.exists(target_path):
+        return {"success": False, "error": f"Path does not exist: {target_path}"}
+
+    results = []
+    truncated = False
+
+    glob_pattern = pattern
+    if not any(c in glob_pattern for c in "*?[]"):
+        # Substring match if no wildcards provided
+        glob_pattern = f"*{pattern}*"
+
+    glob_pattern_lower = glob_pattern.lower()
+
+    if os.path.isfile(target_path):
+        fname = os.path.basename(target_path)
+        if fnmatch.fnmatch(fname.lower(), glob_pattern_lower) or fnmatch.fnmatch(fname, glob_pattern):
+            rel = os.path.relpath(target_path, PROJECT_ROOT).replace("\\", "/")
+            return {"success": True, "count": 1, "total_returned": 1, "truncated": False, "files": [rel]}
+        return {"success": True, "count": 0, "total_returned": 0, "truncated": False, "files": []}
+
+    if recursive:
+        for root, dirs, files in os.walk(target_path):
+            dirs[:] = [d for d in dirs if d not in DEFAULT_EXCLUDE_DIRS and not d.startswith(".")]
+            if include_dirs:
+                for d in dirs:
+                    if fnmatch.fnmatch(d.lower(), glob_pattern_lower) or fnmatch.fnmatch(d, glob_pattern):
+                        full = os.path.join(root, d)
+                        rel = os.path.relpath(full, PROJECT_ROOT).replace("\\", "/") + "/"
+                        results.append(rel)
+                        if len(results) >= max_results:
+                            truncated = True
+                            break
+                if truncated:
+                    break
+
+            for f in files:
+                if fnmatch.fnmatch(f.lower(), glob_pattern_lower) or fnmatch.fnmatch(f, glob_pattern):
+                    full = os.path.join(root, f)
+                    rel = os.path.relpath(full, PROJECT_ROOT).replace("\\", "/")
+                    results.append(rel)
+                    if len(results) >= max_results:
+                        truncated = True
+                        break
+            if truncated:
+                break
+    else:
+        try:
+            entries = os.listdir(target_path)
+        except Exception as e:
+            return {"success": False, "error": f"Failed to list directory: {e}"}
+
+        for entry in sorted(entries):
+            if entry in DEFAULT_EXCLUDE_DIRS or entry.startswith("."):
+                continue
+            full = os.path.join(target_path, entry)
+            is_dir = os.path.isdir(full)
+            if is_dir and not include_dirs:
+                continue
+            if fnmatch.fnmatch(entry.lower(), glob_pattern_lower) or fnmatch.fnmatch(entry, glob_pattern):
+                rel = os.path.relpath(full, PROJECT_ROOT).replace("\\", "/")
+                if is_dir:
+                    rel += "/"
+                results.append(rel)
+                if len(results) >= max_results:
+                    truncated = True
+                    break
+
+    results.sort()
+    return {
+        "success": True,
+        "pattern": pattern,
+        "searched_path": os.path.relpath(target_path, PROJECT_ROOT).replace("\\", "/") if target_path != PROJECT_ROOT else ".",
+        "count": len(results),
+        "total_returned": len(results),
+        "truncated": truncated,
+        "files": results
+    }
+
 PINNED_LOG_FILES = {
     "client": "game.log",
     "game": "game.log",
@@ -762,6 +857,35 @@ TOOLS = [
             "type": "object",
             "properties": {}
         }
+    },
+    {
+        "name": "find_files",
+        "description": "Finds files and directories matching a glob pattern (e.g. '*.md', '*phase*', 'm_*.c') within the repository without running shell commands.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Glob pattern or substring to match file or directory names (e.g. '*.md', '*phase*', '*.h', 'settings.*'). Defaults to '*'."
+                },
+                "path": {
+                    "type": "string",
+                    "description": "Optional subdirectory or path to search within (e.g. '.', 'src', 'pc', 'include'). Defaults to repository root."
+                },
+                "recursive": {
+                    "type": "boolean",
+                    "description": "Whether to recursively search subdirectories. Defaults to true."
+                },
+                "include_dirs": {
+                    "type": "boolean",
+                    "description": "Whether to include matching directory paths in the results. Defaults to false."
+                },
+                "max_results": {
+                    "type": "integer",
+                    "description": "Maximum number of matching file paths to return. Defaults to 200."
+                }
+            }
+        }
     }
 ]
 
@@ -809,6 +933,14 @@ def handle_tool_call(name, arguments):
         )
     elif name == "get_game_status":
         return tool_get_game_status()
+    elif name == "find_files":
+        return tool_find_files(
+            pattern=arguments.get("pattern") or arguments.get("filter") or arguments.get("file_pattern") or "*",
+            path=arguments.get("path") or arguments.get("directory"),
+            recursive=arguments.get("recursive", True),
+            include_dirs=arguments.get("include_dirs", False),
+            max_results=arguments.get("max_results", 200)
+        )
     else:
         raise ValueError(f"Unknown tool: {name}")
 
@@ -981,6 +1113,13 @@ def run_cli():
     search_p.add_argument("-r", "--regex", action="store_true", help="Treat query as regex")
     search_p.add_argument("-m", "--max-matches", type=int, default=50, help="Max matches")
 
+    find_p = subparsers.add_parser("find", help="Find files matching pattern or glob")
+    find_p.add_argument("pattern", nargs="?", default="*", help="File pattern or glob (e.g. *.md, *phase*)")
+    find_p.add_argument("-p", "--path", default=None, help="Directory to search within")
+    find_p.add_argument("-nr", "--no-recursive", action="store_true", help="Do not search recursively")
+    find_p.add_argument("-d", "--include-dirs", action="store_true", help="Include directories in results")
+    find_p.add_argument("-m", "--max-results", type=int, default=200, help="Max results")
+
     args = parser.parse_args()
     if args.command == "build":
         res = tool_build_game(target=args.target, clean=args.clean)
@@ -1032,6 +1171,21 @@ def run_cli():
             print(f"Error: {res.get('error', 'Unknown error')}")
             sys.exit(1)
         print(res.get("content", ""))
+    elif args.command == "find":
+        res = tool_find_files(
+            pattern=args.pattern,
+            path=args.path,
+            recursive=not args.no_recursive,
+            include_dirs=args.include_dirs,
+            max_results=args.max_results
+        )
+        if not res.get("success"):
+            print(f"Error: {res.get('error', 'Unknown error')}")
+            sys.exit(1)
+        for f in res.get("files", []):
+            print(f)
+        if res.get("truncated"):
+            print(f"... (truncated at {res.get('count')} results)")
     else:
         parser.print_help()
 
