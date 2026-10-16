@@ -88,6 +88,15 @@ The `acgc-tools` MCP server provides specialized tools tailored for this codebas
   call_mcp_tool(ServerName="acgc-tools", ToolName="search_code", Arguments={"query": "mFI_InitRegisterBgInfo", "path": "src/game"})
   ```
 
+### `get_game_status`
+- **When to use**: To check if the game client (`AnimalCrossing.exe`) or dedicated server (`AnimalCrossingServer.exe`) are currently running in Windows Task Manager, or if they have crashed/exited.
+- **What it provides**: Reports process running state, PID, memory usage, execution status, CPU time, and window responsiveness.
+- **Parameters**: None required.
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="get_game_status", Arguments={})
+  ```
+
 ---
 
 ## 3. General Development Rules

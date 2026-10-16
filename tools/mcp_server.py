@@ -204,6 +204,57 @@ def tool_git_status(diff=False, files=None):
             "error": f"Failed to execute git: {e}"
         }
 
+def tool_get_game_status():
+    """Queries running processes to check if AnimalCrossing.exe or AnimalCrossingServer.exe are active."""
+    results = {
+        "client": {"running": False},
+        "server": {"running": False}
+    }
+    try:
+        proc = subprocess.Popen(
+            ["tasklist", "/FO", "CSV", "/V", "/FI", "IMAGENAME eq AnimalCrossing*"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace"
+        )
+        stdout, _ = proc.communicate(timeout=10)
+        lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+        if lines:
+            import csv
+            reader = csv.reader(lines)
+            rows = list(reader)
+            if rows and len(rows) > 0 and "Image Name" in rows[0]:
+                headers = rows[0]
+                for row in rows[1:]:
+                    if len(row) < len(headers):
+                        continue
+                    row_dict = dict(zip(headers, row))
+                    img_name = row_dict.get("Image Name", "").lower()
+                    pid_str = row_dict.get("PID", "")
+                    info = {
+                        "running": True,
+                        "pid": int(pid_str) if pid_str.isdigit() else pid_str,
+                        "memory": row_dict.get("Mem Usage", ""),
+                        "status": row_dict.get("Status", ""),
+                        "cpu_time": row_dict.get("CPU Time", ""),
+                        "window_title": row_dict.get("Window Title", "")
+                    }
+                    if "server" in img_name:
+                        results["server"] = info
+                    elif "animalcrossing" in img_name:
+                        results["client"] = info
+        return {
+            "success": True,
+            "processes": results
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to query process status: {e}"
+        }
+
 DEFAULT_EXCLUDE_DIRS = {
     ".git", "build32", "build", "bin", "__pycache__", ".vscode", ".idea", ".agent", ".agents"
 }
@@ -703,6 +754,14 @@ TOOLS = [
             },
             "required": ["query"]
         }
+    },
+    {
+        "name": "get_game_status",
+        "description": "Queries Windows running processes to check if AnimalCrossing.exe or AnimalCrossingServer.exe are active, returning PID, memory usage, status, CPU time, and window title.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {}
+        }
     }
 ]
 
@@ -748,6 +807,8 @@ def handle_tool_call(name, arguments):
             is_regex=arguments.get("is_regex", False),
             max_matches=arguments.get("max_matches", 50)
         )
+    elif name == "get_game_status":
+        return tool_get_game_status()
     else:
         raise ValueError(f"Unknown tool: {name}")
 

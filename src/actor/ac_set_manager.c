@@ -2,6 +2,7 @@
 #include "m_name_table.h"
 #include "m_lib.h"
 #include "m_field_info.h"
+#include "m_field_make.h"
 #include "m_player_lib.h"
 #include "m_common_data.h"
 #include "libultra/libultra.h"
@@ -130,6 +131,9 @@ static void aSetMgr_clear_keep(aSetMgr_keep_c* keep) {
  * @return TRUE when updated, FALSE otherwise
  **/
 static int aSetMgr_move_check_set(GAME_PLAY* play, SET_MANAGER* set_manager) {
+#ifdef TARGET_PC
+  static int reseed_timer = 0;
+#endif
   int wading = FALSE;
   aSetMgr_renewal_player_pos(play, &set_manager->player_pos);
 
@@ -147,43 +151,62 @@ static int aSetMgr_move_check_set(GAME_PLAY* play, SET_MANAGER* set_manager) {
   }
 #ifdef TARGET_PC
   else {
-    /* Periodic multiplayer reseed:
-     * Check active player acres every 300 frames (~5s) in round-robin fashion so that
-     * players who stay in an acre still experience natural fish and insect spawns.
+    /* Periodic reseed:
+     * Check any town acre every ~60 seconds (3600 frames at 60fps) so that
+     * bugs and fish naturally populate open slots throughout the entire town,
+     * without restricting spawns to only acres players currently occupy.
      */
-    static int reseed_timer = 0;
-    static int player_turn = 0;
-
     reseed_timer++;
-    if (reseed_timer >= 300) {
-      reseed_timer = 0;
+    if (reseed_timer >= 3600) {
+      int start_idx = (int)(fqrand() * (f32)FG_BLOCK_TOTAL_NUM);
+      int i;
+      int chosen_bx = 0;
+      int chosen_bz = 0;
+      int fallback_bx = 0;
+      int fallback_bz = 0;
 
-      int num_players = 0;
-      ACTOR* plist[PLAYER_NUM];
-      ACTOR* p = play->actor_info.list[ACTOR_PART_PLAYER].actor;
-      while (p != NULL && num_players < PLAYER_NUM) {
-        plist[num_players++] = p;
-        p = p->next_actor;
-      }
+      for (i = 0; i < FG_BLOCK_TOTAL_NUM; i++) {
+        int idx = (start_idx + i) % FG_BLOCK_TOTAL_NUM;
+        int bx = FGIDX_2_BLOCK_X(idx);
+        int bz = FGIDX_2_BLOCK_Z(idx);
+        u32 block_kind = mFI_BkNum2BlockKind(bx, bz);
 
-      if (num_players > 0) {
-        player_turn = player_turn % num_players;
-        ACTOR* target_p = plist[player_turn];
-        player_turn = (player_turn + 1) % num_players;
+        if (block_kind != 0) {
+          if (fallback_bx == 0) {
+            fallback_bx = bx;
+            fallback_bz = bz;
+          }
 
-        int bx, bz;
-        if (mFI_Wpos2BlockNum(&bx, &bz, target_p->world.position)) {
-          if (bx >= 1 && bx <= FG_BLOCK_X_NUM && bz >= 1 && bz <= FG_BLOCK_Z_NUM) {
-            u32 block_kind = mFI_BkNum2BlockKind(bx, bz);
-            if (block_kind != 0) {
-              set_manager->player_pos.next_bx = bx;
-              set_manager->player_pos.next_bz = bz;
-              set_manager->next_move_proc = aSetMgr_MOVE_move_set;
-              set_manager->set_ovl_type = aSetMgr_OVERLAY_BEGIN;
-              wading = TRUE;
-            }
+          int has_insect = FALSE;
+          int has_fish = FALSE;
+          if (Common_Get(clip.insect_clip) != NULL && Common_Get(clip.insect_clip)->chk_live_insect_proc != NULL) {
+            has_insect = (*Common_Get(clip.insect_clip)->chk_live_insect_proc)(bx, bz, (GAME*)play);
+          }
+          if (Common_Get(clip.gyo_clip) != NULL && Common_Get(clip.gyo_clip)->chk_live_gyoei_proc != NULL) {
+            has_fish = (*Common_Get(clip.gyo_clip)->chk_live_gyoei_proc)(bx, bz, (GAME*)play);
+          }
+
+          /* Pick an acre that has an open slot for either insect or fish */
+          if (!has_insect || !has_fish) {
+            chosen_bx = bx;
+            chosen_bz = bz;
+            break;
           }
         }
+      }
+
+      if (chosen_bx == 0) {
+        chosen_bx = fallback_bx;
+        chosen_bz = fallback_bz;
+      }
+
+      if (chosen_bx != 0 && chosen_bz != 0) {
+        reseed_timer = 0;
+        set_manager->player_pos.next_bx = chosen_bx;
+        set_manager->player_pos.next_bz = chosen_bz;
+        set_manager->next_move_proc = aSetMgr_MOVE_move_set;
+        set_manager->set_ovl_type = aSetMgr_OVERLAY_BEGIN;
+        wading = TRUE;
       }
     }
   }

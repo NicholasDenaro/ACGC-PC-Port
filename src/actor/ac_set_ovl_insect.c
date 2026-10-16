@@ -27,7 +27,11 @@ static aSOI_insect_birth_sum_c l_insect_birth_sum[aINS_INSECT_TYPE_EXTENDED_NUM]
   { 1, 0 }, // aINS_INSECT_TYPE_BROWN_CICADA
   { 1, 0 }, // aINS_INSECT_TYPE_BEE
   { 1, 0 }, // aINS_INSECT_TYPE_COMMON_DRAGONFLY
+#ifdef TARGET_PC
+  { 1, 0 }, // aINS_INSECT_TYPE_RED_DRAGONFLY
+#else
   { 6, 3 }, // aINS_INSECT_TYPE_RED_DRAGONFLY
+#endif
   { 1, 0 }, // aINS_INSECT_TYPE_DARNER_DRAGONFLY
   { 1, 0 }, // aINS_INSECT_TYPE_BANDED_DRAGONFLY
   { 1, 0 }, // aINS_INSECT_TYPE_LONG_LOCUST
@@ -44,7 +48,11 @@ static aSOI_insect_birth_sum_c l_insect_birth_sum[aINS_INSECT_TYPE_EXTENDED_NUM]
   { 1, 0 }, // aINS_INSECT_TYPE_LADYBUG
   { 1, 0 }, // aINS_INSECT_TYPE_SPOTTED_LADYBUG
   { 1, 0 }, // aINS_INSECT_TYPE_MANTIS
+#ifdef TARGET_PC
+  { 1, 0 }, // aINS_INSECT_TYPE_FIREFLY
+#else
   { 6, 3 }, // aINS_INSECT_TYPE_FIREFLY
+#endif
   { 1, 0 }, // aINS_INSECT_TYPE_COCKROACH
   { 1, 0 }, // aINS_INSECT_TYPE_SAW_STAG_BEETLE
   { 1, 0 }, // aINS_INSECT_TYPE_MOUNTAIN_BEETLE
@@ -2093,6 +2101,9 @@ static int aSOI_ins_make(aSOI_set_data_c* set_data, aSetMgr_player_pos_c* player
   if (set_data->should_spawn == TRUE && Common_Get(clip).insect_clip->make_insect_proc != NULL && Common_Get(clip).insect_clip->make_ant_proc != NULL) {
     aSOI_insect_birth_sum_c* birth_sum = l_insect_birth_sum + set_data->type;
     int birth_num = birth_sum->min_birth_count + (int)(fqrand() * (f32)birth_sum->additional_range);
+#ifdef TARGET_PC
+    birth_num = 1;
+#endif
 
     while (birth_num != 0) {
       res = aSOI_ins_make_sub(set_data, player_pos, game);

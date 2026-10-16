@@ -751,7 +751,9 @@ static void aITB_touch_water_init(aINS_INSECT_ACTOR* insect, GAME* game) {
  * @param game Pointer to the game context.
  */
 static void aITB_touch_water_reverse_init(aINS_INSECT_ACTOR* insect, GAME* game) {
-    eEC_CLIP->effect_make_proc(eEC_EFFECT_TURI_HAMON, insect->tools_actor.actor_class.world.position, 1, insect->tools_actor.actor_class.world.angle.y, game, EMPTY_NO, 4, 0);
+    if (eEC_CLIP != NULL && eEC_CLIP->effect_make_proc != NULL) {
+        eEC_CLIP->effect_make_proc(eEC_EFFECT_TURI_HAMON, insect->tools_actor.actor_class.world.position, 1, insect->tools_actor.actor_class.world.angle.y, game, EMPTY_NO, 4, 0);
+    }
     insect->tools_actor.actor_class.max_velocity_y = 4.0f;
     insect->tools_actor.actor_class.position_speed.y = 4.0f;
     insect->timer = aITB_TOUCH_WATER_REVERSE_TIMER;
