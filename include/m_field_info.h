@@ -246,6 +246,9 @@ extern mFM_field_pal_c* mFI_GetFieldPal();
 extern int mFI_GetPlayerHouseFloorNo(int scene);
 extern int mFI_GetNowPlayerHouseFloorNo();
 extern void mFI_InitRegisterBgInfo();
+#ifdef TARGET_PC
+extern void mFI_RebuildRegisterBgInfoFromDrawInfo();
+#endif
 extern int mFI_CheckBgDma(int bx, int bz);
 extern f32 mFI_UtNum2BaseHeight(int ut_x, int ut_z);
 extern f32 mFI_BkNum2BaseHeight(int bx, int bz);

@@ -9,6 +9,9 @@
 #include "m_player_lib.h"
 #include "m_bg_type.h"
 #include "m_fg_type.h"
+#ifdef TARGET_PC
+#include <stdio.h>
+#endif
 
 static mCoBG_Collision_u l_edge_ut = { { 0, 31, 31, 31, 31, 31, mCoBG_ATTRIBUTE_GRASS0 } };
 
@@ -555,6 +558,37 @@ extern void mFI_InitRegisterBgInfo() {
         mFI_ClearRegisterBgInfo(&l_register_bg_info[i]);
     }
 }
+
+#ifdef TARGET_PC
+extern void mFI_RebuildRegisterBgInfoFromDrawInfo() {
+    if (mFI_CheckFieldData()) {
+        mFM_field_draw_info_c* draw_info = mFI_BGDisplayListTop();
+        int i;
+        int restored_count = 0;
+
+        for (i = 0; i < mFM_VISIBLE_BLOCK_NUM; i++) {
+            if (draw_info[i].block_x != 0xFF && draw_info[i].block_z != 0xFF) {
+                l_register_bg_info[i].bg_num = i;
+                l_register_bg_info[i].dma_active = FALSE;
+                draw_info[i].dma_loaded = TRUE;
+                Common_Set(remove_cut_tree_info_bitfield,
+                           Common_Get(remove_cut_tree_info_bitfield) | (1 << i));
+                restored_count++;
+            } else {
+                l_register_bg_info[i].bg_num = -1;
+                l_register_bg_info[i].dma_active = FALSE;
+                draw_info[i].dma_loaded = FALSE;
+            }
+        }
+
+        FILE* flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[REBUILD REGISTER BG INFO] restored=%d acres\n", restored_count);
+            fclose(flog);
+        }
+    }
+}
+#endif
 
 static int mFI_CheckFreeRegisterBgInfo(mFI_register_bg_info_c* bg_info) {
     int res = FALSE;

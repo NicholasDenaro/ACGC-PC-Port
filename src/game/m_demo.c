@@ -17,7 +17,7 @@ int mDemo_IsActorBusy(ACTOR* actor) {
     if (actor->part == ACTOR_PART_NPC) {
         return ((NPC_ACTOR*)actor)->is_busy;
     }
-    return (actor->state_bitfield & ACTOR_STATE_IN_DEMO) != 0;
+    return FALSE;
 }
 
 void mDemo_SetActorBusy(ACTOR* actor, u32 player_id) {

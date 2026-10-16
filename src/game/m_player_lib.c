@@ -1302,7 +1302,18 @@ extern void mPlib_change_player_face(GAME* game) {
 }
 
 extern PLAYER_ACTOR* get_player_actor_withoutCheck(GAME_PLAY* play) {
-    return (PLAYER_ACTOR*)&play->actor_info.list[ACTOR_PART_PLAYER].actor[0];
+    if (play == NULL) {
+        return NULL;
+    }
+#ifdef TARGET_PC
+    for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
+        PLAYER_ACTOR* pa = (PLAYER_ACTOR*)a;
+        if (pa->player_no == 0 && !pa->is_dummy) {
+            return pa;
+        }
+    }
+#endif
+    return (PLAYER_ACTOR*)play->actor_info.list[ACTOR_PART_PLAYER].actor;
 }
 
 static int mPlib_check_DynamicLinkFile_m_player(void) {

@@ -336,6 +336,8 @@ extern void mFM_GetPolicePos(int* bx, int* bz, int* ut_x, int* ut_z);
 extern void mFM_DecideBgTexIdx(u8* bg_tex_idx);
 extern void mFM_SetFieldInitData(int bg_disp_num, int bg_disp_size);
 extern void mFM_FieldInit(GAME_PLAY* play);
+extern void mFM_LoadBGCommonTex(int update_tex, u8 tex_idx);
+extern void set_field_type(void);
 extern void mFM_Field_dt();
 extern void mFM_SetBlockKindLoadCombi();
 extern void mFM_InitFgCombiSaveData(GAME* game);

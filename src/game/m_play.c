@@ -42,6 +42,7 @@
 #ifdef TARGET_PC
 #include "pc_diag.h"
 #include "pc_platform.h"
+#include "server/server_zone.h"
 #endif
 #ifdef TARGET_SERVER
 #include "m_start_data_init.h"
@@ -227,6 +228,13 @@ static void Game_play_fbdemo_fade_out_game_end_move_end(GAME_PLAY* play) {
 }
 
 static void Game_play_change_scene_move_end(GAME_PLAY* play) {
+#ifdef TARGET_PC
+    FILE* flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[SCENE CHANGE MOVE END] from=%d next=%d\n", Save_Get(scene_no), play->next_scene_no);
+        fclose(flog);
+    }
+#endif
     game_goto_next_game_play(&play->game);
     Common_Set(last_scene_no, Save_Get(scene_no));
     Save_Set(scene_no, play->next_scene_no);
@@ -375,7 +383,6 @@ extern void play_cleanup(GAME* game) {
     play->submenu.mode = mSM_MODE_IDLE;
 
     PreRender_cleanup(&play->prerender);
-    CollisionCheck_dt(game, &play->collision_check);
 
     if (play->fb_mode == FBDEMO_MODE_MOVE) {
         fbdemo_cleanup(&fbdemo);
@@ -386,10 +393,74 @@ extern void play_cleanup(GAME* game) {
         Game_play_fbdemo_wipe_destroy(play);
     }
 
+#ifdef TARGET_PC
+    FILE* flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[PLAY CLEANUP START] scene=%d next=%d\n", play->scene_id, play->next_scene_no);
+        fclose(flog);
+    }
+
+    if (play->next_scene_no >= 0 && play->next_scene_no < SCENE_NUM) {
+        Common_Set(last_scene_no, play->scene_id);
+        Save_Set(scene_no, play->next_scene_no);
+    }
+
+    if (play->next_scene_no == SCENE_TITLE_DEMO) {
+        g_server_zones[ZONE_ID_OUTDOOR_TOWN].is_active = FALSE;
+    }
+
+    if (play->scene_id == SCENE_FG && !mEv_IsTitleDemo()) {
+        /* Preserve Zone 0 (Outdoor Town) state for concurrent background simulation */
+        ServerZone* outdoor = &g_server_zones[ZONE_ID_OUTDOOR_TOWN];
+        outdoor->actor_info = play->actor_info;
+        outdoor->collision_check = play->collision_check;
+        outdoor->block_table = play->block_table;
+        outdoor->field_info = g_fdinfo;
+        outdoor->scene_data = play->current_scene_data;
+        outdoor->scene_id = SCENE_FG;
+        outdoor->clip = Common_Get(clip);
+        outdoor->field_type = Common_Get(field_type);
+        server_zone_remove_player(outdoor, 0);
+
+        /* Clear play pointers so game_dt doesn't alter outdoor structures */
+        bzero(&play->actor_info, sizeof(Actor_info));
+        bzero(&play->collision_check, sizeof(CollisionCheck_c));
+
+        OSReport("[SERVER ZONE] Preserved Zone 0 (outdoor town, %d actors) across transition to scene %d\n",
+                 outdoor->actor_info.total_num, play->next_scene_no);
+    } else {
+        /* Indoor room or demo: clean up normally */
+        ServerZone* room_zone = server_zone_get_by_scene(play->scene_id, -1);
+        if (room_zone != NULL) {
+            bzero(&room_zone->actor_info, sizeof(Actor_info));
+            bzero(&room_zone->collision_check, sizeof(CollisionCheck_c));
+            room_zone->field_info = NULL;
+            room_zone->scene_data = NULL;
+            server_zone_remove_player(room_zone, 0);
+        }
+        CollisionCheck_dt(game, &play->collision_check);
+        Actor_info_dt(&play->actor_info, play);
+        bzero(&play->actor_info, sizeof(Actor_info));
+        mEv_finish(&play->event);
+        mNpc_ClearEventNpc();
+        mNpc_ClearMaskNpc();
+        mFM_Field_dt();
+        g_fdinfo = NULL;
+    }
+    flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[PLAY CLEANUP BEFORE RESET CTX]\n");
+        fclose(flog);
+    }
+    server_zone_reset_current_context();
+#else
+    CollisionCheck_dt(game, &play->collision_check);
     Actor_info_dt(&play->actor_info, play);
     mEv_finish(&play->event);
     mNpc_ClearEventNpc();
     mNpc_ClearMaskNpc();
+    mFM_Field_dt();
+#endif
 
     mSM_submenu_dt(&play->submenu);
     play->submenu_ground_idx = -1;
@@ -398,7 +469,6 @@ extern void play_cleanup(GAME* game) {
     mPlib_Object_Exchange_keep_Player_dt(play);
 
     mHsRm_GetHuusuiRoom(NULL, Common_Get(player_no));
-    mFM_Field_dt();
     mCD_toNextLand();
     mEA_CleanCardDLProgram();
 
@@ -406,7 +476,18 @@ extern void play_cleanup(GAME* game) {
         my_malloc_current = NULL;
     }
 
+#ifdef TARGET_PC
+    if (!g_server_zones[ZONE_ID_OUTDOOR_TOWN].is_active) {
+        zelda_CleanupArena();
+    }
+    flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[PLAY CLEANUP END]\n");
+        fclose(flog);
+    }
+#else
     zelda_CleanupArena();
+#endif
 }
 
 static void VR_Box_ct(GAME_PLAY* play) {
@@ -618,16 +699,240 @@ extern void play_init(GAME* game) {
 
     play->fade_color_value.rgba8888 = 0;
 
+#ifdef TARGET_PC
+    (void)freebytes; (void)alloc; (void)aligned; (void)size;
+    static void* s_pc_zelda_arena_buf = NULL;
+    if (s_pc_zelda_arena_buf == NULL) {
+        size_t arena_sz = 192 * 1024 * 1024;
+        s_pc_zelda_arena_buf = malloc(arena_sz);
+    }
+    if (!zelda_MallocIsInitalized() && s_pc_zelda_arena_buf != NULL) {
+        zelda_InitArena(s_pc_zelda_arena_buf, 192 * 1024 * 1024);
+        printf("[SERVER] Initialized persistent 192MB zelda_arena at %p\n", s_pc_zelda_arena_buf);
+    }
+#else
     freebytes = game_getFreeBytes(game);
     alloc = (u32)THA_alloc16(&game->tha, freebytes);
     aligned = ALIGN_NEXT(alloc, 16);
     size = aligned - alloc;
 
     zelda_InitArena((void*)aligned, freebytes - size);
+#endif
 
     if (my_malloc_current == NULL) {
         my_malloc_current = &my_malloc_func;
     }
+
+#ifdef TARGET_PC
+    int resume_outdoor_zone = FALSE;
+    ServerZone* outdoor = &g_server_zones[ZONE_ID_OUTDOOR_TOWN];
+    int last_scene = Common_Get(last_scene_no);
+    ZoneType last_type = server_zone_type_from_scene(last_scene);
+
+    FILE* flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[PLAY INIT] scene=%d last_scene=%d last_type=%d outdoor_active=%d total_actors=%d\n",
+                Save_Get(scene_no), last_scene, (int)last_type, outdoor->is_active, outdoor->actor_info.total_num);
+        fclose(flog);
+    }
+
+    if (!mEv_IsTitleDemo() && Save_Get(scene_no) == SCENE_FG &&
+        outdoor->is_active && outdoor->actor_info.total_num > 0 &&
+        outdoor->actor_info.list[ACTOR_PART_PLAYER].actor != NULL &&
+        last_type != ZONE_TYPE_OTHER && last_type != ZONE_TYPE_OUTDOOR_TOWN) {
+        resume_outdoor_zone = TRUE;
+    }
+
+    if (resume_outdoor_zone) {
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS START]\n");
+            fclose(flog);
+        }
+        /* Seamlessly restore Zone 0 (outdoors) */
+        play->actor_info = outdoor->actor_info;
+        play->collision_check = outdoor->collision_check;
+        play->block_table = outdoor->block_table;
+        g_fdinfo = outdoor->field_info;
+        play->current_scene_data = outdoor->scene_data;
+        server_set_active_zone_context(play, outdoor);
+        server_zone_add_player(outdoor, 0);
+
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS CONTEXT SET]\n");
+            fclose(flog);
+        }
+
+        PLAYER_ACTOR* player_actor = get_player_actor_withoutCheck(play);
+        if (player_actor != NULL) {
+            static const s16 angle_table[mSc_DIRECT_NUM] = {
+                DEG2SHORT_ANGLE(0.0f),    /* 0x0000 - SOUTH */
+                DEG2SHORT_ANGLE(45.0f),   /* 0x2000 - SOUTH_EAST */
+                DEG2SHORT_ANGLE(90.0f),   /* 0x4000 - EAST */
+                DEG2SHORT_ANGLE(135.0f),  /* 0x6000 - NORTH_EAST */
+                DEG2SHORT_ANGLE(-180.0f), /* 0x8000 - NORTH */
+                DEG2SHORT_ANGLE(-135.0f), /* 0xA000 - NORTH_WEST */
+                DEG2SHORT_ANGLE(-90.0f),  /* 0xC000 - WEST */
+                DEG2SHORT_ANGLE(-45.0f)   /* 0xE000 - SOUTH_WEST */
+            };
+
+            Door_data_c* d_data = Common_GetPointer(door_data);
+            if (d_data->next_scene_id == 0 && Common_Get(structure_exit_door_data).next_scene_id != 0) {
+                d_data = Common_GetPointer(structure_exit_door_data);
+            }
+
+            if (d_data->next_scene_id != 0) {
+                xyz_t exit_pos;
+                exit_pos.x = (f32)d_data->exit_position.x;
+                exit_pos.y = (f32)d_data->exit_position.y;
+                exit_pos.z = (f32)d_data->exit_position.z;
+
+                u8 orientation = d_data->exit_orientation;
+                s16 exit_angle = 0;
+                if (orientation < mSc_DIRECT_NUM) {
+                    exit_angle = angle_table[orientation];
+                }
+
+                mActor_name_t door_name = d_data->door_actor_name;
+                STRUCTURE_ACTOR* str_actor = NULL;
+                if (ITEM_NAME_GET_TYPE(door_name) == NAME_TYPE_STRUCT) {
+                    str_actor =
+                        (STRUCTURE_ACTOR*)Actor_info_fgName_search(&play->actor_info, door_name, ACTOR_PART_ITEM);
+                }
+
+                /* Step closer to the doorstep mat from the default out data */
+                f32 pull_closer = 20.0f;
+                exit_pos.x -= sin_s(exit_angle) * pull_closer;
+                exit_pos.z -= cos_s(exit_angle) * pull_closer;
+
+                /* For post office, door trigger is at (-40, +50); place player at (-44, +53) right on the mat */
+                if (door_name == POST_OFFICE && str_actor != NULL) {
+                    exit_pos.x = str_actor->actor_class.world.position.x - 44.0f;
+                    exit_pos.z = str_actor->actor_class.world.position.z + 53.0f;
+                }
+                exit_pos.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(exit_pos, 0.0f);
+
+                player_actor->actor_class.world.position = exit_pos;
+                player_actor->actor_class.last_world_position = exit_pos;
+                player_actor->actor_class.eye.position = exit_pos;
+                player_actor->actor_class.eye.position.y += 180.0f;
+                player_actor->actor_class.position_speed = (xyz_t){ 0.0f, 0.0f, 0.0f };
+                player_actor->actor_class.speed = 0.0f;
+                player_actor->actor_class.world.angle.y = exit_angle;
+                player_actor->actor_class.shape_info.rotation.y = exit_angle;
+
+                int bx = 0, bz = 0;
+                mFI_Wpos2BlockNum(&bx, &bz, exit_pos);
+                player_actor->actor_class.block_x = (s8)bx;
+                player_actor->actor_class.block_z = (s8)bz;
+
+                /* Clear any active/stale demo locks so mDemo_Check doesn't mistakenly think the door demo is still running */
+                mDemo_Init(play);
+
+                /* Reset structure actor out of dormant none_proc1 and trigger door animation */
+                if (ITEM_NAME_GET_TYPE(door_name) == NAME_TYPE_STRUCT && str_actor != NULL &&
+                    str_actor->actor_class.dlftbl != NULL && str_actor->actor_class.dlftbl->profile != NULL) {
+                    /* Reset world position to home position before constructor offset */
+                    str_actor->actor_class.world = str_actor->actor_class.home;
+                    str_actor->actor_class.shape_info.rotation = str_actor->actor_class.world.angle;
+                    Actor_world_to_eye((ACTOR*)str_actor, 0.0f);
+                    xyz_t_move(&str_actor->actor_class.last_world_position, &str_actor->actor_class.world.position);
+
+                    /* Re-run structure constructor from profile to reset keyframe and action_proc to wait */
+                    if (str_actor->actor_class.dlftbl->profile->ct_proc != NULL) {
+                        str_actor->actor_class.dlftbl->profile->ct_proc((ACTOR*)str_actor, (GAME*)play);
+                    }
+                    str_actor->request_type = (d_data->exit_type == TRUE) ? 5 : 4;
+                }
+
+                FILE* f_log = fopen("server_player.log", "a");
+                if (f_log) {
+                    fprintf(f_log, "[RESUME DOOR] door_name=0x%04X exit_pos=(%.1f, %.1f, %.1f) str_actor=%p\n",
+                            door_name, exit_pos.x, exit_pos.y, exit_pos.z, (void*)str_actor);
+                    fclose(f_log);
+                }
+
+                Common_Set(door_data.next_scene_id, 0);
+            }
+
+            /* Reload player face and body skin texture & palette into object exchange bank */
+            mPlib_change_player_face((GAME*)play);
+
+            Player_actor_force_wait((ACTOR*)player_actor, (GAME*)play);
+            Camera2_request_main_normal(play, 1, 1);
+        }
+
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS BEFORE BGTEX]\n");
+            fclose(flog);
+        }
+
+        /* Reload outdoor ground textures and palettes */
+        mFM_LoadBGCommonTex(TRUE, Save_Get(bg_tex_idx));
+
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS AFTER BGTEX]\n");
+            fclose(flog);
+        }
+
+        /* Reinitialize acre collision tracking & field keeping */
+        mFI_InitMoveActorBitData();
+        mFI_ClearColKeep();
+        mFI_InitAreaInfo();
+        mFI_RebuildRegisterBgInfoFromDrawInfo();
+
+        /* Trigger immediate FG item renewal so trees, rocks, signboards stay visible */
+        mFI_SetFGUpData();
+        mFI_BornItemON();
+
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS AFTER FIELD KEEP]\n");
+            fclose(flog);
+        }
+
+        /* Restore field type and floor to outdoors */
+        set_field_type();
+        Common_Set(floor_idx, -1);
+        Save_Set(scene_no, SCENE_FG);
+        play->scene_id = SCENE_FG;
+
+        /* Switch BGM back to outdoor town hourly music */
+        if (mEv_CheckFirstIntro() == TRUE) {
+            mBGMPsComp_scene_mode(9);
+        } else if (mEv_CheckGateway() == TRUE) {
+            mBGMPsComp_scene_mode(8);
+        } else {
+            mBGMPsComp_scene_mode(1);
+        }
+
+        VR_Box_ct(play);
+        mMmd_MakeMuseumDisplayData();
+        play->draw_chk_proc = none_proc1;
+        mMsg_ct(game);
+        mEv_2nd_init(&play->event);
+        mTD_player_keydata_init(play);
+        Balloon_init(play);
+        mNtc_set_auto_nwrite_data();
+        banti_ct();
+        watch_my_step_ct();
+        event_title_flag_off();
+        mEA_GetCardDLProgram();
+        actor_dlftbls_init();
+
+        flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[RESUME OUTDOORS FINISHED] %d actors active\n", outdoor->actor_info.total_num);
+            fclose(flog);
+        }
+
+        printf("[SERVER ZONE] Seamlessly resumed Zone 0 (outdoors)! %d actors active.\n",
+               outdoor->actor_info.total_num);
+    } else {
+#endif
 
 #ifdef TARGET_SERVER
     printf("[SERVER] Initializing world field simulation (mFM_FieldInit)...\n");
@@ -650,10 +955,49 @@ extern void play_init(GAME* game) {
 #ifdef TARGET_SERVER
     printf("[SERVER] World simulation initialized! Ready for player connections.\n");
 #endif
+#ifdef TARGET_PC
+        if (Save_Get(scene_no) == SCENE_FG) {
+            if (!mEv_IsTitleDemo()) {
+                server_zone_init(play);
+                server_zone_add_player(&g_server_zones[ZONE_ID_OUTDOOR_TOWN], 0);
+            }
+        } else {
+            ZoneType ztype = server_zone_type_from_scene(Save_Get(scene_no));
+            if (ztype != ZONE_TYPE_OTHER && !mEv_IsTitleDemo()) {
+                ServerZone* room = server_zone_find_or_create(play, Save_Get(scene_no), ztype, -1);
+                if (room != NULL) {
+                    room->actor_info = play->actor_info;
+                    room->collision_check = play->collision_check;
+                    room->block_table = play->block_table;
+                    room->field_info = g_fdinfo;
+                    room->scene_data = play->current_scene_data;
+                    room->clip = Common_Get(clip);
+                    room->field_type = Common_Get(field_type);
+                    server_zone_add_player(room, 0);
+                    server_set_active_zone_context(play, room);
+                }
+            }
+        }
+    }
+    flog = fopen("server_player.log", "a");
+    if (flog) {
+        fprintf(flog, "[PLAY INIT END]\n");
+        fclose(flog);
+    }
+#endif
 }
 
 static void Game_play_move_fbdemo_not_move(GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
+#ifdef TARGET_PC
+    if (play->game_frame < 5) {
+        FILE* flog = fopen("server_player.log", "a");
+        if (flog) {
+            fprintf(flog, "[NOT MOVE START] frame=%u scene=%d\n", play->game_frame, play->scene_id);
+            fclose(flog);
+        }
+    }
+#endif
 
     game->doing_point = 0;
     game->doing_point_specific = 0x8F;
@@ -689,10 +1033,22 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
 #ifdef TARGET_PC
     {
         extern void server_player_tick(GAME_PLAY* play);
+        FILE* flog = fopen("server_player.log", "a");
+        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d entering Actor_info_call_actor\n", play->game_frame, play->scene_id); fclose(flog); }
         server_player_tick(play);
     }
 #endif
     Actor_info_call_actor(play, &play->actor_info);
+#ifdef TARGET_PC
+    {
+        FILE* flog = fopen("server_player.log", "a");
+        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d entering server_tick_zones\n", play->game_frame, play->scene_id); fclose(flog); }
+        extern void server_tick_zones(GAME_PLAY* play);
+        server_tick_zones(play);
+        flog = fopen("server_player.log", "a");
+        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d finished server_tick_zones\n", play->game_frame, play->scene_id); fclose(flog); }
+    }
+#endif
     game->doing_point = 0;
     game->doing_point_specific = 0x91;
     game->doing_point = 1;
@@ -732,6 +1088,9 @@ static void Game_play_move(GAME* game) {
     if (!pause) {
         game->doing_point = 1;
         Game_play_fbdemo_wipe_proc(play);
+        if (game->exec == NULL) {
+            return;
+        }
         game->doing_point = 2;
         Game_play_fbdemo_proc(play);
         game->doing_point = 3;

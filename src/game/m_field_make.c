@@ -1098,7 +1098,7 @@ extern void mFM_DecideBgTexIdx(u8* bg_tex_idx) {
     *bg_tex_idx = RANDOM(mFM_BG_TEX_NUM);
 }
 
-static void mFM_LoadBGCommonTex(int update_tex, u8 tex_idx) {
+extern void mFM_LoadBGCommonTex(int update_tex, u8 tex_idx) {
     void** bg_tex_tbl;
     u32 season = Common_Get(time.season);
     int i;
@@ -1132,7 +1132,7 @@ static void mFM_LoadBGCommonTex(int update_tex, u8 tex_idx) {
     mFM_LoadBGCommonMonthlyPal();
 }
 
-static void set_field_type() {
+extern void set_field_type() {
     int field_id = mFI_GetFieldId();
     int house_owner_id;
     u8 field_type;

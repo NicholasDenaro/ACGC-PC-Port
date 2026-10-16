@@ -2318,6 +2318,9 @@ extern void Player_actor_ct(ACTOR*, GAME*);
 extern void Player_actor_dt(ACTOR*, GAME*);
 extern void Player_actor_move(ACTOR*, GAME*);
 extern void Player_actor_draw(ACTOR*, GAME*);
+#ifdef TARGET_PC
+extern void Player_actor_force_wait(ACTOR*, GAME*);
+#endif
 
 #ifdef __cplusplus
 }

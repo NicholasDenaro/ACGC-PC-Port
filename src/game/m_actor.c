@@ -20,6 +20,7 @@
 #include "m_common_data.h"
 #ifdef TARGET_PC
 #include "pc_platform.h"
+#include "server/server_zone.h"
 #endif
 
 #ifdef MUST_MATCH
@@ -322,6 +323,12 @@ static void Actor_cull_check(ACTOR* actor) {
 static void Actor_delete_check(ACTOR* actor, GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
 
+#ifdef TARGET_PC
+    if (server_zone_is_background()) {
+        return;
+    }
+#endif
+
     if ((actor->state_bitfield &
          (ACTOR_STATE_NO_MOVE_WHILE_CULLED | ACTOR_STATE_NO_DRAW_WHILE_CULLED | ACTOR_STATE_NO_CULL)) == 0) {
         if (actor->npc_id != EMPTY_NO) {
@@ -474,8 +481,22 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
     PLAYER_ACTOR* player_actor = get_player_actor_withoutCheck(play);
     ACTOR* actor;
     int i;
+#ifdef TARGET_PC
+    ServerZone* cur_zone = server_zone_get_current();
+#endif
 
-    mFI_FieldMove(player_actor->actor_class.world.position);
+    if (player_actor != NULL) {
+#ifdef TARGET_PC
+        if (!server_zone_is_background() && (cur_zone == NULL || (cur_zone->player_occupant_mask & (1u << player_actor->player_no)))) {
+            mFI_FieldMove(player_actor->actor_class.world.position);
+        }
+#else
+        mFI_FieldMove(player_actor->actor_class.world.position);
+#endif
+    }
+#ifdef TARGET_PC
+    if (!server_zone_is_background())
+#endif
     mBI_move(play);
 
     for (i = 0; i < ACTOR_PART_NUM; i++) {
@@ -483,6 +504,15 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
         actor = actor_info->list[i].actor;
 
         while (actor != NULL) {
+#ifdef TARGET_PC
+            if (i == ACTOR_PART_PLAYER) {
+                PLAYER_ACTOR* pa = (PLAYER_ACTOR*)actor;
+                if (cur_zone != NULL && !(cur_zone->player_occupant_mask & (1u << pa->player_no))) {
+                    actor = actor->next_actor;
+                    continue;
+                }
+            }
+#endif
             play->game.doing_point = actor->id;
             play->game.doing_point_specific = 151;
 
@@ -493,6 +523,16 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
             if (actor->ct_proc != NULL) {
                 if (Actor_data_bank_dma_end_check(actor, play) == TRUE) {
                     play->game.doing_point_specific = 152;
+#ifdef TARGET_PC
+                    if (play->game_frame < 5) {
+                        FILE* flog = fopen("server_player.log", "a");
+                        if (flog) {
+                            fprintf(flog, "[ACTOR CT] part=%d id=%04x ct=%p\n",
+                                    actor->part, actor->id, (void*)actor->ct_proc);
+                            fclose(flog);
+                        }
+                    }
+#endif
                     (*actor->ct_proc)(actor, (GAME*)play);
                     play->game.doing_point_specific = 153;
                     actor->ct_proc = NULL;
@@ -506,6 +546,11 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
                     play->game.doing_point_specific = 155;
                     next = actor->next_actor;
                 } else if (actor->mv_proc == NULL) {
+#ifdef TARGET_PC
+                    if (server_zone_is_background()) {
+                        next = actor->next_actor;
+                    } else
+#endif
                     if (actor->drawn == FALSE) {
                         play->game.doing_point_specific = 156;
                         next = Actor_info_delete(&play->actor_info, actor, (GAME*)play);
@@ -550,9 +595,29 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
 #endif
                     actor->state_bitfield &= ~ACTOR_STATE_24;
 
+#ifdef TARGET_PC
+                    if (server_zone_is_background()) {
+                        if (actor->id == mAc_PROFILE_WEATHER || actor->id == mAc_PROFILE_EFFECTBG) {
+                            CollisionCheck_Status_Clear(&actor->status_data);
+                            next = actor->next_actor;
+                            actor = next;
+                            continue;
+                        }
+                    }
+#endif
                     if ((actor->state_bitfield & (ACTOR_STATE_NO_MOVE_WHILE_CULLED | ACTOR_STATE_NO_CULL)) ||
                         actor->part == ACTOR_PART_NPC) {
                         play->game.doing_point_specific = 161;
+#ifdef TARGET_PC
+                        if (play->game_frame < 5 || server_zone_is_background()) {
+                            FILE* flog = fopen("server_player.log", "a");
+                            if (flog) {
+                                fprintf(flog, "[ACTOR TICK] bg=%d part=%d id=%04x npc_id=%04x mv=%p\n",
+                                        server_zone_is_background(), actor->part, actor->id, actor->npc_id, (void*)actor->mv_proc);
+                                fclose(flog);
+                            }
+                        }
+#endif
                         (*actor->mv_proc)(actor, (GAME*)play);
                         play->game.doing_point_specific = 162;
                     }
@@ -592,6 +657,16 @@ extern void Actor_info_draw_actor(GAME_PLAY* play, Actor_info* actor_info) {
                 if ((actor->state_bitfield & (ACTOR_STATE_NO_DRAW_WHILE_CULLED | ACTOR_STATE_NO_CULL))) {
                     if ((actor->state_bitfield & ACTOR_STATE_INVISIBLE) == 0 && actor->cull_while_talking == FALSE &&
                         actor->skip_drawing == FALSE) {
+#ifdef TARGET_PC
+                        if (play->game_frame < 5) {
+                            FILE* flog = fopen("server_player.log", "a");
+                            if (flog) {
+                                fprintf(flog, "[DRAW ACTOR] frame=%u part=%d id=%04x dw=%p\n",
+                                        play->game_frame, actor->part, actor->id, (void*)actor->dw_proc);
+                                fclose(flog);
+                            }
+                        }
+#endif
                         Actor_draw(play, actor);
                         actor->drawn = TRUE;
                     }
@@ -676,11 +751,27 @@ static void actor_free_check(ACTOR_DLFTBL* dlftbl, mActor_name_t id) {
         switch (ITEM_NAME_GET_TYPE(id)) {
             case NAME_TYPE_SPNPC:
             case NAME_TYPE_NPC:
+#ifdef TARGET_PC
+                if (Common_Get(clip).npc_clip != NULL && Common_Get(clip).npc_clip->free_overlay_area_proc != NULL) {
+                    (*Common_Get(clip).npc_clip->free_overlay_area_proc)(dlftbl);
+                } else {
+                    Actor_free_overlay_area(dlftbl);
+                }
+#else
                 (*Common_Get(clip).npc_clip->free_overlay_area_proc)(dlftbl);
+#endif
                 break;
 
             case NAME_TYPE_STRUCT:
+#ifdef TARGET_PC
+                if (Common_Get(clip).structure_clip != NULL && Common_Get(clip).structure_clip->free_overlay_area_proc != NULL) {
+                    (*Common_Get(clip).structure_clip->free_overlay_area_proc)(dlftbl);
+                } else {
+                    Actor_free_overlay_area(dlftbl);
+                }
+#else
                 (*Common_Get(clip).structure_clip->free_overlay_area_proc)(dlftbl);
+#endif
                 break;
 
             default:
@@ -936,12 +1027,28 @@ extern ACTOR* Actor_info_delete(Actor_info* actor_info, ACTOR* actor, GAME* game
     switch (ITEM_NAME_GET_TYPE(name_id)) {
         case NAME_TYPE_SPNPC:
         case NAME_TYPE_NPC: {
+#ifdef TARGET_PC
+            if (Common_Get(clip).npc_clip != NULL && Common_Get(clip).npc_clip->free_actor_area_proc != NULL) {
+                (*Common_Get(clip).npc_clip->free_actor_area_proc)(actor);
+            } else {
+                zelda_free(actor);
+            }
+#else
             (*Common_Get(clip).npc_clip->free_actor_area_proc)(actor);
+#endif
             break;
         }
 
         case NAME_TYPE_STRUCT: {
+#ifdef TARGET_PC
+            if (Common_Get(clip).structure_clip != NULL && Common_Get(clip).structure_clip->free_actor_area_proc != NULL) {
+                (*Common_Get(clip).structure_clip->free_actor_area_proc)((STRUCTURE_ACTOR*)actor);
+            } else {
+                zelda_free(actor);
+            }
+#else
             (*Common_Get(clip).structure_clip->free_actor_area_proc)((STRUCTURE_ACTOR*)actor);
+#endif
             break;
         }
 

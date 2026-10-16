@@ -147,6 +147,10 @@ void pc_platform_shutdown(void) {
         SDL_DestroyWindow(g_pc_window);
         g_pc_window = NULL;
     }
+    if (g_pc_log_file != NULL) {
+        fclose(g_pc_log_file);
+        g_pc_log_file = NULL;
+    }
     SDL_Quit();
 }
 
@@ -259,6 +263,10 @@ static int pc_parse_rain_intensity(const char* text) {
 }
 
 int main(int argc, char* argv[]) {
+    if (g_pc_log_file == NULL) {
+        g_pc_log_file = fopen("game.log", "w");
+    }
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
             printf("Usage: AnimalCrossing [options]\n");

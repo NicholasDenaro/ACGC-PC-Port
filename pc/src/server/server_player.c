@@ -1,5 +1,6 @@
 /* server_player.c - Multi-player ConnectedClient registry and tracking */
 #include "server/server_player.h"
+#include "server/server_zone.h"
 #include "server/server_runner.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -104,6 +105,10 @@ int server_player_register(uint32_t client_id, uint32_t zone_id, const Private_c
 
             printf("[SERVER] Registered Client ID %u in slot %d (Zone %u).\n",
                    client_id, i, zone_id);
+            ServerZone* zone = server_zone_get(zone_id);
+            if (zone != NULL) {
+                server_zone_add_player(zone, i);
+            }
             return i;
         }
     }
@@ -116,6 +121,10 @@ void server_player_unregister(uint32_t client_id) {
     for (int i = 0; i < MAX_SERVER_CLIENTS; i++) {
         if (g_server_clients[i].is_connected && g_server_clients[i].client_id == client_id) {
             ConnectedClient* client = &g_server_clients[i];
+            ServerZone* zone = server_zone_get(client->zone_id);
+            if (zone != NULL) {
+                server_zone_remove_player(zone, i);
+            }
             if (client->player_actor != NULL) {
                 Actor_delete((ACTOR*)client->player_actor);
                 client->player_actor = NULL;
@@ -261,6 +270,16 @@ int server_spawn_dummy_player(GAME_PLAY* play, const char* name, xyz_t pos) {
         pos.y = ground_y;
     }
 
+    if (client->player_actor == NULL) {
+        for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
+            PLAYER_ACTOR* pa = (PLAYER_ACTOR*)a;
+            if (pa->is_dummy || pa->player_no == slot) {
+                client->player_actor = pa;
+                break;
+            }
+        }
+    }
+
     /* If dummy actor already exists in the scene, teleport it */
     if (client->player_actor != NULL) {
         int exists = 0;
@@ -404,6 +423,22 @@ void server_player_tick(GAME_PLAY* play) {
     int is_outdoors = (play->scene_id == SCENE_FG && cur_field_type == mFI_FIELDTYPE2_FG);
     if (should_spawn && is_outdoors && g_server_clients[0].player_actor != NULL) {
         ConnectedClient* dummy_client = &g_server_clients[1];
+        if (dummy_client->player_actor == NULL) {
+            for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
+                PLAYER_ACTOR* pa = (PLAYER_ACTOR*)a;
+                if (pa->is_dummy || pa->player_no == 1) {
+                    dummy_client->player_actor = pa;
+                    dummy_client->is_connected = 1;
+                    dummy_client->is_dummy = 1;
+                    pa->player_no = 1;
+                    pa->client_id = 2;
+                    pa->is_dummy = 1;
+                    a->cull_distance = 10000.0f;
+                    a->state_bitfield |= (ACTOR_STATE_NO_CULL | ACTOR_STATE_NO_MOVE_WHILE_CULLED | ACTOR_STATE_NO_DRAW_WHILE_CULLED);
+                    break;
+                }
+            }
+        }
         if (!dummy_client->is_connected || dummy_client->player_actor == NULL) {
             xyz_t dummy_pos = {0.0f, 0.0f, 0.0f};
             FILE* flog = fopen("server_player.log", "a");

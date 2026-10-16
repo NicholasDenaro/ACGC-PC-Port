@@ -29,7 +29,7 @@
 #define PC_SCREEN_HEIGHT  PC_GC_HEIGHT
 #define PC_WINDOW_TITLE   "Animal Crossing"
 
-#define PC_MAIN_MEMORY_SIZE   (24 * 1024 * 1024)
+#define PC_MAIN_MEMORY_SIZE   (256 * 1024 * 1024)
 #define PC_ARAM_SIZE          (16 * 1024 * 1024)
 #define PC_FIFO_SIZE          (256 * 1024)
 
@@ -67,6 +67,7 @@ extern SDL_Window*   g_pc_window;
 extern SDL_GLContext  g_pc_gl_context;
 extern int           g_pc_running;
 extern int           g_pc_verbose;
+extern FILE*         g_pc_log_file;
 extern int           g_pc_frame_limit_override;
 extern int           g_pc_speedhack_enabled;
 extern int           g_pc_time_override;

@@ -57,6 +57,10 @@ void pc_platform_shutdown(void) {
 
     server_runner_shutdown();
     pc_disc_shutdown();
+    if (g_pc_log_file != NULL) {
+        fclose(g_pc_log_file);
+        g_pc_log_file = NULL;
+    }
     SDL_Quit();
 }
 
@@ -103,6 +107,10 @@ static void print_usage(const char* prog) {
 }
 
 int main(int argc, char** argv) {
+    if (g_pc_log_file == NULL) {
+        g_pc_log_file = fopen("server.log", "w");
+    }
+
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 

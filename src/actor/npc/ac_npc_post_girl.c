@@ -67,7 +67,13 @@ void aPG_actor_ct(ACTOR *actorx, GAME *game) {
 }
 
 void aPG_actor_save(ACTOR *actorx, GAME *game) {
+#ifdef TARGET_PC
+    if (CLIP(npc_clip) != NULL && CLIP(npc_clip)->save_proc != NULL) {
+        CLIP(npc_clip)->save_proc(actorx, game);
+    }
+#else
     CLIP(npc_clip)->save_proc(actorx, game);
+#endif
 }
 
 void aPG_actor_dt(ACTOR *actorx, GAME *game) {
@@ -75,15 +81,33 @@ void aPG_actor_dt(ACTOR *actorx, GAME *game) {
     if (postgirl->is_desk_full == TRUE) {
         Common_Get(force_mail_delivery_flag) = TRUE;
     }
+#ifdef TARGET_PC
+    if (CLIP(npc_clip) != NULL && CLIP(npc_clip)->dt_proc != NULL) {
+        CLIP(npc_clip)->dt_proc(actorx, game);
+    }
+#else
     CLIP(npc_clip)->dt_proc(actorx, game);
+#endif
 }
 
 void aPG_actor_init(ACTOR *actorx, GAME *game) {
+#ifdef TARGET_PC
+    if (CLIP(npc_clip) != NULL && CLIP(npc_clip)->init_proc != NULL) {
+        CLIP(npc_clip)->init_proc(actorx, game);
+    }
+#else
     CLIP(npc_clip)->init_proc(actorx, game);
+#endif
 }
 
 void aPG_actor_draw(ACTOR *actorx, GAME *game) {
+#ifdef TARGET_PC
+    if (CLIP(npc_clip) != NULL && CLIP(npc_clip)->draw_proc != NULL) {
+        CLIP(npc_clip)->draw_proc(actorx, game);
+    }
+#else
     CLIP(npc_clip)->draw_proc(actorx, game);
+#endif
 }
 
 #include "../src/actor/npc/ac_npc_post_girl.c_inc"

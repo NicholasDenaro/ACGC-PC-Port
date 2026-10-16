@@ -292,8 +292,18 @@ void __OSCacheInit(void) {}
 
 u32 OSGetConsoleType(void) { return 0x10000004; /* OS_CONSOLE_DEVHW1 */ }
 
+FILE* g_pc_log_file = NULL;
+
 void OSPanic(const char* file, int line, const char* msg, ...) {
     va_list args;
+    if (g_pc_log_file != NULL) {
+        fprintf(g_pc_log_file, "OSPanic at %s:%d: ", file, line);
+        va_start(args, msg);
+        vfprintf(g_pc_log_file, msg, args);
+        va_end(args);
+        fprintf(g_pc_log_file, "\n");
+        fflush(g_pc_log_file);
+    }
     fprintf(stderr, "OSPanic at %s:%d: ", file, line);
     va_start(args, msg);
     vfprintf(stderr, msg, args);
@@ -302,6 +312,13 @@ void OSPanic(const char* file, int line, const char* msg, ...) {
 }
 
 void OSReport(const char* fmt, ...) {
+    if (g_pc_log_file != NULL) {
+        va_list fargs;
+        va_start(fargs, fmt);
+        vfprintf(g_pc_log_file, fmt, fargs);
+        va_end(fargs);
+        fflush(g_pc_log_file);
+    }
     if (!g_pc_verbose) return;
     va_list args;
     va_start(args, fmt);
@@ -311,6 +328,13 @@ void OSReport(const char* fmt, ...) {
 }
 
 void OSVReport(const char* fmt, va_list list) {
+    if (g_pc_log_file != NULL) {
+        va_list fargs;
+        va_copy(fargs, list);
+        vfprintf(g_pc_log_file, fmt, fargs);
+        va_end(fargs);
+        fflush(g_pc_log_file);
+    }
     if (!g_pc_verbose) return;
     vprintf(fmt, list);
 }

@@ -1354,6 +1354,25 @@ static void Player_actor_change_proc_index(ACTOR* actorx, GAME* game) {
     player->changed_main_index = Player_actor_change_main_index(actorx, game);
 }
 
+#ifdef TARGET_PC
+extern void Player_actor_force_wait(ACTOR* actorx, GAME* game) {
+    PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
+    if (player == NULL) {
+        return;
+    }
+
+    player->actor_class.state_bitfield &= ~ACTOR_STATE_IN_DEMO;
+    player->requested_main_index = mPlayer_INDEX_WAIT;
+    player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_43;
+    player->requested_main_index_changed = TRUE;
+    player->requested_main_index_data.wait.morph_speed = -5.0f;
+    player->requested_main_index_data.wait.flags = 0;
+    player->requested_main_index_data.wait._04 = 0.0f;
+    Player_actor_change_proc_index(actorx, game);
+    player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_NONE;
+}
+#endif
+
 typedef void (*mPlayer_MAIN_PROC)(ACTOR*, GAME*);
 
 static void Player_actor_main_Dma(ACTOR*, GAME*);
