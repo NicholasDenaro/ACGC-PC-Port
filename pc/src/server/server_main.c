@@ -4,6 +4,7 @@
 #include "pc_disc.h"
 #include "pc_settings.h"
 #include "server/server_runner.h"
+#include "network/net_packets.h"
 #include <enet/enet.h>
 
 #include <signal.h>
@@ -104,6 +105,7 @@ static void print_usage(const char* prog) {
     printf("  --town-name <name>  Custom town name for new town\n");
     printf("  --save-dir <path>   Directory containing save files (default: 'save')\n");
     printf("  --spawn-dummy-player Spawn a simulated player into the world for testing\n");
+    printf("  --test-packets      Run network packet serialization self-tests and exit\n");
     printf("  -v, --verbose       Enable verbose diagnostic output\n");
     printf("  -h, --help          Show this help message\n");
 }
@@ -136,6 +138,15 @@ int main(int argc, char** argv) {
             g_server_config.save_dir = argv[++i];
         } else if (strcmp(argv[i], "--spawn-dummy-player") == 0) {
             g_server_config.spawn_dummy_player = true;
+        } else if (strcmp(argv[i], "--test-packets") == 0) {
+            printf("[SERVER] Running network packet serialization unit tests...\n");
+            if (net_packer_run_tests()) {
+                printf("[SERVER] All packet serialization tests passed successfully!\n");
+                return 0;
+            } else {
+                fprintf(stderr, "[SERVER ERROR] Packet serialization tests failed!\n");
+                return 1;
+            }
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
             g_server_config.verbose = true;
             g_pc_verbose = 1;
@@ -175,6 +186,13 @@ int main(int argc, char** argv) {
 
     if (enet_initialize() != 0) {
         fprintf(stderr, "[SERVER ERROR] Failed to initialize ENet networking subsystem.\n");
+        SDL_Quit();
+        return 1;
+    }
+
+    if (!net_packer_run_tests()) {
+        fprintf(stderr, "[SERVER ERROR] Packet serialization self-test failed.\n");
+        enet_deinitialize();
         SDL_Quit();
         return 1;
     }

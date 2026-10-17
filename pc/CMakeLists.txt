@@ -337,6 +337,7 @@ set(PC_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/pc_disc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_player.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_zone.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/network/net_packer.c
 )
 
 # =============================================================================

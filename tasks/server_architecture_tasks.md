@@ -187,8 +187,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Add ENet as a vendored or CMake FetchContent dependency in `pc/CMakeLists.txt` for both client and server targets.
   - **Acceptance Criteria**: Both client and server compile and link against `enet.lib` / `libenet.a`.
 
-- [ ] **Task 6.2: Network Packet Serialization Subsystem**
-  - **State**: `Not Implemented`
+- [x] **Task 6.2: Network Packet Serialization Subsystem**
+  - **State**: `Implemented`
   - **Files**: `include/network/net_packets.h`, `pc/src/network/net_packer.c`
   - **Description**: Implement compact binary serializers/deserializers for all packet types (`PKT_C2S_HANDSHAKE`, `PKT_C2S_INPUT`, `PKT_S2C_ENTITY_SYNC`, `PKT_S2C_FG_DELTA`, etc.) with endian safety.
   - **Acceptance Criteria**: Packet structures serialize to tightly packed byte buffers and pass round-trip unit tests.
