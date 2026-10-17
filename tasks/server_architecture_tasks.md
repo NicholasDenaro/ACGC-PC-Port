@@ -193,8 +193,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Implement compact binary serializers/deserializers for all packet types (`PKT_C2S_HANDSHAKE`, `PKT_C2S_INPUT`, `PKT_S2C_ENTITY_SYNC`, `PKT_S2C_FG_DELTA`, etc.) with endian safety.
   - **Acceptance Criteria**: Packet structures serialize to tightly packed byte buffers and pass round-trip unit tests.
 
-- [ ] **Task 6.3: Server Network Listener & Client Session State Machine**
-  - **State**: `Not Implemented`
+- [x] **Task 6.3: Server Network Listener & Client Session State Machine**
+  - **State**: `Implemented`
   - **Files**: `pc/src/server/server_network.c`, `pc/include/server/server_network.h`
   - **Description**: Implement ENet host creation, event polling (`ENET_EVENT_TYPE_CONNECT`, `RECEIVE`, `DISCONNECT`), connection authentication, and timeout handling.
   - **Acceptance Criteria**: Server accepts incoming client connections, tracks heartbeat ping/pong, and cleans up on client disconnect.

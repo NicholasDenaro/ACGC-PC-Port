@@ -1,5 +1,6 @@
 /* server_runner.c - Authoritative server tick runner & lifecycle management */
 #include "server/server_runner.h"
+#include "server/server_network.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,12 +25,14 @@ void server_config_init_defaults(ServerConfig* config) {
 void server_runner_init(void) {
     memset(&g_server_stats, 0, sizeof(ServerStats));
     g_server_running = 1;
+    server_network_init(g_server_config.port);
     printf("[SERVER] Server runner initialized (Target Tickrate: %u Hz, Port: %u)\n",
            g_server_config.tickrate, g_server_config.port);
 }
 
 void server_runner_shutdown(void) {
     g_server_running = 0;
+    server_network_shutdown();
     printf("[SERVER] Server runner shutting down. Total ticks processed: %llu\n",
            (unsigned long long)g_server_stats.total_ticks);
 }

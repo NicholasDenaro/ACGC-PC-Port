@@ -4,8 +4,14 @@
 #include "pc_disc.h"
 #include "pc_settings.h"
 #include "server/server_runner.h"
+#include "server/server_network.h"
 #include "network/net_packets.h"
 #include <enet/enet.h>
+
+#ifdef _WIN32
+#undef near
+#undef far
+#endif
 
 #include <signal.h>
 #include <stdio.h>
@@ -106,6 +112,7 @@ static void print_usage(const char* prog) {
     printf("  --save-dir <path>   Directory containing save files (default: 'save')\n");
     printf("  --spawn-dummy-player Spawn a simulated player into the world for testing\n");
     printf("  --test-packets      Run network packet serialization self-tests and exit\n");
+    printf("  --test-network      Run network listener & session self-tests and exit\n");
     printf("  -v, --verbose       Enable verbose diagnostic output\n");
     printf("  -h, --help          Show this help message\n");
 }
@@ -145,6 +152,21 @@ int main(int argc, char** argv) {
                 return 0;
             } else {
                 fprintf(stderr, "[SERVER ERROR] Packet serialization tests failed!\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--test-network") == 0) {
+            printf("[SERVER] Running network listener & session unit tests...\n");
+            SDL_SetMainReady();
+            SDL_Init(SDL_INIT_TIMER);
+            enet_initialize();
+            int res = server_network_run_tests();
+            enet_deinitialize();
+            SDL_Quit();
+            if (res) {
+                printf("[SERVER] All network listener tests passed successfully!\n");
+                return 0;
+            } else {
+                fprintf(stderr, "[SERVER ERROR] Network listener tests failed!\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
@@ -192,6 +214,13 @@ int main(int argc, char** argv) {
 
     if (!net_packer_run_tests()) {
         fprintf(stderr, "[SERVER ERROR] Packet serialization self-test failed.\n");
+        enet_deinitialize();
+        SDL_Quit();
+        return 1;
+    }
+
+    if (!server_network_run_tests()) {
+        fprintf(stderr, "[SERVER ERROR] Network listener self-test failed.\n");
         enet_deinitialize();
         SDL_Quit();
         return 1;

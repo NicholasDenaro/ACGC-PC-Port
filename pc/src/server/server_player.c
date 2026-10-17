@@ -2,6 +2,7 @@
 #include "server/server_player.h"
 #include "server/server_zone.h"
 #include "server/server_runner.h"
+#include "server/server_network.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
 #include "m_actor.h"
@@ -354,6 +355,9 @@ void server_player_tick(GAME_PLAY* play) {
     if (!s_player_registry_initialized) {
         server_player_init();
     }
+
+    /* Process incoming network events and packets */
+    server_network_poll();
 
     /* Reset actor pointers if scene or play context changed */
     static GAME_PLAY* s_last_play = NULL;
