@@ -5,6 +5,7 @@
 #include "pc_settings.h"
 #include "server/server_runner.h"
 #include "server/server_network.h"
+#include "client/client_network.h"
 #include "network/net_packets.h"
 #include <enet/enet.h>
 
@@ -155,18 +156,19 @@ int main(int argc, char** argv) {
                 return 1;
             }
         } else if (strcmp(argv[i], "--test-network") == 0) {
-            printf("[SERVER] Running network listener & session unit tests...\n");
+            printf("[SERVER] Running server & client network unit tests...\n");
             SDL_SetMainReady();
             SDL_Init(SDL_INIT_TIMER);
             enet_initialize();
-            int res = server_network_run_tests();
+            int s_res = server_network_run_tests();
+            int c_res = client_network_run_tests();
             enet_deinitialize();
             SDL_Quit();
-            if (res) {
-                printf("[SERVER] All network listener tests passed successfully!\n");
+            if (s_res && c_res) {
+                printf("[SERVER] All server listener & client controller tests passed successfully!\n");
                 return 0;
             } else {
-                fprintf(stderr, "[SERVER ERROR] Network listener tests failed!\n");
+                fprintf(stderr, "[SERVER ERROR] Network tests failed!\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
@@ -219,8 +221,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!server_network_run_tests()) {
-        fprintf(stderr, "[SERVER ERROR] Network listener self-test failed.\n");
+    if (!server_network_run_tests() || !client_network_run_tests()) {
+        fprintf(stderr, "[SERVER ERROR] Network self-test failed.\n");
         enet_deinitialize();
         SDL_Quit();
         return 1;

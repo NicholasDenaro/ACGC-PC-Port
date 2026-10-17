@@ -199,8 +199,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Implement ENet host creation, event polling (`ENET_EVENT_TYPE_CONNECT`, `RECEIVE`, `DISCONNECT`), connection authentication, and timeout handling.
   - **Acceptance Criteria**: Server accepts incoming client connections, tracks heartbeat ping/pong, and cleans up on client disconnect.
 
-- [ ] **Task 6.4: Client Network Controller & Server Discovery**
-  - **State**: `Not Implemented`
+- [x] **Task 6.4: Client Network Controller & Server Discovery**
+  - **State**: `Implemented`
   - **Files**: `pc/src/client/client_network.c`, `pc/include/client/client_network.h`
   - **Description**: Create the client-side networking manager that connects to a target server IP:port, transmits input packets, and applies server state packets to local actors.
   - **Acceptance Criteria**: Client successfully connects to a local or remote server and completes the initial handshake.
@@ -241,22 +241,40 @@ This task tracker outlines all implementation milestones defined in [Specificati
 
 ---
 
-### Phase 8: World Persistence & Save Journaling
+### Phase 8: Resident Ownership, Extended Storage & Tiered Persistence
 
-- [ ] **Task 8.1: Master Town Save Loader & Periodic Snapshotting**
-  - **State**: `Not Implemented`
-  - **Files**: `pc/src/server/server_storage.c`, `src/game/m_flashrom.c`
-  - **Description**: Implement master town save loading from `save/town_master.sav`. Run periodic atomic flushes every 5 minutes and upon clean shutdown.
-  - **Acceptance Criteria**: Server restarts reload exact town condition, villager roster, and planted flora.
+- [x] **Task 8.1: Zero-Player Dedicated Server Town Initialization & Vacancy**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_play.c`, `src/game/m_huusui_room.c`, `pc/src/server/server_player.c`
+  - **Description**: Remove automatic stub player allocation and forced House 0 ownership on dedicated server startup. All 4 houses remain unowned and vacant (`ownerID` is null), ready for real connecting players to claim.
+  - **Acceptance Criteria**: Dedicated server boots with all 4 houses vacant, Gyroids in unowned status, and no artificial Player 1 occupying slot 0.
 
-- [ ] **Task 8.2: Write-Ahead Delta Journaling**
-  - **State**: `Not Implemented`
-  - **Files**: `pc/src/server/server_journal.c`, `pc/include/server/server_journal.h`
-  - **Description**: Append every tile modification, inventory trade, and villager dialogue milestone to an append-only log (`save/journal.log`). On crash recovery, replay the journal against the last master snapshot.
-  - **Acceptance Criteria**: Abruptly terminating the server process preserves all tile and item changes made prior to termination.
+- [x] **Task 8.2: Client Persistent Identity Token Subsystem (`client_token.dat`)**
+  - **State**: `Implemented`
+  - **Files**: `pc/src/client/client_identity.c`, `pc/include/client/client_identity.h`, `pc/src/client/client_network.c`
+  - **Description**: Generate and persist a unique 32-byte UUID token (`save/client_token.dat`) on first launch. Transmit this token in `PKT_C2S_HANDSHAKE.auth_token` for seamless authentication and character binding.
+  - **Acceptance Criteria**: Returning clients instantly resume their existing character on reconnect without entering credentials.
 
-- [ ] **Task 8.3: Individual Player Data Persistence**
+- [ ] **Task 8.3: Server Extended Resident & Visitor Database**
   - **State**: `Not Implemented`
-  - **Files**: `pc/src/server/server_player_storage.c`
-  - **Description**: Save each connecting player's pockets, bells, debts, inventory, and custom designs into separate files (`save/players/<uuid>.dat`) to allow character portability across different dedicated servers.
-  - **Acceptance Criteria**: Players retain their personal inventory, clothes, and wallet across disconnects and server transitions.
+  - **Files**: `pc/src/server/server_storage.c`, `pc/include/server/server_storage.h`
+  - **Description**: Maintain `save/server_extended.dat` alongside canonical `DobutsunomoriP_MURA.gci`. Store all 8 residents (2 per house acting as roommates), roommate pairings, shared mortgage debt balances, and persistent visitor profiles while mirroring the primary 4 residents to the `.gci` for vanilla GameCube compatibility.
+  - **Acceptance Criteria**: Server tracks 8 residents across 4 houses and remembers returning visitor profiles.
+
+- [ ] **Task 8.4: Event-Driven Autosave & Tiered Rolling Backups**
+  - **State**: `Not Implemented`
+  - **Files**: `pc/src/server/server_storage.c`, `pc/src/server/server_backup.c`, `pc/include/server/server_backup.h`
+  - **Description**: Implement atomic file writes (`.tmp` + rename). Trigger autosave upon game mutations (debounced 1s) and every 60s. Maintain automated rolling backups in `save/backups/`: `minute/` (last 10m), `hour/` (last 24h), `daily/` (last 14d).
+  - **Acceptance Criteria**: Save data writes atomically without hitching, and snapshots rotate through minute, hour, and daily backup folders.
+
+- [ ] **Task 8.5: First-Time Connection Train Ride & Rover Character Creation**
+  - **State**: `Not Implemented`
+  - **Files**: `src/game/m_start_data_init.c`, `pc/src/client/client_network.c`
+  - **Description**: When a client connects with an unassigned token, route them through the authentic Rover questionnaire on the train (`SCENE_START_DEMO`) to establish their name, gender, face, and clothing before arriving at the station as a Visitor.
+  - **Acceptance Criteria**: New players experience the train intro with Rover and customize their character on the server.
+
+- [ ] **Task 8.6: House Exterior Gyroid Move-In & Roommate Interaction**
+  - **State**: `Not Implemented`
+  - **Files**: `src/actor/ac_gyroid.c`, `src/game/m_house.c`, `pc/src/server/server_storage.c`
+  - **Description**: Hook house exterior Gyroids to display a "Move In" prompt when spoken to by an eligible visitor. Check that the house has an open roommate slot (< 2 residents), assign the player to the house, and update mailbox/door permissions.
+  - **Acceptance Criteria**: A visitor speaking to a house Gyroid can claim an open slot, becoming a permanent town resident and roommate.

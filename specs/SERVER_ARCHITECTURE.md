@@ -341,3 +341,102 @@ flowchart TD
    * Seeds the offshore island layout and islander via `mISL_init()`.
    * Flushes the freshly populated `Save` structure to disk as the new base `town_master.sav`.
 
+---
+
+### 3.6 8-Resident Roommate System & Visitor Progression
+
+```mermaid
+flowchart LR
+    NewClient["Connecting Client"] --> TokenCheck{"Has Token in\nServer Registry?"}
+    TokenCheck -->|No| Rover["Rover Train Intro\n(Character Creation)"]
+    Rover --> Visitor["Visitor / Guest Role\n(Arrive at Station)"]
+    TokenCheck -->|Yes - Visitor| Visitor
+    TokenCheck -->|Yes - Resident| Resident["Resident Role\n(Spawn at Claimed House)"]
+
+    Visitor --> Explore["Explore Town, Shop, Talk to Villagers"]
+    Explore --> GyroidTalk["Speak to House Gyroid\n(Check Open Roommate Slot)"]
+    GyroidTalk --> MoveIn{"Move In Confirmed?\n(< 2 Roommates in House)"}
+    MoveIn -->|Yes| Resident
+```
+
+1. **Town Capacity & Resident Allocation**:
+   * The town contains 4 physical houses (`Save.homes[0..3]`).
+   * Exactly **8 permanent Resident slots** are supported (2 residents per house acting as roommates):
+     * **House 0**: Resident 0 & Resident 1
+     * **House 1**: Resident 2 & Resident 3
+     * **House 2**: Resident 4 & Resident 5
+     * **House 3**: Resident 6 & Resident 7
+   * **Simultaneous Connections**: Up to 8 players can be online simultaneously (any combination of residents and visiting guests).
+
+2. **Shared House Mechanics (Roommates)**:
+   * **Shared Attributes**:
+     * House expansion tier and interior dimensions (`size_info`).
+     * Common mortgage debt: payments made at the Post Office or ABD apply to the shared house loan balance.
+     * Interior furniture layout, wallpaper, flooring, and background stereo music.
+     * Exterior roof color and door sign.
+   * **Independent Personal Attributes**:
+     * Pockets inventory (15 items) and handheld tools.
+     * Personal wallet Bells and individual bank savings balance.
+     * Personal letter storage (10 letters), custom clothing designs, catalog, and encyclopedia.
+
+3. **Visitor / Guest Progression**:
+   * Players connecting to a server for the first time complete the authentic Rover train conversation (`SCENE_START_DEMO`) to establish their name, gender, face, and clothing.
+   * They arrive at the train station with the status of **Visitor / Guest**.
+   * Visitors can explore the town, catch bugs/fish, interact with animals, and purchase goods from Tom Nook.
+   * A visitor may choose to settle permanently in town by speaking to the **exterior Gyroid** outside any house with an open roommate slot (< 2 registered owners).
+   * Upon confirmation, the player is promoted to **Resident**, bound to that house and roommate slot, granted house keys, and assigned their share of the house mortgage.
+
+---
+
+### 3.7 Persistent Client Identity Tokens (`client_token.dat`)
+
+To seamlessly identify returning players without cumbersome passwords or IP address locking:
+1. On first launch, the PC client generates a cryptographically random 32-byte UUID token and persists it to `save/client_token.dat`.
+2. During connection handshake ([`PKT_C2S_HANDSHAKE`](file:///C:/Source/ACGC-PC-Port/include/network/net_packets.h#L105-L117)), the client transmits this token in `auth_token[32]`.
+3. The server queries its extended database (`save/server_extended.dat`):
+   * **Matched Token**: Immediately links the peer to their existing character profile (Resident or Returning Visitor) and restores their inventory.
+   * **New Token**: Allocates a new player record and triggers Rover's character creation on the train.
+
+---
+
+### 3.8 Zero-Player Dedicated Server Town Initialization
+
+In original GameCube gameplay, the engine assumes Player 0 is local host and assigns them House 0 immediately upon town creation. In an authoritative dedicated server architecture:
+1. The dedicated server daemon is **not a player entity**.
+2. When the server generates a new world:
+   * All 30 acres, municipal structures, and 15 animal villagers are created.
+   * **No stub or dummy player is placed into Player Slot 0**.
+   * All 4 houses start in **Vacant / Unowned** status (`ownerID` is null).
+   * All 4 exterior Gyroids start in "Available for Purchase / Move-in" status.
+   * All 8 server client slots remain open and awaiting incoming network peers.
+
+---
+
+### 3.9 Server Storage, Extended Database & Tiered Rolling Backups
+
+```
+save/
+├── card_a/
+│   └── DobutsunomoriP_MURA.gci       (Canonical 470KB Vanilla GameCube Save)
+├── server_extended.dat               (8 Residents, Roommate Bindings, Visitor DB)
+└── backups/
+    ├── minute/                       (Snapshots every 1 min, keeps last 10)
+    │   └── save_min_YYYYMMDD_HHMM.tar.gz
+    ├── hour/                         (Snapshots every 1 hour, keeps last 24)
+    │   └── save_hour_YYYYMMDD_HH00.tar.gz
+    └── daily/                        (Snapshots daily at midnight, keeps last 14)
+        └── save_day_YYYYMMDD.tar.gz
+```
+
+1. **Dual-File Storage Strategy**:
+   * **`DobutsunomoriP_MURA.gci`**: Retains 100% vanilla binary layout. Contains the 30 acres of town terrain, `Save.fg` tile matrix, municipal buildings, resident villagers, and syncs the first 4 residents to remain playable in vanilla GameCube emulators.
+   * **`server_extended.dat`**: Stores persistent auth tokens, the full 8-resident roster with roommate bindings, and the persistent visitor registry.
+2. **Autosave Pipeline**:
+   * **Event-Driven**: Triggered immediately upon critical game mutations (house move-in, debt payments, shop purchases, player disconnects), debounced with a 1-second interval.
+   * **Heartbeat**: 60-second periodic background flush.
+   * **Atomic Writes**: Writes to `.tmp` files before renaming to eliminate power-loss corruption risk.
+3. **Tiered Rolling Backups**:
+   * **Minute Tier**: Snapshots every 60 seconds (keeps last 10 minutes of gameplay).
+   * **Hour Tier**: Snapshots hourly (keeps 24 hourly checkpoints).
+   * **Daily Tier**: Snapshots once per day (keeps 14 daily archives).
+

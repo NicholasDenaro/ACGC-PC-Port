@@ -12,6 +12,11 @@
 #include "pc_profiler.h"
 #include "m_kankyo.h"
 #include <enet/enet.h>
+#ifdef _WIN32
+#undef near
+#undef far
+#endif
+#include "client/client_network.h"
 
 /* prefer discrete GPU on laptops */
 #ifdef _WIN32
@@ -37,6 +42,9 @@ int           g_pc_window_w = PC_SCREEN_WIDTH;
 int           g_pc_window_h = PC_SCREEN_HEIGHT;
 int           g_pc_widescreen_stretch = 0;
 int           g_pc_spawn_dummy_player = 0;
+int           g_pc_net_connect = 0;
+char          g_pc_net_host[64] = "127.0.0.1";
+uint16_t      g_pc_net_port = 21025;
 
 /* exe image range -- used by seg2k0 to distinguish pointers from segment addresses */
 unsigned int pc_image_base = 0;
@@ -305,6 +313,8 @@ int main(int argc, char* argv[]) {
             printf("  --date M/D[/Y]      Override in-game date (e.g. 7/4, 12/24/2026)\n");
             printf("  --rain [intensity]  Force rainy weather; intensity is light, normal, or heavy\n");
             printf("  --uber-shader       Disable shader specialization (single uber shader)\n");
+            printf("  --connect [host[:port]] Connect to dedicated server (default 127.0.0.1:21025)\n");
+            printf("  --test-network      Run network controller self-tests and exit\n");
             printf("  --help, -h          Show this help message\n");
             return 0;
         } else if (strcmp(argv[i], "--framelimit") == 0) {
@@ -366,6 +376,35 @@ int main(int argc, char* argv[]) {
         } else if (strcmp(argv[i], "--spawn-dummy-player") == 0) {
             g_pc_spawn_dummy_player = 1;
             g_pc_verbose = 1; /* enable console output to view dummy player logs */
+        } else if (strcmp(argv[i], "--test-network") == 0) {
+            printf("[PC] Running client & server network self-tests...\n");
+            SDL_Init(SDL_INIT_TIMER);
+            enet_initialize();
+            extern int server_network_run_tests(void);
+            int res1 = server_network_run_tests();
+            int res2 = client_network_run_tests();
+            enet_deinitialize();
+            SDL_Quit();
+            if (res1 && res2) {
+                printf("[PC] All network tests passed successfully!\n");
+                return 0;
+            } else {
+                fprintf(stderr, "[PC ERROR] Network tests failed!\n");
+                return 1;
+            }
+        } else if (strcmp(argv[i], "--connect") == 0) {
+            g_pc_net_connect = 1;
+            g_pc_verbose = 1;
+            if (i + 1 < argc && argv[i + 1][0] != '-') {
+                char arg_copy[64];
+                snprintf(arg_copy, sizeof(arg_copy), "%s", argv[++i]);
+                char* colon = strchr(arg_copy, ':');
+                if (colon) {
+                    *colon = '\0';
+                    g_pc_net_port = (uint16_t)atoi(colon + 1);
+                }
+                snprintf(g_pc_net_host, sizeof(g_pc_net_host), "%s", arg_copy);
+            }
         }
     }
 
@@ -435,8 +474,12 @@ int main(int argc, char* argv[]) {
     }
 
     ac_entry();                         /* sets HotStartEntry = &entry */
+    if (g_pc_net_connect) {
+        client_network_connect(g_pc_net_host, g_pc_net_port);
+    }
     boot_main(argc, (const char**)argv); /* full init → HotStartEntry → game loop */
 
+    client_network_shutdown();
     pc_disc_shutdown();
     pc_platform_shutdown();
     return 0;

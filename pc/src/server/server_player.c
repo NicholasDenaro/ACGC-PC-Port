@@ -25,7 +25,8 @@ static int s_player_registry_initialized = 0;
 void server_player_init(void) {
     memset(g_server_clients, 0, sizeof(g_server_clients));
 
-    /* Initialize slot 0 as Player 1 (Host / Primary Player) */
+#ifndef TARGET_SERVER
+    /* On client, slot 0 is the local player */
     g_server_clients[0].client_id = 1;
     g_server_clients[0].is_connected = 1;
     g_server_clients[0].is_dummy = 0;
@@ -35,10 +36,16 @@ void server_player_init(void) {
     if (now_priv != NULL) {
         memcpy(&g_server_clients[0].private_data, now_priv, sizeof(Private_c));
     }
+#endif
 
     s_player_registry_initialized = 1;
-    printf("[SERVER] Player registry initialized (Capacity: %d clients). Slot 0 reserved for Host/Player 1.\n",
+#ifdef TARGET_SERVER
+    printf("[SERVER] Player registry initialized (Capacity: %d clients). All slots open.\n",
            MAX_SERVER_CLIENTS);
+#else
+    printf("[SERVER] Player registry initialized (Capacity: %d clients). Slot 0 reserved for Local Player.\n",
+           MAX_SERVER_CLIENTS);
+#endif
 }
 
 ConnectedClient* server_player_get(uint32_t client_id) {
@@ -386,7 +393,8 @@ void server_player_tick(GAME_PLAY* play) {
         }
     }
 
-    /* Bind Player 1 (Host) actor */
+#ifndef TARGET_SERVER
+    /* Bind Player 1 (Local Player) actor on client */
     PLAYER_ACTOR* host_actor = get_player_actor_withoutCheck(play);
     if (host_actor != NULL) {
         g_server_clients[0].player_actor = host_actor;
@@ -394,6 +402,7 @@ void server_player_tick(GAME_PLAY* play) {
         host_actor->client_id = 1;
         host_actor->is_dummy = 0;
     }
+#endif
 
     /* Check if dummy player spawn was requested */
     int should_spawn = 0;

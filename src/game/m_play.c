@@ -80,7 +80,12 @@ static void Game_play_dec_dt_timer(f32* timer, GAME_PLAY* play) {
 
 static void Game_play_Reset_destiny() {
     lbRTC_time_c* rtc_time = Common_GetPointer(time.rtc_time);
-    mPr_destiny_c* destiny = &Common_Get(now_private)->destiny;
+    mPr_destiny_c* destiny;
+
+    if (Common_Get(now_private) == NULL) {
+        return;
+    }
+    destiny = &Common_Get(now_private)->destiny;
 
     if (destiny->type == mPr_DESTINY_NORMAL) {
         return;
@@ -530,6 +535,7 @@ extern void play_init(GAME* game) {
     play->submenu_ground_idx = -1;
 
 #ifdef TARGET_SERVER
+    int h;
     printf("[SERVER] play_init: checking town map and save data...\n");
     Common_Set(time.rtc_enabled, TRUE);
     lbRTC_GetTime(Common_GetPointer(time.rtc_time));
@@ -540,7 +546,6 @@ extern void play_init(GAME* game) {
         printf("[SERVER] Bootstrapping procedural map generation (mSDI_StartInitBefore)...\n");
         mFI_ClearFieldData();
         if (mSDI_StartInitBefore(game, 0, mSDI_INIT_MODE_NEW, mSDI_MALLOC_FLAG_GAME) == TRUE) {
-            int h;
             Private_c* priv0;
             static const u8 default_town_name[LAND_NAME_SIZE] = { 'F', 'o', 'r', 'e', 's', 't', CHAR_SPACE, CHAR_SPACE };
             static const u8 default_player_name[PLAYER_NAME_LEN] = { 'P', 'l', 'a', 'y', 'e', 'r', CHAR_SPACE, CHAR_SPACE };
@@ -552,34 +557,15 @@ extern void play_init(GAME* game) {
             mLd_CopyLandName(Save_Get(land_info).name, (u8*)default_town_name);
             bcopy(Save_GetPointer(land_info), &Save_Get(island).landinfo, sizeof(mLd_land_info_c));
 
-            priv0 = Save_GetPointer(private_data[0]);
-            priv0->exists = TRUE;
-            priv0->player_ID.land_id = Save_Get(land_info).id;
-            mLd_CopyLandName(priv0->player_ID.land_name, Save_Get(land_info).name);
-            mPr_CopyPlayerName(priv0->player_ID.player_name, (u8*)default_player_name);
-            priv0->reset_code = 0;
-            priv0->reset_count = 0;
-            Common_Set(now_private, priv0);
-            Common_Set(player_no, 0);
-
-            /* Assign House 0 to Player 0 */
-            mHS_set_use(0, 0);
-            mHm_SetNowHome();
-            Save_Get(homes[0]).flags.has_saved = TRUE;
-
-            /* Catalog starter items */
-            mPr_SetItemCollectBit(priv0->cloth.item);
-            mPr_SetItemCollectBit(FTR_START(FTR_SUM_CASSE01));
-            mPr_SetItemCollectBit(ITM_CARPET_START + Save_Get(homes[0]).floors[0].wall_floor.flooring_idx);
-            mPr_SetItemCollectBit(ITM_WALL_START + Save_Get(homes[0]).floors[0].wall_floor.wallpaper_idx);
-
-            /* Bypass Part-Time Job (Arbeit) / Intro demo */
-            mEv_ClearPersonalEventFlag(0);
-            mEv_UnSetFirstIntro();
-            mEv_UnSetFirstJob();
-            priv0->inventory.loan = 17000;
-            mTM_off_renew_time(1);
-            Common_Set(complete_payment_type, mPlayer_COMPLETE_PAYMENT_TYPE_ARBEIT);
+            /* Dedicated server town initialization: leave all 4 houses unowned and vacant */
+            for (h = 0; h < PLAYER_NUM; h++) {
+                mPr_ClearPrivateInfo(Save_GetPointer(private_data[h]));
+                bzero(&Save_Get(homes[h]).ownerID, sizeof(PersonalID_c));
+                Save_Get(homes[h]).flags.has_saved = FALSE;
+                Save_Get(homes[h]).size_info.size = mHm_HOMESIZE_SMALL;
+            }
+            Common_Set(now_private, NULL);
+            Common_Set(player_no, -1);
 
             /* Initialize RTC timestamps to current real time so no time travel weeds/cockroaches spawn */
             lbRTC_TimeCopy(Save_GetPointer(last_grow_time), Common_GetPointer(time.rtc_time));
@@ -609,31 +595,12 @@ extern void play_init(GAME* game) {
         }
     } else {
         /* Existing save data loaded: sanitize corrupted/uninitialized fields */
-        Private_c* priv0 = Save_GetPointer(private_data[0]);
-        int h;
-        if (mPr_NullCheckPlayerName(priv0->player_ID.player_name)) {
-            static const u8 default_player_name[PLAYER_NAME_LEN] = { 'P', 'l', 'a', 'y', 'e', 'r', CHAR_SPACE, CHAR_SPACE };
-            mPr_CopyPlayerName(priv0->player_ID.player_name, (u8*)default_player_name);
-            priv0->exists = TRUE;
-            priv0->player_ID.land_id = Save_Get(land_info).id;
-            mLd_CopyLandName(priv0->player_ID.land_name, Save_Get(land_info).name);
-        }
         if (mLd_CheckCmpLandName(Save_Get(land_info).name, (u8*)"        ") ||
             Save_Get(land_info).name[0] == 0 || (u8)Save_Get(land_info).name[0] == 0xFF) {
             static const u8 default_town_name[LAND_NAME_SIZE] = { 'F', 'o', 'r', 'e', 's', 't', CHAR_SPACE, CHAR_SPACE };
             mLd_CopyLandName(Save_Get(land_info).name, (u8*)default_town_name);
             bcopy(Save_GetPointer(land_info), &Save_Get(island).landinfo, sizeof(mLd_land_info_c));
         }
-        if (mPr_NullCheckPersonalID(&Save_Get(homes[0]).ownerID)) {
-            mHS_set_use(0, 0);
-            mHm_SetNowHome();
-            Save_Get(homes[0]).flags.has_saved = TRUE;
-            mEv_ClearPersonalEventFlag(0);
-            mEv_UnSetFirstIntro();
-            mEv_UnSetFirstJob();
-        }
-        priv0->reset_code = 0;
-        priv0->reset_count = 0;
         Common_Set(reset_flag, FALSE);
 
         /* Fix year 0 timestamps and weed explosion from previous bug */
@@ -657,9 +624,11 @@ extern void play_init(GAME* game) {
             }
         }
     }
+#ifndef TARGET_SERVER
     if (Common_Get(now_private) == NULL) {
         Common_Set(now_private, Save_GetPointer(private_data[0]));
     }
+#endif
     printf("[SERVER] Loading scene %d...\n", Save_Get(scene_no));
 #endif
 
@@ -1032,6 +1001,8 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
     game->doing_point_specific = 0x90;
 #ifdef TARGET_PC
     {
+        extern void client_network_poll(void);
+        client_network_poll();
         extern void server_player_tick(GAME_PLAY* play);
         FILE* flog = fopen("server_player.log", "a");
         if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d entering Actor_info_call_actor\n", play->game_frame, play->scene_id); fclose(flog); }

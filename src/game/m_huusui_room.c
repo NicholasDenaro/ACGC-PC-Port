@@ -14,7 +14,7 @@
  **/
 extern void mHsRm_GetHuusuiRoom(GAME* game, int player_no) {
   /* Do not calculate Feng Shui if the player is doing chores or is from another town */
-  if (mEv_CheckFirstJob() == FALSE && player_no != mPr_FOREIGNER) {
+  if (mEv_CheckFirstJob() == FALSE && player_no >= 0 && player_no < PLAYER_NUM && player_no != mPr_FOREIGNER) {
     mHsRm_HuusuiRoomOvl(player_no);
   }
   else {
