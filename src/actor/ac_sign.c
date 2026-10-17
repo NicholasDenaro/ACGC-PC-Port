@@ -301,6 +301,10 @@ static int aSIGN_actor_set_target(SIGN_ACTOR* sign, GAME* game) {
     aSIGN_draw_c* draw_p;
     int res = FALSE;
 
+    if (player_actor == NULL) {
+        return FALSE;
+    }
+
     if (mFI_Wpos2BkandUtNuminBlock(&base_bx, &base_bz, &base_ut_x, &base_ut_z, player_actor->world.position)) {
 
         for (z = -1; z < 1; z++) {

@@ -837,28 +837,32 @@ static int aQMgr_talk_common_get_set_data_p(QUEST_MANAGER_ACTOR* manager) {
 }
 
 static void aQMgr_actor_init_quest(QUEST_MANAGER_ACTOR* manager) {
-    mQst_delivery_c* delivery = Common_Get(now_private)->deliveries;
-    mQst_errand_c* errand = Common_Get(now_private)->errands;
+    mQst_delivery_c* delivery = (Common_Get(now_private) != NULL) ? Common_Get(now_private)->deliveries : NULL;
+    mQst_errand_c* errand = (Common_Get(now_private) != NULL) ? Common_Get(now_private)->errands : NULL;
     Animal_c* animal = Save_Get(animals);
     int free_idx = 0;
     int i;
 
-    for (i = 0; i < mPr_DELIVERY_QUEST_NUM; i++) {
-        if (free_idx == -1) {
-            break;
-        }
+    if (delivery != NULL) {
+        for (i = 0; i < mPr_DELIVERY_QUEST_NUM; i++) {
+            if (free_idx == -1) {
+                break;
+            }
 
-        aQMgr_actor_regist_quest(manager, &free_idx, (aQMgr_quest_c*)delivery, i);
-        delivery++;
+            aQMgr_actor_regist_quest(manager, &free_idx, (aQMgr_quest_c*)delivery, i);
+            delivery++;
+        }
     }
 
-    for (i = 0; i < mPr_ERRAND_QUEST_NUM; i++) {
-        if (free_idx == -1) {
-            break;
-        }
+    if (errand != NULL) {
+        for (i = 0; i < mPr_ERRAND_QUEST_NUM; i++) {
+            if (free_idx == -1) {
+                break;
+            }
 
-        aQMgr_actor_regist_quest(manager, &free_idx, (aQMgr_quest_c*)errand, i);
-        errand++;
+            aQMgr_actor_regist_quest(manager, &free_idx, (aQMgr_quest_c*)errand, i);
+            errand++;
+        }
     }
 
     for (i = 0; i < ANIMAL_NUM_MAX; i++) {

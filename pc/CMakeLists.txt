@@ -561,7 +561,7 @@ if(BUILD_SERVER)
     endif()
 
     if(WIN32)
-        target_link_libraries(ac_server opengl32 winmm imm32 version setupapi ws2_32)
+        target_link_libraries(ac_server opengl32 winmm imm32 version setupapi ws2_32 dbghelp)
     else()
         find_package(OpenGL REQUIRED)
         target_link_libraries(ac_server OpenGL::GL dl pthread m)

@@ -209,6 +209,10 @@ static int aSNMgr_get_player_pos(xyz_t* pos_p, GAME* game) {
     if (player != NULL) {
         *pos_p = player->world.position;
         ret = TRUE;
+    } else {
+        pos_p->x = 3.0f * mFI_BK_WORLDSIZE_X_F + mFI_BK_WORLDSIZE_HALF_X_F;
+        pos_p->y = 0.0f;
+        pos_p->z = 3.0f * mFI_BK_WORLDSIZE_Z_F + mFI_BK_WORLDSIZE_HALF_Z_F;
     }
 
     return ret;
@@ -889,7 +893,7 @@ static int aSNMgr_check_in_block_max(int bx, int bz, u8* in_block_p) {
     int ret = FALSE;
     int block = mFI_GetBlockNum(bx, bz);
 
-    if (in_block_p[block] >= 3) {
+    if (block >= 0 && block < ((BLOCK_Z_NUM - 2) * BLOCK_X_NUM) && in_block_p[block] >= 3) {
         ret = TRUE;
     }
 
@@ -1255,6 +1259,19 @@ static void aSNMgr_setup_set_proc(SET_NPC_MANAGER_ACTOR* manager, int set_mode) 
 static void aSNMgr_actor_move(ACTOR* actorx, GAME* game) {
     SET_NPC_MANAGER_ACTOR* manager = (SET_NPC_MANAGER_ACTOR*)actorx;
     GAME_PLAY* play = (GAME_PLAY*)game;
+
+#ifdef TARGET_SERVER
+    if (GET_PLAYER_ACTOR_GAME_ACTOR(game) == NULL) {
+        if (play->fb_fade_type == FADE_TYPE_NONE) {
+            aSNMgr_clear_make_npc(manager->npc_info.make, aSNMgr_SET_NPC_MAX);
+            if (!aSNMgr_chk_arbeit_and_demo_and_halloween()) {
+                aSNMgr_force_go_home(manager);
+                aSNMgr_walk_npc(manager, game);
+            }
+        }
+        return;
+    }
+#endif
 
     aSNMgr_get_player_pos(&manager->player_pos.pos, game);
     switch (mFI_GetPlayerWade()) {

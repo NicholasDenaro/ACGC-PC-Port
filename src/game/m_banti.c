@@ -275,8 +275,15 @@ static void banti_time_check() {
 }
 
 extern void banti_move(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#else
     int addressable_type;
     int update;
+
+    if (get_player_actor_withoutCheck(play) == NULL) {
+        return;
+    }
 
     banti_chk_disp_left(play);
 
@@ -308,6 +315,7 @@ extern void banti_move(GAME_PLAY* play) {
 
     banti_calc_disp_alpha_rate(play);
     banti_time_check();
+#endif
 }
 
 static int banti_draw_before(GAME* game, cKF_SkeletonInfo_R_c* keyframe, int joint_idx, Gfx** joint_shape,

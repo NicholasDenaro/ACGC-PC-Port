@@ -1337,6 +1337,12 @@ static void Camera2_main_Normal_SetEndCenterPos_fromPlayer(GAME_PLAY* play, xyz_
     }
 
     Camera2_GetBorderScale(play, scale, &border_x0, &border_x1, &border_z0, &border_z1);
+    if (player == NULL) {
+        end_center_pos->x = 0.0f;
+        end_center_pos->y = 0.0f;
+        end_center_pos->z = 0.0f;
+        return;
+    }
     *end_center_pos = player->actor_class.eye.position;
 
     if (mPlib_get_player_actor_main_index((GAME*)play) == mPlayer_INDEX_DEMO_GETON_BOAT_WAIT) {
@@ -2713,6 +2719,9 @@ static void Camera2_change_main_index(GAME_PLAY* play) {
 
 typedef void (*CAMERA2_MAIN_INDEX_PROC)(GAME_PLAY*);
 extern void Camera2_process(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     static const CAMERA2_MAIN_INDEX_PROC proc[CAMERA2_PROCESS_NUM] = {
         &Camera2_main_Stop,   &Camera2_main_Normal,    &Camera2_main_Wade,  &Camera2_main_Talk,
         &Camera2_main_Demo,   &Camera2_main_Item,      &Camera2_main_Lock,  &Camera2_main_Door,

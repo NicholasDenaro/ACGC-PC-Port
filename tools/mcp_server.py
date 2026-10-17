@@ -22,8 +22,9 @@ import fnmatch
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "pc", "build32")
-CLIENT_EXE = os.path.join(BUILD_DIR, "bin", "AnimalCrossing.exe")
-SERVER_EXE = os.path.join(BUILD_DIR, "bin", "AnimalCrossingServer.exe")
+BIN_DIR = os.path.join(BUILD_DIR, "bin")
+CLIENT_EXE = os.path.join(BIN_DIR, "AnimalCrossing.exe")
+SERVER_EXE = os.path.join(BIN_DIR, "AnimalCrossingServer.exe")
 MSYS2_SHELL = "C:/msys64/msys2_shell.cmd"
 
 def run_msys2(bash_cmd, timeout=300, cwd=PROJECT_ROOT):
@@ -114,12 +115,24 @@ def tool_compile_check(files=None):
         "output": out
     }
 
-def tool_run_server_test(timeout_seconds=5, extra_args=None):
+def tool_run_server_test(timeout_seconds=5, extra_args=None, debug=False):
     """Runs the headless dedicated server temporarily to verify startup/zones."""
     if not os.path.exists(SERVER_EXE):
         return {
             "success": False,
             "output": f"Server binary not found at {SERVER_EXE}. Please build it first."
+        }
+
+    args_str = " ".join(extra_args) if extra_args else ""
+
+    if debug:
+        gdb_cmd = f"gdb --batch -ex 'set pagination off' -ex 'run {args_str}' -ex 'bt' -ex 'quit' ./AnimalCrossingServer.exe"
+        code, out = run_msys2(gdb_cmd, timeout=timeout_seconds + 30, cwd=BIN_DIR)
+        return {
+            "success": (code == 0),
+            "debug": True,
+            "return_code": code,
+            "output": out
         }
 
     cmd = [SERVER_EXE]
@@ -132,7 +145,7 @@ def tool_run_server_test(timeout_seconds=5, extra_args=None):
     try:
         proc = subprocess.Popen(
             cmd,
-            cwd=BUILD_DIR,
+            cwd=BIN_DIR,
             env=merged_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -146,12 +159,27 @@ def tool_run_server_test(timeout_seconds=5, extra_args=None):
             stdout, _ = proc.communicate(timeout=timeout_seconds)
             # If server stopped on its own
             code = proc.returncode
-            return {
+            res = {
                 "success": (code == 0),
                 "terminated_naturally": True,
                 "return_code": code,
                 "output": stdout
             }
+            if code != 0:
+                # Extract addresses from crash report and resolve with addr2line
+                crash_addrs = re.findall(r'\[0x([0-9a-fA-F]+)\]', stdout)
+                fault = re.search(r'Fault Address:\s*([0-9a-fA-F]+)', stdout)
+                if fault and fault.group(1) not in crash_addrs:
+                    crash_addrs.insert(0, fault.group(1))
+                if crash_addrs:
+                    addrs_str = " ".join(f"0x{a}" for a in crash_addrs[:10])
+                    acode, aout = run_msys2(f"addr2line -e ./AnimalCrossingServer.exe -f -C -p {addrs_str}", timeout=15, cwd=BIN_DIR)
+                    res["resolved_crash_stack"] = aout
+                else:
+                    gdb_cmd = f"gdb --batch -ex 'set pagination off' -ex 'run {args_str}' -ex 'bt' -ex 'quit' ./AnimalCrossingServer.exe"
+                    gcode, gdb_out = run_msys2(gdb_cmd, timeout=30, cwd=BIN_DIR)
+                    res["gdb_backtrace"] = gdb_out
+            return res
         except subprocess.TimeoutExpired:
             # Server is alive and running as expected!
             proc.terminate()
@@ -736,6 +764,10 @@ TOOLS = [
                     "type": "array",
                     "items": {"type": "string"},
                     "description": "Optional command line arguments to pass to the server."
+                },
+                "debug": {
+                    "type": "boolean",
+                    "description": "Run the server under GDB in the MSYS2 environment to produce a stack trace upon crash."
                 }
             }
         }
@@ -900,7 +932,8 @@ def handle_tool_call(name, arguments):
     elif name == "run_server_test":
         return tool_run_server_test(
             timeout_seconds=arguments.get("timeout_seconds", 5),
-            extra_args=arguments.get("extra_args")
+            extra_args=arguments.get("extra_args"),
+            debug=arguments.get("debug", False)
         )
     elif name == "git_status":
         return tool_git_status(

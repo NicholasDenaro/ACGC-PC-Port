@@ -382,6 +382,7 @@ extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player
     }
 
     /* Try spawning the player actor */
+#ifndef TARGET_SERVER
     if (player_data != NULL) {
         player_actor =
             Actor_info_make_actor(actor_info, game, player_data->profile, player_data->position.x, player_data->position.y,
@@ -395,6 +396,9 @@ extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player
     } else {
         player_actor = NULL;
     }
+#else
+    player_actor = NULL;
+#endif
 
     /* Spawn the current bg item type actor */
     if (Common_Get(bg_item_profile) != 0) {

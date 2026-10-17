@@ -660,8 +660,13 @@ extern void mEv_SetGateway();
 extern int mEv_CheckGateway();
 extern void mEv_UnSetGateway();
 extern int mEv_CheckTitleDemo();
+#ifdef TARGET_SERVER
+#define mEv_IsTitleDemo() (FALSE)
+#define mEv_IsNotTitleDemo() (TRUE)
+#else
 #define mEv_IsTitleDemo() (mEv_CheckTitleDemo() > mEv_TITLEDEMO_NONE)
 #define mEv_IsNotTitleDemo() (!mEv_IsTitleDemo())
+#endif
 extern void mEv_SetTitleDemo(int demo_number);
 extern void mEv_RenewalDataEveryDay();
 extern void mEv_GetEventWeather(s16* weather, s16* intensity);

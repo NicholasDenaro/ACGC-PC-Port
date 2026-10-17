@@ -296,7 +296,11 @@ extern void mEv_UnSetGateway() {
     }
 }
 
+#ifdef TARGET_SERVER
+static int title_demo_number = mEv_TITLEDEMO_NONE;
+#else
 static int title_demo_number = mEv_TITLEDEMO_LOGO;
+#endif
 
 extern int mEv_CheckTitleDemo() {
     return title_demo_number;
@@ -965,7 +969,7 @@ static int init_special_event(int new_event) {
     special_end_ymdh.hour = get_special_event_end_time(type);
 
     if (check_ymdh_range(rtc_ymdh.raw, special_ymdh.raw, special_end_ymdh.raw) == FALSE || new_event) {
-        int player_id = Common_Get(now_private)->player_ID.player_id;
+        int player_id = (Common_Get(now_private) != NULL) ? Common_Get(now_private)->player_ID.player_id : (int)Save_Get(land_info).id;
         int n;
         int seed = player_id;
         int sale_weekday;

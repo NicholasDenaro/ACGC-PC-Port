@@ -111,8 +111,12 @@ static void event_title_flag_off() {
 }
 
 static void Game_play_camera_proc(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#else
     Camera2_ClearActorTalking_Cull(play);
     Camera2_process(play);
+#endif
 }
 
 static void Game_play_fbdemo_wipe_destroy(GAME_PLAY* play) {
@@ -229,7 +233,11 @@ static void Game_play_fbdemo_fade_out_start_emu_move_end(GAME_PLAY* play) {
 }
 
 static void Game_play_fbdemo_fade_out_game_end_move_end(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#else
     GAME_GOTO_NEXT(&play->game, trademark, TRADEMARK);
+#endif
 }
 
 static void Game_play_change_scene_move_end(GAME_PLAY* play) {
@@ -425,7 +433,9 @@ extern void play_cleanup(GAME* game) {
         outdoor->scene_id = SCENE_FG;
         outdoor->clip = Common_Get(clip);
         outdoor->field_type = Common_Get(field_type);
+#ifndef TARGET_SERVER
         server_zone_remove_player(outdoor, 0);
+#endif
 
         /* Clear play pointers so game_dt doesn't alter outdoor structures */
         bzero(&play->actor_info, sizeof(Actor_info));
@@ -441,7 +451,9 @@ extern void play_cleanup(GAME* game) {
             bzero(&room_zone->collision_check, sizeof(CollisionCheck_c));
             room_zone->field_info = NULL;
             room_zone->scene_data = NULL;
+#ifndef TARGET_SERVER
             server_zone_remove_player(room_zone, 0);
+#endif
         }
         CollisionCheck_dt(game, &play->collision_check);
         Actor_info_dt(&play->actor_info, play);
@@ -536,6 +548,7 @@ extern void play_init(GAME* game) {
 
 #ifdef TARGET_SERVER
     int h;
+    mEv_SetTitleDemo(mEv_TITLEDEMO_NONE);
     printf("[SERVER] play_init: checking town map and save data...\n");
     Common_Set(time.rtc_enabled, TRUE);
     lbRTC_GetTime(Common_GetPointer(time.rtc_time));
@@ -725,7 +738,9 @@ extern void play_init(GAME* game) {
         g_fdinfo = outdoor->field_info;
         play->current_scene_data = outdoor->scene_data;
         server_set_active_zone_context(play, outdoor);
+#ifndef TARGET_SERVER
         server_zone_add_player(outdoor, 0);
+#endif
         aNPC_reinit_cloth_data_area(&play->object_exchange);
 
         flog = fopen("server_player.log", "a");
@@ -904,7 +919,7 @@ extern void play_init(GAME* game) {
 #endif
 
 #ifdef TARGET_SERVER
-    printf("[SERVER] Initializing world field simulation (mFM_FieldInit)...\n");
+    printf("[SERVER] Initializing world field simulation (mFM_FieldInit)...\n"); fflush(stdout);
 #endif
 
     mFM_FieldInit(play);
@@ -922,13 +937,15 @@ extern void play_init(GAME* game) {
     event_title_flag_off();
     mEA_GetCardDLProgram();
 #ifdef TARGET_SERVER
-    printf("[SERVER] World simulation initialized! Ready for player connections.\n");
+    printf("[SERVER] World simulation initialized! Ready for player connections.\n"); fflush(stdout);
 #endif
 #ifdef TARGET_PC
         if (Save_Get(scene_no) == SCENE_FG) {
             if (!mEv_IsTitleDemo()) {
                 server_zone_init(play);
+#ifndef TARGET_SERVER
                 server_zone_add_player(&g_server_zones[ZONE_ID_OUTDOOR_TOWN], 0);
+#endif
             }
         } else {
             ZoneType ztype = server_zone_type_from_scene(Save_Get(scene_no));
@@ -942,8 +959,10 @@ extern void play_init(GAME* game) {
                     room->scene_data = play->current_scene_data;
                     room->clip = Common_Get(clip);
                     room->field_type = Common_Get(field_type);
+#ifndef TARGET_SERVER
                     server_zone_add_player(room, 0);
                     server_set_active_zone_context(play, room);
+#endif
                 }
             }
         }
@@ -958,15 +977,6 @@ extern void play_init(GAME* game) {
 
 static void Game_play_move_fbdemo_not_move(GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
-#ifdef TARGET_PC
-    if (play->game_frame < 5) {
-        FILE* flog = fopen("server_player.log", "a");
-        if (flog) {
-            fprintf(flog, "[NOT MOVE START] frame=%u scene=%d\n", play->game_frame, play->scene_id);
-            fclose(flog);
-        }
-    }
-#endif
 
     game->doing_point = 0;
     game->doing_point_specific = 0x8F;
@@ -1004,20 +1014,14 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
         extern void client_network_poll(void);
         client_network_poll();
         extern void server_player_tick(GAME_PLAY* play);
-        FILE* flog = fopen("server_player.log", "a");
-        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d entering Actor_info_call_actor\n", play->game_frame, play->scene_id); fclose(flog); }
         server_player_tick(play);
     }
 #endif
     Actor_info_call_actor(play, &play->actor_info);
 #ifdef TARGET_PC
     {
-        FILE* flog = fopen("server_player.log", "a");
-        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d entering server_tick_zones\n", play->game_frame, play->scene_id); fclose(flog); }
         extern void server_tick_zones(GAME_PLAY* play);
         server_tick_zones(play);
-        flog = fopen("server_player.log", "a");
-        if (flog) { fprintf(flog, "[MOVE] frame=%u scene=%d finished server_tick_zones\n", play->game_frame, play->scene_id); fclose(flog); }
     }
 #endif
     game->doing_point = 0;
@@ -1390,6 +1394,7 @@ extern void play_main(GAME* game) {
     if ((GETREG(HREG, 80) != 10) || (GETREG(HREG, 81) != 0)) {
         Game_play_move(game);
     }
+#ifndef TARGET_SERVER
     game->doing_point = 0;
     game->doing_point_specific = 0xAA;
     Game_play_draw(play);
@@ -1402,6 +1407,7 @@ extern void play_main(GAME* game) {
         game_debug_draw_last(game, graph);
         game_draw_last(graph);
     }
+#endif
 
     game->doing_point = 0;
     game->doing_point_specific = 0XBe;

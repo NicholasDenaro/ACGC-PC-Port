@@ -205,7 +205,7 @@ static void aEvMgr_actor_init_field_info(aEvMgr_field_info_c* field_info) {
 
 static void aEvMgr_move(ACTOR* actorx, GAME* game) {
     EVENT_MANAGER_ACTOR* evmgr = (EVENT_MANAGER_ACTOR*)actorx;
-    
+
     aEvMgr_actor_renewal_player_pos(game, evmgr);
     mEv_RenewalDataEveryDay();
     schedule_main(actorx);
@@ -259,6 +259,10 @@ static void w_guide_arrow(void) {
     int bx;
     int bz;
 
+    if (playerx == NULL) {
+        return;
+    }
+
     if (mFI_Wpos2BlockNum(&bx, &bz, playerx->world.position) && wpppp != NULL) {
         xyz_t arrow_pos = playerx->world.position;
         xyz_t center_pos;
@@ -279,6 +283,10 @@ static void sp_guide_arrow(void) {
     ACTOR* playerx = GET_PLAYER_ACTOR_NOW_ACTOR();
     int bx;
     int bz;
+
+    if (playerx == NULL) {
+        return;
+    }
 
     if (mFI_Wpos2BlockNum(&bx, &bz, playerx->world.position) && spppp != NULL) {
         xyz_t arrow_pos = playerx->world.position;
@@ -301,6 +309,10 @@ static void day_guide_arrow(void) {
     int bx;
     int bz;
 
+    if (playerx == NULL) {
+        return;
+    }
+
     if (mFI_Wpos2BlockNum(&bx, &bz, playerx->world.position) && dpppp != NULL) {
         xyz_t arrow_pos = playerx->world.position;
         xyz_t center_pos;
@@ -321,6 +333,10 @@ static void turkey_guide_arrow(void) {
     ACTOR* playerx = GET_PLAYER_ACTOR_NOW_ACTOR();
     int bx;
     int bz;
+
+    if (playerx == NULL) {
+        return;
+    }
 
     if (mFI_Wpos2BlockNum(&bx, &bz, playerx->world.position) && tpppp != NULL) {
         xyz_t arrow_pos = playerx->world.position;
@@ -1846,6 +1862,10 @@ static mEv_place_data_c* walk_FG_somewhere_lot4sale(EVENT_MANAGER_ACTOR* evmgr, 
 static void make_effect(int type) {
     ACTOR* playerx = GET_PLAYER_ACTOR_NOW_ACTOR();
 
+    if (playerx == NULL) {
+        return;
+    }
+
     if (mFI_GET_TYPE(mFI_GetFieldId()) == mFI_FIELDTYPE2_FG) {
         eEC_CLIP->effect_make_proc(type, playerx->world.position, 3, 0, gamePT, RSV_NO, 0, 0);
     }
@@ -2112,11 +2132,12 @@ static int title_fade(EVENT_MANAGER_ACTOR* evmgr, int type, int title_type, u32 
     GAME_PLAY* play = (GAME_PLAY*)gamePT;
     ACTOR* playerx = GET_PLAYER_ACTOR_NOW_ACTOR();
     Door_data_c door_data;
-    s16 angle_y = playerx->world.angle.y;
+    s16 angle_y;
     s_xyz pos_s;
     u8 exit_drt;
 
-    if (mDemo_CheckDemo4Event() ||
+    if (playerx == NULL ||
+        mDemo_CheckDemo4Event() ||
         mEv_PlayerOK() == FALSE ||
         Common_Get(reset_flag) ||
         mEv_LiveSonchoPresent() ||
@@ -2124,6 +2145,8 @@ static int title_fade(EVENT_MANAGER_ACTOR* evmgr, int type, int title_type, u32 
     ) {
         return FALSE;
     }
+
+    angle_y = playerx->world.angle.y;
 
     door_data.next_scene_id = SCENE_FG;
     door_data.exit_orientation = mSc_DIRECT_SOUTH;
@@ -4754,7 +4777,7 @@ static void schedule_main(ACTOR* actorx) {
         }
     }
 
-    if (mEv_ArbeitPlayer_kari(player_no) != FALSE || mEv_LivePlayer(player_no) == FALSE || mEv_LiveSonchoPresent() != FALSE) {
+    if (mEv_ArbeitPlayer_kari(player_no) != FALSE || mEv_LivePlayer(player_no) == FALSE || mEv_LiveSonchoPresent() != FALSE || playerx == NULL) {
         return;
     }
     if (mFI_GET_TYPE(mFI_GetFieldId()) == mFI_FIELDTYPE2_FG) {

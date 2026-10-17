@@ -22,6 +22,80 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <dbghelp.h>
+
+static LONG WINAPI server_crash_handler(EXCEPTION_POINTERS* ep) {
+    DWORD code = ep->ExceptionRecord->ExceptionCode;
+    PVOID addr = ep->ExceptionRecord->ExceptionAddress;
+    HMODULE hMod = GetModuleHandle(NULL);
+    uintptr_t static_addr = (uintptr_t)addr - (uintptr_t)hMod + 0x00400000;
+    fprintf(stderr, "\n======================================================\n");
+    fprintf(stderr, " [FATAL CRASH] Dedicated server encountered Exception 0x%08lX\n", (unsigned long)code);
+    fprintf(stderr, " Fault Address: %p (Static: 0x%08lX, Base: %p)\n", addr, (unsigned long)static_addr, (void*)hMod);
+    fprintf(stderr, "======================================================\n");
+    fflush(stderr);
+
+    HANDLE process = GetCurrentProcess();
+    SymInitialize(process, NULL, TRUE);
+
+    STACKFRAME64 stack_frame;
+    memset(&stack_frame, 0, sizeof(stack_frame));
+    CONTEXT context = *ep->ContextRecord;
+
+#if defined(_M_IX86) || defined(__i386__)
+    DWORD machine_type = IMAGE_FILE_MACHINE_I386;
+    stack_frame.AddrPC.Offset = context.Eip;
+    stack_frame.AddrPC.Mode = AddrModeFlat;
+    stack_frame.AddrFrame.Offset = context.Ebp;
+    stack_frame.AddrFrame.Mode = AddrModeFlat;
+    stack_frame.AddrStack.Offset = context.Esp;
+    stack_frame.AddrStack.Mode = AddrModeFlat;
+#elif defined(_M_X64) || defined(__x86_64__)
+    DWORD machine_type = IMAGE_FILE_MACHINE_AMD64;
+    stack_frame.AddrPC.Offset = context.Rip;
+    stack_frame.AddrPC.Mode = AddrModeFlat;
+    stack_frame.AddrFrame.Offset = context.Rbp;
+    stack_frame.AddrFrame.Mode = AddrModeFlat;
+    stack_frame.AddrStack.Offset = context.Rsp;
+    stack_frame.AddrStack.Mode = AddrModeFlat;
+#endif
+
+    int frame_idx = 0;
+    while (StackWalk64(machine_type, process, GetCurrentThread(), &stack_frame, &context,
+                       NULL, SymFunctionTableAccess64, SymGetModuleBase64, NULL)) {
+        if (stack_frame.AddrPC.Offset == 0) break;
+
+        char buffer[sizeof(SYMBOL_INFO) + 256];
+        PSYMBOL_INFO symbol = (PSYMBOL_INFO)buffer;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
+        symbol->MaxNameLen = 255;
+        DWORD64 displacement = 0;
+
+        IMAGEHLP_LINE64 line;
+        DWORD line_disp = 0;
+        line.SizeOfStruct = sizeof(IMAGEHLP_LINE64);
+
+        uintptr_t static_pc = (uintptr_t)stack_frame.AddrPC.Offset - (uintptr_t)hMod + 0x00400000;
+        if (SymFromAddr(process, stack_frame.AddrPC.Offset, &displacement, symbol)) {
+            if (SymGetLineFromAddr64(process, stack_frame.AddrPC.Offset, &line_disp, &line)) {
+                fprintf(stderr, "  #%02d [0x%08llX] (0x%08lX) %s (%s:%u)\n",
+                        frame_idx, (unsigned long long)stack_frame.AddrPC.Offset, (unsigned long)static_pc,
+                        symbol->Name, line.FileName, (unsigned int)line.LineNumber);
+            } else {
+                fprintf(stderr, "  #%02d [0x%08llX] (0x%08lX) %s + 0x%llX\n",
+                        frame_idx, (unsigned long long)stack_frame.AddrPC.Offset, (unsigned long)static_pc,
+                        symbol->Name, (unsigned long long)displacement);
+            }
+        } else {
+            fprintf(stderr, "  #%02d [0x%08llX] (0x%08lX)\n",
+                    frame_idx, (unsigned long long)stack_frame.AddrPC.Offset, (unsigned long)static_pc);
+        }
+        frame_idx++;
+        if (frame_idx >= 30) break;
+    }
+    fflush(stderr);
+    return EXCEPTION_EXECUTE_HANDLER;
+}
 #endif
 
 /* Global state symbols required by PC layer */
@@ -189,6 +263,7 @@ int main(int argc, char** argv) {
     signal(SIGINT, handle_signal);
     signal(SIGTERM, handle_signal);
 #ifdef _WIN32
+    SetUnhandledExceptionFilter(server_crash_handler);
     SetConsoleCtrlHandler(console_ctrl_handler, TRUE);
 #endif
 

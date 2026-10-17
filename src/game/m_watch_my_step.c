@@ -73,9 +73,18 @@ extern void watch_my_step_ct() {
 }
 
 extern void watch_my_step_move(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#else
     mActor_name_t window_item;
     PLAYER_ACTOR* player_actor = get_player_actor_withoutCheck(play);
-    int can_show =
+    int can_show;
+
+    if (player_actor == NULL) {
+        return;
+    }
+
+    can_show =
         play->camera.now_main_index == CAMERA2_PROCESS_NORMAL && play->camera.main_data.normal.morph_counter > 20;
 
     navigate_camera_move(play);
@@ -188,6 +197,7 @@ extern void watch_my_step_move(GAME_PLAY* play) {
             }
         }
     }
+#endif
 }
 
 extern void watch_my_step_draw(GAME_PLAY* play) {
@@ -584,9 +594,14 @@ static void mWt_mybell_confirmation_draw(GAME_PLAY* play) {
 static u32 get_all_money() {
     static mActor_name_t fg_name[MONEY_NUM] = { ITM_MONEY_1000, ITM_MONEY_10000, ITM_MONEY_30000, ITM_MONEY_100 };
     static u32 amount[MONEY_NUM] = { 1000, 10000, 30000, 100 };
-
-    u32 money = Common_Get(now_private)->inventory.wallet;
+    u32 money;
     int i;
+
+    if (Common_Get(now_private) == NULL) {
+        return 0;
+    }
+
+    money = Common_Get(now_private)->inventory.wallet;
 
     for (i = 0; i < MONEY_NUM; i++) {
         int sum = mPr_GetPossessionItemSumWithCond(Common_Get(now_private), fg_name[i], mPr_ITEM_COND_NORMAL);

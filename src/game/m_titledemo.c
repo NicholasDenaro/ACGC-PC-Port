@@ -228,6 +228,9 @@ static void mTD_game_end_init(GAME_PLAY* play) {
 }
 
 extern void title_demo_move(GAME_PLAY* play) {
+#ifdef TARGET_SERVER
+    return;
+#endif
     if (mEv_IsTitleDemo()) {
 #ifdef TARGET_PC
         /* Hold the demo while the Options overlay owns the screen: neither

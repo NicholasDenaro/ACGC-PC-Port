@@ -360,8 +360,13 @@ static int aBC_check_update_actors_in_nearby_blocks(BIRTH_CONTROL_ACTOR* birth_c
   int quadrant;
   int block_ux;
   int block_uz;
+  ACTOR* player = GET_PLAYER_ACTOR_ACTOR(play);
 
-  if (mFI_Wpos2UtNum_inBlock(&block_ux, &block_uz, GET_PLAYER_ACTOR_ACTOR(play)->world.position) == FALSE) {
+  if (player == NULL) {
+    return FALSE;
+  }
+
+  if (mFI_Wpos2UtNum_inBlock(&block_ux, &block_uz, player->world.position) == FALSE) {
     return FALSE;
   }
 

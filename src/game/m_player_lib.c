@@ -995,18 +995,22 @@ static u32 mPlib_Get_UseFaceTexRom_p_common(int sex, int face_type, int swell, i
 }
 
 static u32 mPlib_Get_UseFaceTexRom_p(void) {
-    return mPlib_Get_UseFaceTexRom_p_common(Now_Private->gender, Now_Private->face, Common_Get(player_bee_swell_flag),
+    int gender = (Now_Private != NULL) ? Now_Private->gender : mPr_SEX_MALE;
+    int face = (Now_Private != NULL) ? Now_Private->face : mPr_FACE_TYPE0;
+    return mPlib_Get_UseFaceTexRom_p_common(gender, face, Common_Get(player_bee_swell_flag),
                                             Common_Get(player_decoy_flag));
 }
 
 static u32 mPlib_Get_UseFacePalletRom_p(void) {
-    int sunburn_rank = Now_Private->sunburn.rank;
+    int sunburn_rank = (Now_Private != NULL) ? Now_Private->sunburn.rank : 0;
     int decoy_flag = Common_Get(player_decoy_flag);
+    int gender = (Now_Private != NULL) ? Now_Private->gender : mPr_SEX_MALE;
+    int face = (Now_Private != NULL) ? Now_Private->face : mPr_FACE_TYPE0;
     u32 base;
     u32 ofs;
 
     if (sunburn_rank > 0 && decoy_flag == FALSE) {
-        u32 idx = mPlib_Get_UseFaceRom_index(Now_Private->gender, Now_Private->face, Common_Get(player_bee_swell_flag),
+        u32 idx = mPlib_Get_UseFaceRom_index(gender, face, Common_Get(player_bee_swell_flag),
                                              FALSE, mPlayer_USE_FACE_ROM_TYPE_PAL);
 
         base = mPlib_Get_UseFaceTexRom_p_common(mPr_SEX_FEMALE, mPr_FACE_TYPE7, TRUE, TRUE);
@@ -1321,13 +1325,17 @@ static int mPlib_check_DynamicLinkFile_m_player(void) {
 }
 
 extern int mPlib_get_player_actor_main_index(GAME* game) {
-    return GET_PLAYER_ACTOR_GAME(game)->now_main_index;
+    PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
+    if (player == NULL) {
+        return -1;
+    }
+    return player->now_main_index;
 }
 
 extern int mPlib_get_player_actor_request_main_index(GAME* game) {
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
 
-    if (player->requested_main_index_changed) {
+    if (player != NULL && player->requested_main_index_changed) {
         return player->requested_main_index;
     }
 
@@ -1338,7 +1346,7 @@ extern cKF_Skeleton_R_c cKF_bs_r_boy_1;
 extern cKF_Skeleton_R_c cKF_bs_r_grl_1;
 
 extern cKF_Skeleton_R_c* mPlib_get_player_mdl_p(void) {
-    if (Now_Private->gender == mPr_SEX_MALE) {
+    if (Now_Private == NULL || Now_Private->gender == mPr_SEX_MALE) {
         return &cKF_bs_r_boy_1;
     } else {
         return &cKF_bs_r_grl_1;

@@ -329,9 +329,10 @@ static int eEC_DistDeath(eEC_Effect_c* effect, GAME* game, s16 prog_idx) {
         if (max_dist != eEC_IGNORE_DEATH_DIST) {
             PLAYER_ACTOR* player = GET_PLAYER_ACTOR(play);
 
-            if (ABS(player->actor_class.world.position.x - effect->position.x) > max_dist ||
-                ABS(player->actor_class.world.position.z - effect->position.z) > max_dist ||
-                ABS(player->actor_class.world.position.y - effect->position.y) > max_dist) {
+            if (player != NULL &&
+                (ABS(player->actor_class.world.position.x - effect->position.x) > max_dist ||
+                 ABS(player->actor_class.world.position.z - effect->position.z) > max_dist ||
+                 ABS(player->actor_class.world.position.y - effect->position.y) > max_dist)) {
                 res = TRUE; // out of range
             }
         }
@@ -469,7 +470,9 @@ static void eEC_actor_move(ACTOR* actorx, GAME* game) {
 
     eEL_CalcEffectLight_Set(game);
     eEC_AllEffectMove(game);
-    actorx->world.position = player->actor_class.world.position;
+    if (player != NULL) {
+        actorx->world.position = player->actor_class.world.position;
+    }
 }
 
 static int eEC_GetEffectBuff(int prio) {
