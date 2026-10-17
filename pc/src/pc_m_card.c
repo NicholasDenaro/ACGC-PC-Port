@@ -917,6 +917,11 @@ int mCD_InitGameStart_bg(int player_no, int card_private_idx, int start_cond, s3
             if (start_cond >= 0 && start_cond < 5) {
                 mode = init_mode_table[start_cond];
             }
+            if (!Common_Get(time.rtc_enabled)) {
+                Common_Set(time.rtc_enabled, TRUE);
+                lbRTC_GetTime(Common_GetPointer(time.rtc_time));
+                mTM_set_season();
+            }
             mSDI_StartDataInit(gamePT, player_no, mode);
             l_mcd_keep_startCond = start_cond;
             pc_save_ready = 1;

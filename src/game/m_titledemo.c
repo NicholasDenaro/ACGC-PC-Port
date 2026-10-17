@@ -259,13 +259,13 @@ extern void mTD_rtc_set() {
     if (S_titledemo_to_play == TRUE) {
         S_titledemo_to_play = FALSE;
 
+        Common_Set(time.rtc_enabled, TRUE);
         if (Common_Get(time.rtc_crashed) == TRUE) {
             lbRTC_TimeCopy(Common_GetPointer(time.rtc_time), Common_GetPointer(newly_set_time));
         } else {
             lbRTC_GetTime(Common_GetPointer(time.rtc_time));
         }
 
-        Common_Set(time.rtc_enabled, TRUE);
         mTM_set_season();
     }
 }

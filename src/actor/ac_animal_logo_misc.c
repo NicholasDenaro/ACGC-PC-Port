@@ -120,6 +120,7 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             int has_map;
 
             g_pc_quick_start = 0;
+            mTD_rtc_set();
             mCD_InitGameStart_bg(0, -1, mCD_START_COND_1, &result);
 
             if (lbRTC_IsOverTime(&Save_Get(save_check).time, Common_GetPointer(time.rtc_time)) == lbRTC_LESS) {
@@ -166,6 +167,7 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             Common_Set(submenu_disabled, FALSE);
             Common_Get(transition).wipe_type = WIPE_TYPE_TRIFORCE;
             mBGMPsComp_make_ps_wipe(0x11C2);
+            return;
         } else {
             g_pc_quick_start = 0;
             play->next_scene_no = decide_next_scene_no();
