@@ -1,6 +1,7 @@
 /* server_runner.c - Authoritative server tick runner & lifecycle management */
 #include "server/server_runner.h"
 #include "server/server_network.h"
+#include "server/server_storage.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,7 @@ void server_runner_init(void) {
 
 void server_runner_shutdown(void) {
     g_server_running = 0;
+    server_storage_save_all();
     server_network_shutdown();
     printf("[SERVER] Server runner shutting down. Total ticks processed: %llu\n",
            (unsigned long long)g_server_stats.total_ticks);

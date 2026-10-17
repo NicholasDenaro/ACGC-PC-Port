@@ -1,4 +1,5 @@
 #include "server/server_storage.h"
+#include "server/server_backup.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
 #include "m_land.h"
@@ -22,6 +23,10 @@
 static ServerExtendedDB s_db;
 static bool s_storage_initialized = false;
 static char s_save_path[256] = SERVER_EXTENDED_PATH;
+static char s_base_dir[256] = "save";
+static bool s_dirty = false;
+static uint64_t s_last_mutation_ms = 0;
+static uint64_t s_last_periodic_sec = 0;
 
 /* Canonical initial home mortgage debt in Animal Crossing: 19,800 Bells */
 #define INITIAL_HOUSE_DEBT 19800
@@ -49,10 +54,16 @@ bool server_storage_init(const char* save_dir) {
     ensure_save_directory();
 
     if (save_dir != NULL && save_dir[0] != '\0') {
+        strncpy(s_base_dir, save_dir, sizeof(s_base_dir) - 1);
+        s_base_dir[sizeof(s_base_dir) - 1] = '\0';
         snprintf(s_save_path, sizeof(s_save_path), "%s/server_extended.dat", save_dir);
     } else {
+        strncpy(s_base_dir, "save", sizeof(s_base_dir) - 1);
         snprintf(s_save_path, sizeof(s_save_path), "%s", SERVER_EXTENDED_PATH);
     }
+
+    server_backup_init(s_base_dir);
+    s_last_periodic_sec = (uint64_t)time(NULL);
 
     FILE* f = fopen(s_save_path, "rb");
     if (f != NULL) {
@@ -168,6 +179,60 @@ bool server_storage_save(void) {
     /* Keep canonical GCI save synchronized */
     server_storage_sync_to_gci();
     return true;
+}
+
+void server_storage_mark_dirty(void) {
+    s_dirty = true;
+#ifdef _WIN32
+    s_last_mutation_ms = GetTickCount64();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    s_last_mutation_ms = (uint64_t)ts.tv_sec * 1000 + (uint64_t)(ts.tv_nsec / 1000000);
+#endif
+}
+
+bool server_storage_save_all(void) {
+    if (!s_storage_initialized) {
+        return false;
+    }
+    server_storage_sync_to_gci();
+    bool ext_ok = server_storage_save();
+    extern int pc_save_force_write(void);
+    int gci_ok = pc_save_force_write();
+    s_dirty = false;
+    return ext_ok && (gci_ok != 0);
+}
+
+void server_storage_tick(void) {
+    if (!s_storage_initialized) {
+        return;
+    }
+
+#ifdef _WIN32
+    uint64_t now_ms = GetTickCount64();
+#else
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    uint64_t now_ms = (uint64_t)ts.tv_sec * 1000 + (uint64_t)(ts.tv_nsec / 1000000);
+#endif
+    uint64_t now_sec = (uint64_t)time(NULL);
+
+    /* 1. Debounced autosave (1 second after last mutation) */
+    if (s_dirty && (now_ms >= s_last_mutation_ms + 1000)) {
+        server_storage_save_all();
+    }
+
+    /* 2. Periodic backup ticker (every 60 seconds) */
+    if (s_last_periodic_sec == 0) {
+        s_last_periodic_sec = now_sec;
+    } else if (now_sec >= s_last_periodic_sec + 60) {
+        if (s_dirty) {
+            server_storage_save_all();
+        }
+        server_backup_tick(now_sec);
+        s_last_periodic_sec = now_sec;
+    }
 }
 
 int server_storage_find_resident_by_token(const uint8_t token[AUTH_TOKEN_SIZE]) {
@@ -608,6 +673,11 @@ bool server_storage_run_tests(void) {
 
     /* Re-initialize default storage */
     server_storage_init(NULL);
+
+    /* 10. Run tiered rolling backup unit tests */
+    if (!server_backup_run_tests()) {
+        return false;
+    }
 
     printf("[SERVER STORAGE TEST] All server extended storage unit tests passed successfully!\n");
     return true;

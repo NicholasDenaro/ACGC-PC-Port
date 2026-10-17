@@ -298,8 +298,8 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!server_network_run_tests() || !client_network_run_tests()) {
-        fprintf(stderr, "[SERVER ERROR] Network self-test failed.\n");
+    if (!server_storage_run_tests() || !server_network_run_tests() || !client_network_run_tests()) {
+        fprintf(stderr, "[SERVER ERROR] Self-test suite failed.\n");
         enet_deinitialize();
         SDL_Quit();
         return 1;

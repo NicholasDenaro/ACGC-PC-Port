@@ -261,8 +261,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Maintain `save/server_extended.dat` alongside canonical `DobutsunomoriP_MURA.gci`. Store all 8 residents (2 per house acting as roommates), roommate pairings, shared mortgage debt balances, and persistent visitor profiles while mirroring the primary 4 residents to the `.gci` for vanilla GameCube compatibility.
   - **Acceptance Criteria**: Server tracks 8 residents across 4 houses and remembers returning visitor profiles.
 
-- [ ] **Task 8.4: Event-Driven Autosave & Tiered Rolling Backups**
-  - **State**: `Not Implemented`
+- [x] **Task 8.4: Event-Driven Autosave & Tiered Rolling Backups**
+  - **State**: `Implemented`
   - **Files**: `pc/src/server/server_storage.c`, `pc/src/server/server_backup.c`, `pc/include/server/server_backup.h`
   - **Description**: Implement atomic file writes (`.tmp` + rename). Trigger autosave upon game mutations (debounced 1s) and every 60s. Maintain automated rolling backups in `save/backups/`: `minute/` (last 10m), `hour/` (last 24h), `daily/` (last 14d).
   - **Acceptance Criteria**: Save data writes atomically without hitching, and snapshots rotate through minute, hour, and daily backup folders.

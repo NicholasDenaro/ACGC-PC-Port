@@ -75,6 +75,24 @@ bool server_storage_init(const char* save_dir);
 bool server_storage_save(void);
 
 /**
+ * @brief Mark server storage as dirty (mutation occurred).
+ *        Will trigger a debounced autosave (1 second cooldown) and periodic backups.
+ */
+void server_storage_mark_dirty(void);
+
+/**
+ * @brief Atomically save both server_extended.dat and DobutsunomoriP_MURA.gci.
+ * @return true on success, false on error.
+ */
+bool server_storage_save_all(void);
+
+/**
+ * @brief Periodic simulation tick for server storage & autosaves.
+ *        Executes debounced saves when dirty and 60-second periodic backups.
+ */
+void server_storage_tick(void);
+
+/**
  * @brief Find resident index by auth token.
  * @param token 32-byte authentication token.
  * @return Resident index 0..7 if found, -1 if not found.

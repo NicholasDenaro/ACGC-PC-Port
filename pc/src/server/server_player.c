@@ -389,6 +389,9 @@ void server_player_tick(GAME_PLAY* play) {
     /* Process incoming network events and packets */
     server_network_poll();
 
+    /* Tick server storage autosave debounce & periodic backups */
+    server_storage_tick();
+
     /* Reset actor pointers if scene or play context changed */
     static GAME_PLAY* s_last_play = NULL;
     static int s_last_scene_id = -1;
@@ -449,7 +452,7 @@ void server_player_tick(GAME_PLAY* play) {
         FILE* flog = fopen("server_player.log", "a");
         if (flog != NULL) {
             fprintf(flog, "[TICK] frame=%u, scene_id=%d, field_type=%d, host_actor=%p, dummy_actor=%p\n",
-                    play->game_frame, play->scene_id, cur_field_type,
+                    (unsigned int)play->game_frame, play->scene_id, cur_field_type,
                     (void*)g_server_clients[0].player_actor, (void*)g_server_clients[1].player_actor);
             fclose(flog);
         }
