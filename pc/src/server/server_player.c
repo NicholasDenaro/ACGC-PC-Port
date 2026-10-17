@@ -3,6 +3,7 @@
 #include "server/server_zone.h"
 #include "server/server_runner.h"
 #include "server/server_network.h"
+#include "server/server_storage.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
 #include "m_actor.h"
@@ -18,6 +19,7 @@
 #include "m_scene_table.h"
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 ConnectedClient g_server_clients[MAX_SERVER_CLIENTS] = {0};
 static int s_player_registry_initialized = 0;
@@ -137,6 +139,27 @@ void server_player_unregister(uint32_t client_id) {
                 Actor_delete((ACTOR*)client->player_actor);
                 client->player_actor = NULL;
             }
+
+            /* Persist latest player state back to extended storage */
+            bool is_resident = false;
+            int idx = server_storage_find_player(client->auth_token, &is_resident);
+            if (idx >= 0) {
+                if (is_resident) {
+                    ServerResident* r = server_storage_get_resident(idx);
+                    if (r != NULL) {
+                        r->private_data = client->private_data;
+                        r->last_seen_time = (uint64_t)time(NULL);
+                    }
+                } else {
+                    ServerVisitor* v = server_storage_get_visitor(idx);
+                    if (v != NULL) {
+                        v->private_data = client->private_data;
+                        v->last_seen_time = (uint64_t)time(NULL);
+                    }
+                }
+                server_storage_save();
+            }
+
             client->is_connected = 0;
             printf("[SERVER] Unregistered Client ID %u from slot %d.\n", client_id, i);
             return;

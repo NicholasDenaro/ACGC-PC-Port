@@ -255,8 +255,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Generate and persist a unique 32-byte UUID token (`save/client_token.dat`) on first launch. Transmit this token in `PKT_C2S_HANDSHAKE.auth_token` for seamless authentication and character binding.
   - **Acceptance Criteria**: Returning clients instantly resume their existing character on reconnect without entering credentials.
 
-- [ ] **Task 8.3: Server Extended Resident & Visitor Database**
-  - **State**: `Not Implemented`
+- [x] **Task 8.3: Server Extended Resident & Visitor Database**
+  - **State**: `Implemented`
   - **Files**: `pc/src/server/server_storage.c`, `pc/include/server/server_storage.h`
   - **Description**: Maintain `save/server_extended.dat` alongside canonical `DobutsunomoriP_MURA.gci`. Store all 8 residents (2 per house acting as roommates), roommate pairings, shared mortgage debt balances, and persistent visitor profiles while mirroring the primary 4 residents to the `.gci` for vanilla GameCube compatibility.
   - **Acceptance Criteria**: Server tracks 8 residents across 4 houses and remembers returning visitor profiles.

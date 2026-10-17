@@ -3,6 +3,7 @@
 #include "server/server_player.h"
 #include "server/server_zone.h"
 #include "server/server_runner.h"
+#include "server/server_storage.h"
 #include "network/net_packets.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -13,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static ServerClientSession s_sessions[SERVER_NET_MAX_CLIENTS];
 static ENetHost* s_server_host = NULL;
@@ -203,24 +205,47 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
         return;
     }
 
-    /* Initialize private data from client handshake */
-    Private_c priv;
-    mPr_InitPrivateInfo(&priv);
+    /* Query server extended storage for persistent client token */
+    bool is_resident = false;
+    int player_idx = server_storage_find_player((const uint8_t*)hs.auth_token, &is_resident);
 
-    int name_len = (int)strlen(hs.player_name);
-    u8 dummy_name[PLAYER_NAME_LEN];
-    for (int i = 0; i < PLAYER_NAME_LEN; i++) {
-        dummy_name[i] = (i < name_len) ? (u8)hs.player_name[i] : CHAR_SPACE;
+    Private_c priv;
+    if (player_idx >= 0) {
+        if (is_resident) {
+            ServerResident* res = server_storage_get_resident(player_idx);
+            priv = res->private_data;
+            res->last_seen_time = (uint64_t)time(NULL);
+            printf("[SERVER NET] Handshake recognized Resident Slot %d in House %d (Roommate %d).\n",
+                   player_idx, res->house_idx, res->roommate_slot);
+        } else {
+            ServerVisitor* vis = server_storage_get_visitor(player_idx);
+            priv = vis->private_data;
+            vis->last_seen_time = (uint64_t)time(NULL);
+            printf("[SERVER NET] Handshake recognized returning Visitor Slot %d.\n", player_idx);
+        }
+    } else {
+        /* New player token: create initial profile and register as visitor */
+        mPr_InitPrivateInfo(&priv);
+
+        int name_len = (int)strlen(hs.player_name);
+        u8 dummy_name[PLAYER_NAME_LEN];
+        for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+            dummy_name[i] = (i < name_len) ? (u8)hs.player_name[i] : CHAR_SPACE;
+        }
+        mPr_CopyPlayerName(priv.player_ID.player_name, dummy_name);
+        mLd_CopyLandName(priv.player_ID.land_name, Save_Get(land_info).name);
+        priv.player_ID.player_id = hs.player_id ? hs.player_id : 0x55AA;
+        priv.player_ID.land_id = Save_Get(land_info).id;
+        priv.gender = hs.gender;
+        priv.face = hs.face_type;
+        priv.cloth.idx = 0;
+        priv.cloth.item = hs.clothes_id ? hs.clothes_id : 0x2400;
+        priv.inventory.wallet = 1000;
+        priv.exists = TRUE;
+
+        player_idx = server_storage_register_visitor((const uint8_t*)hs.auth_token, &priv);
+        printf("[SERVER NET] Handshake registered new Visitor Slot %d.\n", player_idx);
     }
-    mPr_CopyPlayerName(priv.player_ID.player_name, dummy_name);
-    mLd_CopyLandName(priv.player_ID.land_name, Save_Get(land_info).name);
-    priv.player_ID.player_id = hs.player_id ? hs.player_id : 0x55AA;
-    priv.player_ID.land_id = Save_Get(land_info).id;
-    priv.gender = hs.gender;
-    priv.face = hs.face_type;
-    priv.cloth.idx = 0;
-    priv.cloth.item = hs.clothes_id ? hs.clothes_id : 0x2400;
-    priv.inventory.wallet = 1000;
 
     int slot = server_player_register(session->client_id, 0, &priv);
     if (slot < 0) {
@@ -235,6 +260,13 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
         enet_peer_disconnect_later(session->peer, 0);
         session->state = NET_SESSION_DISCONNECTED;
         return;
+    }
+
+    /* Bind client identity token to ConnectedClient */
+    ConnectedClient* cc = server_player_get(session->client_id);
+    if (cc != NULL) {
+        memcpy(cc->auth_token, hs.auth_token, 32);
+        cc->resident_idx = is_resident ? player_idx : -1;
     }
 
     session->player_slot = slot;

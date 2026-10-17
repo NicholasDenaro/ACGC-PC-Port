@@ -5,6 +5,7 @@
 #include "pc_settings.h"
 #include "server/server_runner.h"
 #include "server/server_network.h"
+#include "server/server_storage.h"
 #include "client/client_network.h"
 #include "network/net_packets.h"
 #include <enet/enet.h>
@@ -156,19 +157,20 @@ int main(int argc, char** argv) {
                 return 1;
             }
         } else if (strcmp(argv[i], "--test-network") == 0) {
-            printf("[SERVER] Running server & client network unit tests...\n");
+            printf("[SERVER] Running server storage, listener & client network unit tests...\n");
             SDL_SetMainReady();
             SDL_Init(SDL_INIT_TIMER);
             enet_initialize();
+            int st_res = server_storage_run_tests();
             int s_res = server_network_run_tests();
             int c_res = client_network_run_tests();
             enet_deinitialize();
             SDL_Quit();
-            if (s_res && c_res) {
-                printf("[SERVER] All server listener & client controller tests passed successfully!\n");
+            if (st_res && s_res && c_res) {
+                printf("[SERVER] All storage, server listener & client controller tests passed successfully!\n");
                 return 0;
             } else {
-                fprintf(stderr, "[SERVER ERROR] Network tests failed!\n");
+                fprintf(stderr, "[SERVER ERROR] Unit tests failed!\n");
                 return 1;
             }
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--verbose") == 0) {
@@ -239,6 +241,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    server_storage_init(g_server_config.save_dir);
     server_runner_init();
 
     /* Boot game engine into headless gameplay */

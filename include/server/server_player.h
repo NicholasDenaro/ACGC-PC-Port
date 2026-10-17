@@ -25,6 +25,8 @@ typedef struct {
     xyz_t predicted_pos;
     s_xyz predicted_angle;
     uint32_t last_ack_input_seq;
+    uint8_t auth_token[32];      /* Client persistent authentication token */
+    int resident_idx;            /* 0..7 if resident, -1 if visitor */
 } ConnectedClient;
 
 extern ConnectedClient g_server_clients[MAX_SERVER_CLIENTS];
