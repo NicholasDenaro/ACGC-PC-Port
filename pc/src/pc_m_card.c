@@ -18,6 +18,8 @@
 #include "m_land.h"
 #include "m_private.h"
 #include "m_event.h"
+#include "m_actor.h"
+#include "m_play.h"
 #include "m_time.h"
 #include "m_scene.h"
 #include "m_name_table.h"
@@ -256,12 +258,102 @@ static void pc_set_reset_code(Private_c* priv) {
     priv->reset_code = 0;
 }
 
+/* Translate any transient runtime DUMMY_ items back to their base structure item.
+ * During gameplay, active acre actors replace structure tiles in Save_Get(fg)
+ * with dummy items or reservation markers. These must never be serialized to disk. */
+static mActor_name_t pc_sanitize_dummy_item(mActor_name_t item) {
+    if (item >= DUMMY_NPC_HOUSE_000 && item <= DUMMY_NPC_HOUSE_END) {
+        return NPC_HOUSE_START + (item - DUMMY_NPC_HOUSE_000);
+    }
+    if (item >= DUMMY_HOUSE0 && item <= DUMMY_HOUSE3) {
+        return HOUSE0 + (item - DUMMY_HOUSE0);
+    }
+    if (item >= DUMMY_SHOP0 && item <= DUMMY_SHOP3) {
+        return SHOP0 + (item - DUMMY_SHOP0);
+    }
+    if (item >= DUMMY_MAILBOX0 && item <= DUMMY_MAILBOX3) {
+        return ACTOR_PROP_MAILBOX0 + (item - DUMMY_MAILBOX0);
+    }
+    if (item >= DUMMY_HANIWA0 && item <= DUMMY_HANIWA3) {
+        return ACTOR_PROP_HANIWA0 + (item - DUMMY_HANIWA0);
+    }
+    switch (item) {
+        case DUMMY_POST_OFFICE: return POST_OFFICE;
+        case DUMMY_STATION: return TRAIN_STATION;
+        case DUMMY_POLICE_STATION: return POLICE_STATION;
+        case DUMMY_RESERVE: return SIGN00;
+        case DUMMY_SHRINE: return NEWYEAR_SHRINE0;
+        case DUMMY_BROKER_SHOP: return BROKER_TENT;
+        case DUMMY_BUGGY: return DESIGNER_CAR;
+        case DUMMY_KAMAKURA: return KAMAKURA;
+        case DUMMY_GOZA: return SAKURA_TABLE0;
+        case DUMMY_RADIO: return AEROBICS_RADIO;
+        case DUMMY_YATAI: return FIREWORKS_STALL0;
+        case DUMMY_MIKUJI: return NEWYEAR_TABLE;
+        case DUMMY_COUNT: return NEWYEAR_COUNTDOWN0;
+        case DUMMY_COUNT02: return NEWYEAR_COUNTDOWN1;
+        case DUMMY_TAMA: return SPORTSFAIR_BALLS_RED;
+        case DUMMY_TURI: return FISHCHECK_STAND0;
+        case DUMMY_KOINOBORI: return KOINOBORI_WINDSOCK;
+        case DUMMY_DUMP: return DUMP;
+        case DUMMY_WINDMILL: return WINDMILL0;
+        case DUMMY_LOTUS: return LOTUS;
+        case DUMMY_MIKANBOX: return MIKANBOX;
+        case DUMMY_DOUZOU: return DOUZOU;
+        case DUMMY_MUSEUM: return MUSEUM;
+        case DUMMY_BRIDGE: return BRIDGE_A0;
+        case DUMMY_FLAG: return FLAG;
+        case DUMMY_COTTAGE_MY: return COTTAGE_MY;
+        case DUMMY_COTTAGE_NPC: return COTTAGE_NPC;
+        case DUMMY_GHOG: return GHOG;
+        case DUMMY_HTABLE: return HTABLE0;
+        case DUMMY_TENT: return TENT;
+        case DUMMY_BOAT: return BOAT;
+        default: return item;
+    }
+}
+
+static void pc_sanitize_fg(void) {
+    int bz, bx, uz, ux;
+    for (bz = 0; bz < FG_BLOCK_Z_NUM; bz++) {
+        for (bx = 0; bx < FG_BLOCK_X_NUM; bx++) {
+            for (uz = 0; uz < UT_Z_NUM; uz++) {
+                for (ux = 0; ux < UT_X_NUM; ux++) {
+                    mActor_name_t item = Save_Get(fg[bz][bx]).items[uz][ux];
+                    mActor_name_t clean = pc_sanitize_dummy_item(item);
+                    if (clean != item) {
+                        OSReport("[PC] Sanitized FG dummy at block (%d,%d) ut (%d,%d): 0x%04X -> 0x%04X\n",
+                                 bx + 1, bz + 1, ux, uz, item, clean);
+                        Save_Get(fg[bz][bx]).items[uz][ux] = clean;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /* Money rock / Wisp / Copy Protect. save_mode mirrors GC SaveHome _04:
  * 0 = full save (clears reset code), nonzero = door save (keeps it armed) */
 static void pc_save_pre_write_side_effects(int save_mode) {
+    extern struct game_s* gamePT;
     Private_c* priv = Now_Private;
     u16 copy_protect;
     int i;
+
+    /* If we are actively in gameplay (GAME_PLAY), run Actor_info_save_actor to
+     * let actors persist any state and restore all foreground items in active acres. */
+    if (gamePT != NULL) {
+        int scene = Save_Get(scene_no);
+        if (scene != SCENE_START_DEMO && scene != SCENE_START_DEMO2 && scene != SCENE_START_DEMO3 &&
+            scene != SCENE_PLAYERSELECT && scene != SCENE_PLAYERSELECT_2 && scene != SCENE_PLAYERSELECT_3 &&
+            scene != SCENE_PLAYERSELECT_SAVE && scene != SCENE_TITLE_DEMO) {
+            Actor_info_save_actor((GAME_PLAY*)gamePT);
+        }
+    }
+
+    /* Sanitize any lingering DUMMY_ items in the foreground grid so structures
+     * are never serialized as transient dummy items. */
+    pc_sanitize_fg();
 
     mCkRh_SavePlayTime(Common_Get(player_no));
 
@@ -306,6 +398,7 @@ static int pc_save_write_gci_to(const char* gci_path, const char* tmp_path) {
 
     if (!pc_save_ready) return TRUE;
 
+    pc_sanitize_fg();
     pc_ensure_save_dirs();
 
     Save_Get(save_exist) = TRUE;
@@ -506,6 +599,7 @@ static int pc_save_read_gci(const char* path) {
 
     memcpy(&common_data.save.save, save_src, sizeof(Save_t));
     pc_save_bswap(&common_data.save.save, PC_BSWAP_FROM_BE);
+    pc_sanitize_fg();
 
     /* --- Load ARAM blocks from Others section ---
      * Current saves (PC + Dolphin/GC) use order: mail, original, diary.

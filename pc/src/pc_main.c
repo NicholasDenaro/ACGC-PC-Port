@@ -11,6 +11,7 @@
 #include "pc_settings_menu.h"
 #include "pc_profiler.h"
 #include "m_kankyo.h"
+#include <enet/enet.h>
 
 /* prefer discrete GPU on laptops */
 #ifdef _WIN32
@@ -70,6 +71,9 @@ void pc_platform_init(void) {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO | SDL_INIT_TIMER) < 0) {
         fprintf(stderr, "SDL_Init failed: %s\n", SDL_GetError());
         exit(1);
+    }
+    if (enet_initialize() != 0) {
+        fprintf(stderr, "[PC] Failed to initialize ENet networking subsystem.\n");
     }
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
@@ -154,6 +158,7 @@ static void pc_speedhack_toggle(void) {
 }
 
 void pc_platform_shutdown(void) {
+    enet_deinitialize();
     pc_audio_shutdown();
     pc_audio_mq_shutdown();
     PADCleanup();

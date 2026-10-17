@@ -4,6 +4,7 @@
 #include "pc_disc.h"
 #include "pc_settings.h"
 #include "server/server_runner.h"
+#include <enet/enet.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -57,6 +58,7 @@ void pc_platform_shutdown(void) {
 
     server_runner_shutdown();
     pc_disc_shutdown();
+    enet_deinitialize();
     if (g_pc_log_file != NULL) {
         fclose(g_pc_log_file);
         g_pc_log_file = NULL;
@@ -168,6 +170,12 @@ int main(int argc, char** argv) {
     SDL_SetMainReady();
     if (SDL_Init(SDL_INIT_TIMER) < 0) {
         fprintf(stderr, "[SERVER ERROR] SDL_Init(TIMER) failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    if (enet_initialize() != 0) {
+        fprintf(stderr, "[SERVER ERROR] Failed to initialize ENet networking subsystem.\n");
+        SDL_Quit();
         return 1;
     }
 

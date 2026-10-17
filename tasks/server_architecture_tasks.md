@@ -13,10 +13,10 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | **Phase 3** | Simulation Unpausing & Input Isolation | 4 | 4 | Implemented |
 | **Phase 4** | Multi-Player Entity Decoupling | 5 | 5 | Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 5 | 5 | Implemented |
-| **Phase 6** | Network Transport Layer (ENet / UDP) | 0 | 4 | Not Implemented |
+| **Phase 6** | Network Transport Layer (ENet / UDP) | 1 | 4 | In Progress |
 | **Phase 7** | World State Replication & Spatial Management | 0 | 5 | Not Implemented |
 | **Phase 8** | World Persistence & Save Journaling | 0 | 3 | Not Implemented |
-| **Total** | | **22** | **34** | **65% Complete** |
+| **Total** | | **23** | **34** | **68% Complete** |
 
 ---
 
@@ -181,8 +181,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
 
 ### Phase 6: Network Transport Layer (ENet / UDP)
 
-- [ ] **Task 6.1: Integrate ENet Library into PC Port**
-  - **State**: `Not Implemented`
+- [x] **Task 6.1: Integrate ENet Library into PC Port**
+  - **State**: `Implemented`
   - **Files**: `pc/CMakeLists.txt`, `pc/lib/enet/`
   - **Description**: Add ENet as a vendored or CMake FetchContent dependency in `pc/CMakeLists.txt` for both client and server targets.
   - **Acceptance Criteria**: Both client and server compile and link against `enet.lib` / `libenet.a`.

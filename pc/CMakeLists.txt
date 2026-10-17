@@ -69,6 +69,7 @@ include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glad/include
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/fixnes
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/include
     # .inc assets are loaded at runtime from disc image (no build/GAFE01_00 needed)
 )
 
@@ -137,6 +138,41 @@ add_library(glad STATIC
 target_include_directories(glad PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/glad/include
 )
+
+# =============================================================================
+# ENet (Reliable UDP networking library)
+# =============================================================================
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/lib/enet/host.c")
+    set(ENET_DIR "${CMAKE_CURRENT_SOURCE_DIR}/lib/enet")
+    if(WIN32)
+        set(ENET_PLATFORM_SRC ${ENET_DIR}/win32.c)
+    else()
+        set(ENET_PLATFORM_SRC ${ENET_DIR}/unix.c)
+    endif()
+    add_library(enet STATIC
+        ${ENET_DIR}/callbacks.c
+        ${ENET_DIR}/compress.c
+        ${ENET_DIR}/host.c
+        ${ENET_DIR}/list.c
+        ${ENET_DIR}/packet.c
+        ${ENET_DIR}/peer.c
+        ${ENET_DIR}/protocol.c
+        ${ENET_PLATFORM_SRC}
+    )
+    target_include_directories(enet PUBLIC ${ENET_DIR}/include)
+    if(WIN32)
+        target_link_libraries(enet PUBLIC ws2_32 winmm)
+    endif()
+else()
+    include(FetchContent)
+    FetchContent_Declare(
+        enet
+        GIT_REPOSITORY https://github.com/lsalzman/enet.git
+        GIT_TAG v1.3.18
+    )
+    FetchContent_MakeAvailable(enet)
+endif()
+
 
 # =============================================================================
 # Collect game source files
@@ -421,14 +457,14 @@ add_executable(ac_pc
 
 # Link SDL2 without SDL2main (we define SDL_MAIN_HANDLED)
 if(TARGET SDL2::SDL2)
-    target_link_libraries(ac_pc glad SDL2::SDL2)
+    target_link_libraries(ac_pc glad enet SDL2::SDL2)
 else()
     list(FILTER SDL2_LIBRARIES EXCLUDE REGEX "SDL2main")
-    target_link_libraries(ac_pc glad ${SDL2_LIBRARIES})
+    target_link_libraries(ac_pc glad enet ${SDL2_LIBRARIES})
 endif()
 
 if(WIN32)
-    target_link_libraries(ac_pc opengl32 winmm imm32 version setupapi)
+    target_link_libraries(ac_pc opengl32 winmm imm32 version setupapi ws2_32)
 else()
     find_package(OpenGL REQUIRED)
     target_link_libraries(ac_pc OpenGL::GL dl pthread m)
@@ -513,14 +549,14 @@ if(BUILD_SERVER)
     )
 
     if(TARGET SDL2::SDL2)
-        target_link_libraries(ac_server glad SDL2::SDL2)
+        target_link_libraries(ac_server glad enet SDL2::SDL2)
     else()
         list(FILTER SDL2_LIBRARIES EXCLUDE REGEX "SDL2main")
-        target_link_libraries(ac_server glad ${SDL2_LIBRARIES})
+        target_link_libraries(ac_server glad enet ${SDL2_LIBRARIES})
     endif()
 
     if(WIN32)
-        target_link_libraries(ac_server opengl32 winmm imm32 version setupapi)
+        target_link_libraries(ac_server opengl32 winmm imm32 version setupapi ws2_32)
     else()
         find_package(OpenGL REQUIRED)
         target_link_libraries(ac_server OpenGL::GL dl pthread m)
