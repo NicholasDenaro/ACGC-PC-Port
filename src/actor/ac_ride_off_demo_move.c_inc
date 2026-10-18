@@ -45,6 +45,13 @@ static void aROD_ride_off_player(ACTOR* actor, GAME* game) {
     RIDE_OFF_DEMO_ACTOR* ride_off = (RIDE_OFF_DEMO_ACTOR*)actor;
     ACTOR* station_master = ride_off->station_master_actor;
 
+#ifdef TARGET_PC
+    if (station_master == NULL) {
+        aROD_setupAction(actor, game, 4);
+        return;
+    }
+#endif
+
     if (ride_off->_188 == 0) {
         if (mDemo_Check(mDemo_TYPE_SPEAK, station_master) == 1) {
             ride_off->_188 = 1;
@@ -61,7 +68,11 @@ static void aROD_walk_one_unit(ACTOR* actor, GAME* game) {
 
     if (player != NULL) {
         if (player->actor_class.world.position.z >= aROD_OFF_UT_Z_POS) {
+#ifdef TARGET_PC
+            if (ride_off->station_master_actor == NULL || F32_IS_ZERO(ride_off->station_master_actor->speed)) {
+#else
             if (F32_IS_ZERO(ride_off->station_master_actor->speed)) {
+#endif
                 mPlib_request_main_wait_type3(game);
                 Camera2_request_main_normal(play, 0, 9);
                 Actor_delete(actor);

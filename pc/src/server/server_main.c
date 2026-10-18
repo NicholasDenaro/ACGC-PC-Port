@@ -5,6 +5,7 @@
 #include "pc_settings.h"
 #include "server/server_runner.h"
 #include "server/server_network.h"
+#include "server/server_spatial.h"
 #include "server/server_storage.h"
 #include "client/client_network.h"
 #include "network/net_packets.h"
@@ -235,13 +236,14 @@ int main(int argc, char** argv) {
             SDL_SetMainReady();
             SDL_Init(SDL_INIT_TIMER);
             enet_initialize();
+            int sp_res = server_spatial_run_tests();
             int st_res = server_storage_run_tests();
             int s_res = server_network_run_tests();
             int c_res = client_network_run_tests();
             enet_deinitialize();
             SDL_Quit();
-            if (st_res && s_res && c_res) {
-                printf("[SERVER] All storage, server listener & client controller tests passed successfully!\n");
+            if (sp_res && st_res && s_res && c_res) {
+                printf("[SERVER] All spatial, storage, listener & client controller tests passed successfully!\n");
                 return 0;
             } else {
                 fprintf(stderr, "[SERVER ERROR] Unit tests failed!\n");
@@ -298,7 +300,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    if (!server_storage_run_tests() || !server_network_run_tests() || !client_network_run_tests()) {
+    if (!server_spatial_run_tests() || !server_storage_run_tests() || !server_network_run_tests() || !client_network_run_tests()) {
         fprintf(stderr, "[SERVER ERROR] Self-test suite failed.\n");
         enet_deinitialize();
         SDL_Quit();

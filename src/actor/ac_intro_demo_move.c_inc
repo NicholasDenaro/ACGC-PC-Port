@@ -45,6 +45,13 @@ static void aID_ride_train(INTRO_DEMO_ACTOR* intro_demo, GAME_PLAY* play) {
 static void aID_ride_off_player(INTRO_DEMO_ACTOR* intro_demo, GAME_PLAY* play) {
     ACTOR* station_master = intro_demo->station_master_actor_p;
 
+#ifdef TARGET_PC
+    if (station_master == NULL) {
+        aID_setupAction(intro_demo, play, aID_ACT_WALK_ONE_UNIT);
+        return;
+    }
+#endif
+
     if (intro_demo->_1A0 == 0) {
         /* Wait for the station master to speak to the player */
         if (mDemo_Check(mDemo_TYPE_SPEAK, station_master) == TRUE) {

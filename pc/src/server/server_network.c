@@ -2,6 +2,7 @@
 #include "server/server_network.h"
 #include "server/server_player.h"
 #include "server/server_zone.h"
+#include "server/server_spatial.h"
 #include "server/server_runner.h"
 #include "server/server_storage.h"
 #include "network/net_packets.h"
@@ -152,6 +153,24 @@ void server_network_broadcast_raw(uint8_t channel, const void* data, size_t len,
     }
 }
 
+void server_network_broadcast_spatial(uint32_t zone_id, int block_x, int block_z, uint8_t channel, const void* data, size_t len, bool reliable, uint32_t exclude_client_id) {
+    for (int i = 0; i < SERVER_NET_MAX_CLIENTS; i++) {
+        if (s_sessions[i].state >= NET_SESSION_AUTHENTICATED &&
+            s_sessions[i].client_id != exclude_client_id &&
+            s_sessions[i].peer != NULL) {
+            if (server_spatial_is_client_interested(s_sessions[i].client_id, zone_id, block_x, block_z)) {
+                server_network_send_raw(s_sessions[i].client_id, channel, data, len, reliable);
+            }
+        }
+    }
+}
+
+void server_network_broadcast_spatial_wpos(uint32_t zone_id, float world_x, float world_z, uint8_t channel, const void* data, size_t len, bool reliable, uint32_t exclude_client_id) {
+    int bx = 0, bz = 0;
+    server_spatial_wpos_to_block(world_x, world_z, &bx, &bz);
+    server_network_broadcast_spatial(zone_id, bx, bz, channel, data, len, reliable, exclude_client_id);
+}
+
 void server_network_disconnect_client(uint32_t client_id, uint8_t reason) {
     ServerClientSession* session = server_network_get_session(client_id);
     if (session == NULL) {
@@ -173,6 +192,8 @@ void server_network_disconnect_client(uint32_t client_id, uint8_t reason) {
     if (session->player_slot >= 0) {
         server_player_unregister(session->client_id);
     }
+
+    server_spatial_remove_client(client_id);
 
     printf("[SERVER NET] Disconnected Client ID %u (reason %u).\n", client_id, reason);
     session->state = NET_SESSION_DISCONNECTED;
@@ -292,6 +313,7 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
         server_network_send_raw(session->client_id, NET_CH_RELIABLE, sbuf, slen, true);
         enet_host_flush(s_server_host);
         session->state = NET_SESSION_AUTHENTICATED;
+        server_spatial_update_client_acre(session->client_id, ack.starting_zone_id, 3, 1);
         printf("[SERVER NET] Handshake accepted: Client ID %u ('%s') assigned to slot %d%s\n",
                session->client_id, hs.player_name, slot, is_new_player ? " (New Player / Rover Train Ride)" : "");
     }
@@ -552,6 +574,7 @@ void server_network_poll(void) {
                                         cc->player_actor->actor_class.world.position.y = inp.player_y;
                                         cc->player_actor->actor_class.world.position.z = inp.player_z;
                                     }
+                                    server_spatial_update_client_wpos(session->client_id, cc->zone_id, inp.player_x, inp.player_z);
                                 }
                             }
                             break;
@@ -571,6 +594,7 @@ void server_network_poll(void) {
                 ServerClientSession* session = (ServerClientSession*)event.peer->data;
                 if (session != NULL) {
                     printf("[SERVER NET] Peer disconnected for Client ID %u\n", session->client_id);
+                    server_spatial_remove_client(session->client_id);
                     if (session->player_slot >= 0) {
                         server_player_unregister(session->client_id);
                     }

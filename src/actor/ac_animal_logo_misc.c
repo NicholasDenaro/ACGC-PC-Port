@@ -116,6 +116,8 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
 
             g_pc_quick_start = 0;
             mTD_rtc_set();
+            extern void pc_sync_server_town_if_needed(void);
+            pc_sync_server_town_if_needed();
             mCD_InitGameStart_bg(0, -1, mCD_START_COND_2, &result);
 
             bzero(&door_data, sizeof(Door_data_c));

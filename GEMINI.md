@@ -97,6 +97,18 @@ The `acgc-tools` MCP server provides specialized tools tailored for this codebas
   call_mcp_tool(ServerName="acgc-tools", ToolName="get_game_status", Arguments={})
   ```
 
+### `stop_game`
+- **When to use**: To terminate the client (`AnimalCrossing.exe`), dedicated server (`AnimalCrossingServer.exe`), or both when releasing build file locks or shutting down processes.
+- **What it provides**: Safely invokes Windows `taskkill` against the targeted binary or PID.
+- **Parameters**:
+  - `target` (*string*, optional): `"server"`, `"client"`, or `"all"` (default: `"all"`).
+  - `pid` (*integer*, optional): Specific Process ID to terminate.
+  - `force` (*boolean*, optional): Whether to forcefully kill the process (default: `true`).
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="stop_game", Arguments={"target": "server"})
+  ```
+
 ### `find_files`
 - **When to use**: To locate files or directories matching a glob pattern or substring across the codebase without running terminal commands like `Get-ChildItem` or `find`.
 - **What it provides**: Recursively lists matching relative file and directory paths. Automatically skips excluded directories (`.git`, `build32`, `bin`, etc.).

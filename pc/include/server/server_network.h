@@ -67,6 +67,10 @@ bool server_network_send_raw(uint32_t client_id, uint8_t channel, const void* da
 /* Broadcast packet buffer to all authenticated clients (optionally excluding one) */
 void server_network_broadcast_raw(uint8_t channel, const void* data, size_t len, bool reliable, uint32_t exclude_client_id);
 
+/* Broadcast packet buffer filtered by spatial interest (3x3 acre subscription for outdoors, zone_id for indoors) */
+void server_network_broadcast_spatial(uint32_t zone_id, int block_x, int block_z, uint8_t channel, const void* data, size_t len, bool reliable, uint32_t exclude_client_id);
+void server_network_broadcast_spatial_wpos(uint32_t zone_id, float world_x, float world_z, uint8_t channel, const void* data, size_t len, bool reliable, uint32_t exclude_client_id);
+
 /* Disconnect a specific client */
 void server_network_disconnect_client(uint32_t client_id, uint8_t reason);
 

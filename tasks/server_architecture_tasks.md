@@ -209,8 +209,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
 
 ### Phase 7: World State Replication & Spatial Management
 
-- [ ] **Task 7.1: Spatial Interest Grid (3x3 Acre Subscription)**
-  - **State**: `Not Implemented`
+- [x] **Task 7.1: Spatial Interest Grid (3x3 Acre Subscription)**
+  - **State**: `Implemented`
   - **Files**: `pc/src/server/server_spatial.c`, `pc/include/server/server_spatial.h`
   - **Description**: Implement the 3×3 acre interest calculation based on each client's current acre coordinate. Filter entity broadcasts so clients only receive updates relevant to their immediate surroundings.
   - **Acceptance Criteria**: Actions occurring in Acre A-1 are not broadcast to players in Acre F-5, saving bandwidth.

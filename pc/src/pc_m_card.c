@@ -800,14 +800,57 @@ static void pc_save_migrate_legacy(void) {
     }
 }
 
+static void pc_copy_file_if_not_exists(const char* src, const char* dst) {
+    struct stat st;
+    if (stat(dst, &st) == 0 && st.st_size > 0) return;
+    FILE* in = fopen(src, "rb");
+    if (!in) return;
+#ifdef _WIN32
+    _mkdir(PC_SAVE_DIR);
+    _mkdir(PC_CARD_A_DIR);
+#else
+    mkdir(PC_SAVE_DIR, 0755);
+    mkdir(PC_CARD_A_DIR, 0755);
+#endif
+    FILE* out = fopen(dst, "wb");
+    if (!out) {
+        fclose(in);
+        return;
+    }
+    char buf[8192];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), in)) > 0) {
+        fwrite(buf, 1, n, out);
+    }
+    fclose(in);
+    fclose(out);
+    OSReport("[PC] Copied server town from '%s' to '%s'\n", src, dst);
+}
+
+void pc_sync_server_town_if_needed(void) {
+    const char* server_gci = "server_save/card_a/DobutsunomoriP_MURA.gci";
+    struct stat st;
+    if (stat(server_gci, &st) == 0 && st.st_size > 0) {
+        pc_copy_file_if_not_exists(server_gci, PC_GCI_PATH);
+        if (pc_save_read_gci(PC_GCI_PATH)) {
+            pc_save_loaded = 1;
+            pc_save_ready = 1;
+        }
+    }
+}
+
 static int pc_save_scan_gci_dir(void) {
-    /* Try common AC save filenames in card_a/ */
-    char path1[300], path2[300];
+    /* Try common AC save filenames in card_a/ and server_save/card_a/ */
+    char path1[300], path2[300], path3[300], path4[300];
     snprintf(path1, sizeof(path1), "%s/DobutsunomoriP_MURA.gci", PC_CARD_A_DIR);
     snprintf(path2, sizeof(path2), "%s/8P-GAFE-DobutsunomoriP_MURA.gci", PC_CARD_A_DIR);
+    snprintf(path3, sizeof(path3), "server_save/card_a/DobutsunomoriP_MURA.gci");
+    snprintf(path4, sizeof(path4), "server_save/card_a/8P-GAFE-DobutsunomoriP_MURA.gci");
     const char* gci_names[] = {
         path1,
         path2,
+        path3,
+        path4,
         NULL
     };
     int i;
@@ -816,6 +859,9 @@ static int pc_save_scan_gci_dir(void) {
     for (i = 0; gci_names[i] != NULL; i++) {
         if (stat(gci_names[i], &st) == 0) {
             OSReport("[PC] GCI scan: found '%s'\n", gci_names[i]);
+            if (i >= 2) {
+                pc_copy_file_if_not_exists(gci_names[i], PC_GCI_PATH);
+            }
             if (pc_save_read_gci(gci_names[i])) {
                 return TRUE;
             }

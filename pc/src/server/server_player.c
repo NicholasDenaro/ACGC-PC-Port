@@ -1,6 +1,7 @@
 /* server_player.c - Multi-player ConnectedClient registry and tracking */
 #include "server/server_player.h"
 #include "server/server_zone.h"
+#include "server/server_spatial.h"
 #include "server/server_runner.h"
 #include "server/server_network.h"
 #include "server/server_storage.h"
@@ -119,6 +120,7 @@ int server_player_register(uint32_t client_id, uint32_t zone_id, const Private_c
             if (zone != NULL) {
                 server_zone_add_player(zone, i);
             }
+            server_spatial_update_client_acre(client_id, zone_id, 3, 1);
             return i;
         }
     }
@@ -131,6 +133,7 @@ void server_player_unregister(uint32_t client_id) {
     for (int i = 0; i < MAX_SERVER_CLIENTS; i++) {
         if (g_server_clients[i].is_connected && g_server_clients[i].client_id == client_id) {
             ConnectedClient* client = &g_server_clients[i];
+            server_spatial_remove_client(client_id);
             ServerZone* zone = server_zone_get(client->zone_id);
             if (zone != NULL) {
                 server_zone_remove_player(zone, i);

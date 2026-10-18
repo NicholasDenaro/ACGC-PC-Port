@@ -232,6 +232,55 @@ def tool_git_status(diff=False, files=None):
             "error": f"Failed to execute git: {e}"
         }
 
+def tool_stop_game(target="all", pid=None, force=True):
+    """Terminates running AnimalCrossing.exe and/or AnimalCrossingServer.exe processes."""
+    results = {}
+    if pid is not None:
+        cmd = ["taskkill"]
+        if force:
+            cmd.append("/F")
+        cmd.extend(["/PID", str(pid)])
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            results[f"pid_{pid}"] = {
+                "status": "terminated" if res.returncode == 0 else "not_running" if res.returncode == 128 else "error",
+                "return_code": res.returncode,
+                "output": (res.stdout + res.stderr).strip()
+            }
+        except Exception as e:
+            results[f"pid_{pid}"] = {"status": "error", "output": str(e)}
+        return {"success": True, "results": results}
+
+    targets = []
+    if target in ("server", "all"):
+        targets.append("AnimalCrossingServer.exe")
+    if target in ("client", "all"):
+        targets.append("AnimalCrossing.exe")
+
+    if not targets:
+        return {"success": False, "error": f"Invalid target '{target}'. Must be 'client', 'server', or 'all'."}
+
+    for exe in targets:
+        cmd = ["taskkill"]
+        if force:
+            cmd.append("/F")
+        cmd.extend(["/IM", exe])
+        try:
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if res.returncode == 0:
+                results[exe] = {"status": "terminated", "output": res.stdout.strip()}
+            elif res.returncode == 128:
+                results[exe] = {"status": "not_running", "output": "Process was not running."}
+            else:
+                results[exe] = {"status": "error", "return_code": res.returncode, "output": (res.stdout + res.stderr).strip()}
+        except Exception as e:
+            results[exe] = {"status": "error", "output": str(e)}
+
+    return {
+        "success": True,
+        "results": results
+    }
+
 def tool_get_game_status():
     """Queries running processes to check if AnimalCrossing.exe or AnimalCrossingServer.exe are active."""
     results = {
@@ -240,14 +289,14 @@ def tool_get_game_status():
     }
     try:
         proc = subprocess.Popen(
-            ["tasklist", "/FO", "CSV", "/V", "/FI", "IMAGENAME eq AnimalCrossing*"],
+            ["tasklist", "/FO", "CSV", "/FI", "IMAGENAME eq AnimalCrossing*"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
             errors="replace"
         )
-        stdout, _ = proc.communicate(timeout=10)
+        stdout, _ = proc.communicate(timeout=5)
         lines = [line.strip() for line in stdout.splitlines() if line.strip()]
         if lines:
             import csv
@@ -265,9 +314,7 @@ def tool_get_game_status():
                         "running": True,
                         "pid": int(pid_str) if pid_str.isdigit() else pid_str,
                         "memory": row_dict.get("Mem Usage", ""),
-                        "status": row_dict.get("Status", ""),
-                        "cpu_time": row_dict.get("CPU Time", ""),
-                        "window_title": row_dict.get("Window Title", "")
+                        "session": row_dict.get("Session Name", "")
                     }
                     if "server" in img_name:
                         results["server"] = info
@@ -963,10 +1010,32 @@ TOOLS = [
     },
     {
         "name": "get_game_status",
-        "description": "Queries Windows running processes to check if AnimalCrossing.exe or AnimalCrossingServer.exe are active, returning PID, memory usage, status, CPU time, and window title.",
+        "description": "Queries Windows running processes to check if AnimalCrossing.exe or AnimalCrossingServer.exe are active, returning PID, memory usage, and session.",
         "inputSchema": {
             "type": "object",
             "properties": {}
+        }
+    },
+    {
+        "name": "stop_game",
+        "description": "Stops or terminates running AnimalCrossing.exe (client) and/or AnimalCrossingServer.exe (dedicated server) processes to release file locks or cleanly shutdown.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "enum": ["server", "client", "all"],
+                    "description": "Which process to terminate: 'server', 'client', or 'all'. Defaults to 'all'."
+                },
+                "pid": {
+                    "type": "integer",
+                    "description": "Optional specific process ID (PID) to terminate."
+                },
+                "force": {
+                    "type": "boolean",
+                    "description": "Whether to forcefully terminate the process. Defaults to true."
+                }
+            }
         }
     },
     {
@@ -1074,6 +1143,12 @@ def handle_tool_call(name, arguments):
         )
     elif name == "get_game_status":
         return tool_get_game_status()
+    elif name == "stop_game":
+        return tool_stop_game(
+            target=arguments.get("target", "all"),
+            pid=arguments.get("pid"),
+            force=arguments.get("force", True)
+        )
     elif name == "find_files":
         return tool_find_files(
             pattern=arguments.get("pattern") or arguments.get("filter") or arguments.get("file_pattern") or "*",
@@ -1261,6 +1336,11 @@ def run_cli():
     find_p.add_argument("-d", "--include-dirs", action="store_true", help="Include directories in results")
     find_p.add_argument("-m", "--max-results", type=int, default=200, help="Max results")
 
+    stop_p = subparsers.add_parser("stop", help="Stop running game client or server processes")
+    stop_p.add_argument("target", nargs="?", default="all", choices=["server", "client", "all"], help="Which process to terminate (default: all)")
+    stop_p.add_argument("--pid", type=int, default=None, help="Specific PID to terminate")
+    stop_p.add_argument("-f", "--force", action="store_true", default=True, help="Force kill (default: True)")
+
     args = parser.parse_args()
     if args.command == "build":
         res = tool_build_game(target=args.target, clean=args.clean)
@@ -1327,6 +1407,10 @@ def run_cli():
             print(f)
         if res.get("truncated"):
             print(f"... (truncated at {res.get('count')} results)")
+    elif args.command == "stop":
+        res = tool_stop_game(target=args.target, pid=args.pid, force=args.force)
+        print(json.dumps(res, indent=2))
+        sys.exit(0 if res.get("success") else 1)
     else:
         parser.print_help()
 
