@@ -79,7 +79,12 @@ static void aWeatherRain_make(ACTOR* actor, GAME* game) {
             if (mEv_CheckTitleDemo() == mEv_TITLEDEMO_STAFFROLL) {
                 PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+                f32 player_y = (player != NULL) ? player->actor_class.world.position.y : 0.0f;
+                pos_mod.y = 70.0f + (120.0f + player_y);
+#else
                 pos_mod.y = 70.0f + (120.0f + player->actor_class.world.position.y);
+#endif
             } else {
                 pos_mod.y = 70.0f + (120.0f + mCoBG_GetBgY_OnlyCenter_FromWpos(pos_mod, 0.0f));
             }
@@ -113,7 +118,11 @@ static void aWeatherRain_MakePicha(ACTOR* actor, GAME* game, xyz_t pos) {
         if (mEv_CheckTitleDemo() == mEv_TITLEDEMO_STAFFROLL) {
             PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            y = (player != NULL) ? player->actor_class.world.position.y : 0.0f;
+#else
             y = player->actor_class.world.position.y;
+#endif
             pos.y = y;
         } else {
             y = mCoBG_GetBgY_OnlyCenter_FromWpos(pos, 0.0f);

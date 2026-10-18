@@ -79,6 +79,10 @@ extern int mPr_GetPlayerName(u8* buf, int player_no) {
 extern int mPr_NullCheckPersonalID(PersonalID_c* pid) {
     int res = FALSE;
 
+    if (pid == NULL) {
+        return TRUE;
+    }
+
     if (pid->land_id == 0xFFFF && mPr_NullCheckPlayerName(pid->player_name) == TRUE) {
         res = TRUE;
     }
@@ -87,6 +91,9 @@ extern int mPr_NullCheckPersonalID(PersonalID_c* pid) {
 }
 
 extern void mPr_ClearPersonalID(PersonalID_c* pid) {
+    if (pid == NULL) {
+        return;
+    }
     mPr_ClearPlayerName(pid->player_name);
     mLd_ClearLandName(pid->land_name);
     pid->land_id = 0xFFFF;
@@ -101,11 +108,17 @@ extern void mPr_ClearAnyPersonalID(PersonalID_c* pid, int count) {
 }
 
 extern void mPr_CopyPersonalID(PersonalID_c* dst, PersonalID_c* src) {
-    mem_copy((u8*)dst, (u8*)src, sizeof(PersonalID_c));
+    if (dst != NULL && src != NULL) {
+        mem_copy((u8*)dst, (u8*)src, sizeof(PersonalID_c));
+    }
 }
 
 extern int mPr_CheckCmpPersonalID(PersonalID_c* pid0, PersonalID_c* pid1) {
     int res = FALSE;
+
+    if (pid0 == NULL || pid1 == NULL) {
+        return FALSE;
+    }
 
     if (pid0->land_id == pid1->land_id && pid0->player_id == pid1->player_id &&
         mLd_CheckCmpLandName(pid0->land_name, pid1->land_name) == TRUE &&

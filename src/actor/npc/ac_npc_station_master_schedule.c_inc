@@ -99,8 +99,11 @@ static void aSTM_get_off_wait(NPC_STATION_MASTER_ACTOR* actor, GAME_PLAY* play) 
                 case mDemo_CLIP_TYPE_INTRO_DEMO: {
                     INTRO_DEMO_ACTOR* demo_actor = (INTRO_DEMO_ACTOR*)demox;
 
-                    // train1 arg0 is passenger flag
+#ifdef TARGET_PC
+                    if (demo_actor->train1_actor_p != NULL && !demo_actor->train1_actor_p->arg0) {
+#else
                     if (mEv_CheckFirstIntro() && demo_actor->train1_actor_p != NULL && !demo_actor->train1_actor_p->arg0) {
+#endif
                         if (mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_DEMO_GETOFF_TRAIN) {
                             aSTM_setup_think_proc(actor, play, aSTM_THINK_TURN);
                         }

@@ -881,7 +881,11 @@ extern void Actor_init_actor_class(ACTOR* actor, ACTOR_PROFILE* profile, ACTOR_D
     actor->block_x = block_x;
     actor->block_z = block_z;
     actor->move_actor_list_idx = move_actor_list_idx;
+#ifdef TARGET_PC
+    actor->npc_id = (name_id != EMPTY_NO) ? name_id : profile->npc_id;
+#else
     actor->npc_id = name_id;
+#endif
 }
 
 typedef struct overlay_struct {

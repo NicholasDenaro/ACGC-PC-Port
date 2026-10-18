@@ -355,7 +355,8 @@ static void aNGD_time_menu_open_wait(NPC_GUIDE_ACTOR* guide, GAME_PLAY* play) {
 }
 
 static void aNGD_time_menu_close_wait(NPC_GUIDE_ACTOR* guide, GAME_PLAY* play) {
-    if (play->submenu.open_flag == FALSE) {
+    if (play->submenu.open_flag == FALSE && play->submenu.menu_type == mSM_OVL_NONE &&
+        play->submenu.process_status == mSM_PROCESS_WAIT) {
         aNGD_setupAction(guide, play, aNGD_ACTION_MSG_WIN_OPEN_WAIT);
     }
 }

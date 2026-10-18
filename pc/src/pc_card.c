@@ -78,8 +78,23 @@ static void card_slot_free(CARDFileInfo_PC* fi) {
 }
 
 /* Per-channel directory: chan 0 = card_a, chan 1 = card_b */
-static const char* card_dir[2] = { "save/card_a", "save/card_b" };
+static char s_save_base_dir[256] = "save";
+static char card_dir[2][300] = { "save/card_a", "save/card_b" };
 static int card_mounted[2] = {0, 0};
+
+void pc_save_set_dir(const char* dir) {
+    if (dir && dir[0] != '\0') {
+        snprintf(s_save_base_dir, sizeof(s_save_base_dir), "%s", dir);
+    } else {
+        snprintf(s_save_base_dir, sizeof(s_save_base_dir), "save");
+    }
+    snprintf(card_dir[0], sizeof(card_dir[0]), "%s/card_a", s_save_base_dir);
+    snprintf(card_dir[1], sizeof(card_dir[1]), "%s/card_b", s_save_base_dir);
+}
+
+const char* pc_save_get_dir(void) {
+    return s_save_base_dir;
+}
 
 static const char* get_card_dir(s32 chan) {
     if (chan >= 0 && chan <= 1) return card_dir[chan];
@@ -98,13 +113,13 @@ static int card_filename_safe(const char* name) {
 
 static void ensure_dirs(void) {
 #ifdef _WIN32
-    _mkdir("save");
-    _mkdir("save/card_a");
-    _mkdir("save/card_b");
+    _mkdir(s_save_base_dir);
+    _mkdir(card_dir[0]);
+    _mkdir(card_dir[1]);
 #else
-    mkdir("save", 0755);
-    mkdir("save/card_a", 0755);
-    mkdir("save/card_b", 0755);
+    mkdir(s_save_base_dir, 0755);
+    mkdir(card_dir[0], 0755);
+    mkdir(card_dir[1], 0755);
 #endif
 }
 

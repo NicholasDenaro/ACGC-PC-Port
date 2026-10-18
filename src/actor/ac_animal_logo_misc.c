@@ -108,6 +108,36 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
     mNpc_ClearAnimalInfo(mNpc_GetInAnimalP());
 #ifdef TARGET_PC
     {
+        extern bool client_network_is_connected(void);
+        extern bool client_network_is_new_player(void);
+        if (client_network_is_connected() && client_network_is_new_player()) {
+            s32 result;
+            Door_data_c door_data;
+
+            g_pc_quick_start = 0;
+            mTD_rtc_set();
+            mCD_InitGameStart_bg(0, -1, mCD_START_COND_2, &result);
+
+            bzero(&door_data, sizeof(Door_data_c));
+            door_data.next_scene_id = SCENE_START_DEMO2;
+            door_data.exit_orientation = mSc_DIRECT_NORTH;
+            door_data.exit_type = 0;
+            door_data.extra_data = 0;
+            door_data.exit_position.x = 120;
+            door_data.exit_position.y = 0;
+            door_data.exit_position.z = 340;
+            door_data.door_actor_name = EMPTY_NO;
+            door_data.wipe_type = WIPE_TYPE_FADE_BLACK;
+
+            Common_Set(door_data, door_data);
+            Common_Get(door_data).next_scene_id = SCENE_START_DEMO2;
+            play->next_scene_no = SCENE_START_DEMO2;
+            Common_Set(submenu_disabled, TRUE);
+            Common_Get(transition).wipe_type = WIPE_TYPE_FADE_BLACK;
+            mBGMPsComp_make_ps_wipe(0x11C2);
+            return;
+        }
+
         int player_exists = (mPr_NullCheckPlayerName(Save_Get(private_data[0]).player_ID.player_name) == FALSE) &&
                             (Save_Get(private_data[0]).exists == TRUE);
         if (g_pc_quick_start && player_exists && decide_next_scene_no() == SCENE_PLAYERSELECT_2) {

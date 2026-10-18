@@ -29,9 +29,13 @@ enum {
     PKT_C2S_DISCONNECT    = 0x03,
     PKT_S2C_DISCONNECT    = 0x04,
 
-    /* Handshake (Reliable) */
-    PKT_C2S_HANDSHAKE     = 0x10,
-    PKT_S2C_HANDSHAKE_ACK = 0x11,
+    /* Handshake, Character Creation & Move-In (Reliable) */
+    PKT_C2S_HANDSHAKE          = 0x10,
+    PKT_S2C_HANDSHAKE_ACK      = 0x11,
+    PKT_C2S_CHARACTER_FINALIZE = 0x12,
+    PKT_S2C_CHARACTER_ACK      = 0x13,
+    PKT_C2S_MOVEIN_REQ         = 0x14,
+    PKT_S2C_MOVEIN_ACK         = 0x15,
 
     /* Movement & Continuous State (Unreliable) */
     PKT_C2S_INPUT         = 0x20,
@@ -52,9 +56,18 @@ enum {
 /* Handshake ACK Status */
 enum {
     NET_HS_OK = 0,
+    NET_HS_OK_NEW_PLAYER,
     NET_HS_VERSION_MISMATCH,
     NET_HS_SERVER_FULL,
     NET_HS_AUTH_FAILED
+};
+
+/* Move-In ACK Status */
+enum {
+    NET_MOVEIN_OK = 0,
+    NET_MOVEIN_HOUSE_FULL,
+    NET_MOVEIN_ALREADY_RESIDENT,
+    NET_MOVEIN_ERROR
 };
 
 /* Interaction Actions */
@@ -126,6 +139,40 @@ typedef struct {
     u8  weather;
     u16 starting_zone_id;
 } pkt_s2c_handshake_ack_t;
+
+/* Character Finalization Client -> Server (Rover Train Complete) */
+typedef struct {
+    u16  client_id;
+    char player_name[NET_MAX_NAME_LEN];
+    u8   gender;
+    u8   face_type;
+    u16  clothes_id;
+    char auth_token[NET_MAX_AUTH_TOKEN_LEN];
+} pkt_c2s_character_finalize_t;
+
+/* Character Finalization ACK Server -> Client */
+typedef struct {
+    u8   status; /* 0 = OK */
+    u16  client_id;
+    u8   is_resident;
+    u8   slot_idx;
+} pkt_s2c_character_ack_t;
+
+/* House Move-In Request Client -> Server (Gyroid Interaction) */
+typedef struct {
+    u16  client_id;
+    u8   house_idx; /* 0..3 */
+    char auth_token[NET_MAX_AUTH_TOKEN_LEN];
+} pkt_c2s_movein_req_t;
+
+/* House Move-In ACK Server -> Client */
+typedef struct {
+    u8  status; /* NET_MOVEIN_* */
+    u16 client_id;
+    u8  house_idx;     /* 0..3 */
+    u8  resident_slot; /* 0..7 */
+    u8  roommate_slot; /* 0 or 1 */
+} pkt_s2c_movein_ack_t;
 
 /* Controller Input Client -> Server */
 typedef struct {
@@ -248,6 +295,18 @@ int net_pack_handshake(u8* buf, size_t buf_size, const pkt_c2s_handshake_t* pkt)
 int net_unpack_handshake(const u8* buf, size_t buf_size, pkt_c2s_handshake_t* pkt);
 int net_pack_handshake_ack(u8* buf, size_t buf_size, const pkt_s2c_handshake_ack_t* pkt);
 int net_unpack_handshake_ack(const u8* buf, size_t buf_size, pkt_s2c_handshake_ack_t* pkt);
+
+/* Character Finalization */
+int net_pack_character_finalize(u8* buf, size_t buf_size, const pkt_c2s_character_finalize_t* pkt);
+int net_unpack_character_finalize(const u8* buf, size_t buf_size, pkt_c2s_character_finalize_t* pkt);
+int net_pack_character_ack(u8* buf, size_t buf_size, const pkt_s2c_character_ack_t* pkt);
+int net_unpack_character_ack(const u8* buf, size_t buf_size, pkt_s2c_character_ack_t* pkt);
+
+/* House Move-In */
+int net_pack_movein_req(u8* buf, size_t buf_size, const pkt_c2s_movein_req_t* pkt);
+int net_unpack_movein_req(const u8* buf, size_t buf_size, pkt_c2s_movein_req_t* pkt);
+int net_pack_movein_ack(u8* buf, size_t buf_size, const pkt_s2c_movein_ack_t* pkt);
+int net_unpack_movein_ack(const u8* buf, size_t buf_size, pkt_s2c_movein_ack_t* pkt);
 
 /* Input */
 int net_pack_input(u8* buf, size_t buf_size, const pkt_c2s_input_t* pkt);

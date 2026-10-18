@@ -260,8 +260,10 @@ void server_set_active_zone_context(GAME_PLAY* play, ServerZone* zone) {
     Common_Get(clip) = zone->clip;
     Common_Set(field_type, zone->field_type);
     Save_Set(scene_no, zone->scene_id);
-    if (get_player_actor_withoutCheck(play) != NULL) {
+    if (play != NULL && play->actor_info.list[ACTOR_PART_PLAYER].actor != NULL) {
         Common_Set(player_actor_exists, TRUE);
+    } else {
+        Common_Set(player_actor_exists, FALSE);
     }
 }
 

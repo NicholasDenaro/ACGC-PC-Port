@@ -111,6 +111,18 @@ The `acgc-tools` MCP server provides specialized tools tailored for this codebas
   call_mcp_tool(ServerName="acgc-tools", ToolName="find_files", Arguments={"pattern": "*.md"})
   ```
 
+### `resolve_crash_address`
+- **When to use**: To resolve raw crash memory addresses or stack traces to exact C/C++ source files and line numbers via DWARF debug symbols.
+- **What it provides**: Invokes MinGW `addr2line` against `AnimalCrossingServer.exe` or `AnimalCrossing.exe`. Note: `read_game_logs` automatically resolves crash stacks on-the-fly when reading logs containing crash traces!
+- **Parameters**:
+  - `addresses` (*array of strings* or *string*): List of hex addresses or stack trace text.
+  - `target` (*string*, optional): `"server"` (default) or `"client"`.
+  - `binary_path` (*string*, optional): Explicit path to executable with DWARF symbols.
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="resolve_crash_address", Arguments={"target": "server", "addresses": ["0x00496005", "0x0060739A"]})
+  ```
+
 ---
 
 ## 3. General Development Rules

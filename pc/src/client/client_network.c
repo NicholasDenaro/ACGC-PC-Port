@@ -2,6 +2,7 @@
 #include "client/client_network.h"
 #include "client/client_identity.h"
 #include "server/server_network.h"
+#include "server/server_storage.h"
 #include "network/net_packets.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -12,6 +13,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/stat.h>
+#endif
 
 ClientNetworkContext g_client_net = {0};
 
@@ -34,6 +41,10 @@ bool client_network_init(void) {
     g_client_net.client_id = 0;
     g_client_net.input_sequence = 0;
     g_client_net.ping_rtt_ms = 0;
+    g_client_net.is_resident = false;
+    g_client_net.resident_slot = -1;
+    g_client_net.house_idx = -1;
+    g_client_net.roommate_slot = -1;
 
     printf("[CLIENT NET] Client network subsystem initialized.\n");
     return true;
@@ -207,6 +218,84 @@ bool client_network_send_input(const pkt_c2s_input_t* input) {
     return false;
 }
 
+bool client_network_is_new_player(void) {
+    return g_client_net.is_new_player;
+}
+
+bool client_network_send_character_finalize(const Private_c* priv) {
+    if (!client_network_is_connected() || priv == NULL) {
+        return false;
+    }
+
+    pkt_c2s_character_finalize_t fin;
+    memset(&fin, 0, sizeof(fin));
+    fin.client_id = g_client_net.client_id;
+
+    /* Extract clean null-terminated player name from GameCube format */
+    char clean_name[PLAYER_NAME_LEN + 1];
+    memset(clean_name, 0, sizeof(clean_name));
+    for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+        if (priv->player_ID.player_name[i] == CHAR_SPACE || priv->player_ID.player_name[i] == 0) {
+            break;
+        }
+        clean_name[i] = (char)priv->player_ID.player_name[i];
+    }
+    snprintf(fin.player_name, sizeof(fin.player_name), "%s", clean_name[0] ? clean_name : "Player");
+    fin.gender = priv->gender;
+    fin.face_type = priv->face;
+    fin.clothes_id = priv->cloth.item;
+    client_identity_get_token((uint8_t*)fin.auth_token);
+
+    u8 buf[128];
+    int len = net_pack_character_finalize(buf, sizeof(buf), &fin);
+    if (len > 0) {
+        printf("[CLIENT NET] Transmitting finalized character profile for '%s' to server...\n", fin.player_name);
+        return client_network_send_raw(NET_CH_RELIABLE, buf, len, true);
+    }
+    return false;
+}
+
+bool client_network_is_resident(void) {
+    return g_client_net.is_resident;
+}
+
+int8_t client_network_get_resident_slot(void) {
+    return g_client_net.resident_slot;
+}
+
+int8_t client_network_get_house_idx(void) {
+    return g_client_net.house_idx;
+}
+
+int8_t client_network_get_roommate_slot(void) {
+    return g_client_net.roommate_slot;
+}
+
+void client_network_set_local_resident(uint8_t house_idx) {
+    g_client_net.is_resident = true;
+    g_client_net.house_idx = (int8_t)house_idx;
+}
+
+bool client_network_send_movein_req(uint8_t house_idx) {
+    if (!client_network_is_connected()) {
+        return false;
+    }
+
+    pkt_c2s_movein_req_t req;
+    memset(&req, 0, sizeof(req));
+    req.client_id = g_client_net.client_id;
+    req.house_idx = house_idx;
+    client_identity_get_token((uint8_t*)req.auth_token);
+
+    u8 buf[128];
+    int len = net_pack_movein_req(buf, sizeof(buf), &req);
+    if (len > 0) {
+        printf("[CLIENT NET] Transmitting Move-In request for House %u to server...\n", house_idx);
+        return client_network_send_raw(NET_CH_RELIABLE, buf, len, true);
+    }
+    return false;
+}
+
 void client_network_poll(void) {
     if (g_client_net.host == NULL) {
         return;
@@ -230,15 +319,54 @@ void client_network_poll(void) {
                         case PKT_S2C_HANDSHAKE_ACK: {
                             pkt_s2c_handshake_ack_t ack;
                             if (net_unpack_handshake_ack(event.packet->data, event.packet->dataLength, &ack) > 0) {
-                                if (ack.status == NET_HS_OK) {
+                                if (ack.status == NET_HS_OK || ack.status == NET_HS_OK_NEW_PLAYER) {
                                     g_client_net.state = CLIENT_NET_CONNECTED;
                                     g_client_net.client_id = ack.client_id;
                                     g_client_net.server_world_info = ack;
-                                    printf("[CLIENT NET] Handshake OK! Connected as Client ID %u (Town: '%s', Land: 0x%04X, Zone: %u)\n",
-                                           ack.client_id, ack.town_name, ack.land_id, ack.starting_zone_id);
+                                    g_client_net.is_new_player = (ack.status == NET_HS_OK_NEW_PLAYER);
+                                    if (g_client_net.is_new_player) {
+                                        printf("[CLIENT NET] Handshake OK! New player token recognized (Rover train intro enabled).\n");
+                                    } else {
+                                        printf("[CLIENT NET] Handshake OK! Connected as Client ID %u (Town: '%s', Land: 0x%04X, Zone: %u)\n",
+                                               ack.client_id, ack.town_name, ack.land_id, ack.starting_zone_id);
+                                    }
                                 } else {
                                     printf("[CLIENT NET ERROR] Server rejected handshake (status code %u).\n", ack.status);
                                     client_network_disconnect(0);
+                                }
+                            }
+                            break;
+                        }
+
+                        case PKT_S2C_CHARACTER_ACK: {
+                            pkt_s2c_character_ack_t ack;
+                            if (net_unpack_character_ack(event.packet->data, event.packet->dataLength, &ack) > 0) {
+                                if (ack.status == 0) {
+                                    g_client_net.character_finalized = true;
+                                    g_client_net.is_new_player = false;
+                                    if (ack.is_resident) {
+                                        g_client_net.is_resident = true;
+                                        g_client_net.resident_slot = (int8_t)ack.slot_idx;
+                                    }
+                                    printf("[CLIENT NET] Character registered on server as %s (Slot %u)!\n",
+                                           ack.is_resident ? "Resident" : "Visitor", ack.slot_idx);
+                                }
+                            }
+                            break;
+                        }
+
+                        case PKT_S2C_MOVEIN_ACK: {
+                            pkt_s2c_movein_ack_t ack;
+                            if (net_unpack_movein_ack(event.packet->data, event.packet->dataLength, &ack) > 0) {
+                                if (ack.status == NET_MOVEIN_OK) {
+                                    g_client_net.is_resident = true;
+                                    g_client_net.house_idx = (int8_t)ack.house_idx;
+                                    g_client_net.resident_slot = (int8_t)ack.resident_slot;
+                                    g_client_net.roommate_slot = (int8_t)ack.roommate_slot;
+                                    printf("[CLIENT NET] Move-in confirmed by server! House %u, Resident Slot %u (Roommate %u)\n",
+                                           ack.house_idx, ack.resident_slot, ack.roommate_slot);
+                                } else {
+                                    printf("[CLIENT NET] Move-in request rejected by server (status %u).\n", ack.status);
                                 }
                             }
                             break;
@@ -332,6 +460,7 @@ void client_network_poll(void) {
     do { \
         if (!(cond)) { \
             fprintf(stderr, "[CLIENT NET TEST FAILED] %s: line %d\n", msg, __LINE__); \
+            server_storage_init(NULL); \
             return 0; \
         } \
     } while (0)
@@ -353,6 +482,22 @@ int client_network_run_tests(void) {
 
     /* 2. Client Connection, Automated Handshake, Input streaming, and Disconnect */
     {
+        /* Use isolated test storage for client network testing */
+        const char* test_storage_dir = "save/test_net_storage";
+#ifdef _WIN32
+        _mkdir("save");
+        _mkdir(test_storage_dir);
+#else
+        mkdir("save", 0755);
+        mkdir(test_storage_dir, 0755);
+#endif
+        char test_file[300], test_tmp[300];
+        snprintf(test_file, sizeof(test_file), "%s/server_extended.dat", test_storage_dir);
+        snprintf(test_tmp, sizeof(test_tmp), "%s/server_extended.dat.tmp", test_storage_dir);
+        remove(test_file);
+        remove(test_tmp);
+        server_storage_init(test_storage_dir);
+
         /* Start dedicated test server listener */
         TEST_CLIENT_ASSERT(server_network_init(test_port), "server_network_init");
 
@@ -373,7 +518,52 @@ int client_network_run_tests(void) {
         TEST_CLIENT_ASSERT(client_network_get_client_id() > 0, "client assigned client_id > 0");
         TEST_CLIENT_ASSERT(server_network_get_authenticated_count() == 1, "server has 1 authenticated client");
 
-        /* 3. Send Client Input stream */
+        /* Test character customization finalization (Rover questionnaire completion) */
+        Private_c test_priv;
+        memset(&test_priv, 0, sizeof(test_priv));
+        test_priv.gender = mPr_SEX_FEMALE;
+        test_priv.face = 4;
+        test_priv.cloth.item = 0x2403;
+        const char* custom_name = "Kiki";
+        for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+            test_priv.player_ID.player_name[i] = (i < (int)strlen(custom_name)) ? (u8)custom_name[i] : CHAR_SPACE;
+        }
+
+        TEST_CLIENT_ASSERT(client_network_send_character_finalize(&test_priv), "client_network_send_character_finalize");
+        enet_host_flush(g_client_net.host);
+
+        start_ms = SDL_GetTicks();
+        while (!g_client_net.character_finalized && SDL_GetTicks() - start_ms < 1000) {
+            server_network_poll();
+            client_network_poll();
+            SDL_Delay(5);
+        }
+
+        TEST_CLIENT_ASSERT(g_client_net.character_finalized, "character finalization acknowledged by server");
+        ConnectedClient* cc_check = server_player_get(client_network_get_client_id());
+        TEST_CLIENT_ASSERT(cc_check != NULL, "server ConnectedClient lookup");
+        TEST_CLIENT_ASSERT(cc_check->private_data.gender == mPr_SEX_FEMALE, "server recorded gender");
+        TEST_CLIENT_ASSERT(cc_check->private_data.face == 4, "server recorded face");
+        TEST_CLIENT_ASSERT(cc_check->private_data.cloth.item == 0x2403, "server recorded clothes");
+
+        /* 3. House Move-In Request (Gyroid Move-In Interaction) */
+        TEST_CLIENT_ASSERT(!client_network_is_resident(), "client starts as visitor before move-in");
+        TEST_CLIENT_ASSERT(client_network_send_movein_req(0), "client_network_send_movein_req");
+        enet_host_flush(g_client_net.host);
+
+        /* Pump events to let server process move-in and send ACK */
+        start_ms = SDL_GetTicks();
+        while (!client_network_is_resident() && SDL_GetTicks() - start_ms < 1000) {
+            server_network_poll();
+            client_network_poll();
+            SDL_Delay(5);
+        }
+
+        TEST_CLIENT_ASSERT(client_network_is_resident(), "client became resident after move-in");
+        TEST_CLIENT_ASSERT(client_network_get_house_idx() == 0, "client assigned house 0");
+        TEST_CLIENT_ASSERT(cc_check->resident_idx == 0, "server bound resident to slot 0");
+
+        /* 4. Send Client Input stream */
         pkt_c2s_input_t inp;
         memset(&inp, 0, sizeof(inp));
         inp.stick_x = 42;
@@ -415,6 +605,10 @@ int client_network_run_tests(void) {
 
         client_network_shutdown();
         server_network_shutdown();
+
+        remove(test_file);
+        remove(test_tmp);
+        server_storage_init(NULL);
     }
 
     printf("[CLIENT NET TEST] All client network controller tests passed successfully!\n");

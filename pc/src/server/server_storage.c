@@ -42,26 +42,26 @@ static uint32_t crc32_compute(const uint8_t* data, size_t length) {
     return ~crc;
 }
 
-static void ensure_save_directory(void) {
+static void ensure_save_directory(const char* dir) {
+    if (!dir || dir[0] == '\0') dir = SERVER_DEFAULT_SAVE_DIR;
 #ifdef _WIN32
-    _mkdir("save");
+    _mkdir(dir);
 #else
-    mkdir("save", 0755);
+    mkdir(dir, 0755);
 #endif
 }
 
 bool server_storage_init(const char* save_dir) {
-    ensure_save_directory();
-
     if (save_dir != NULL && save_dir[0] != '\0') {
         strncpy(s_base_dir, save_dir, sizeof(s_base_dir) - 1);
         s_base_dir[sizeof(s_base_dir) - 1] = '\0';
         snprintf(s_save_path, sizeof(s_save_path), "%s/server_extended.dat", save_dir);
     } else {
-        strncpy(s_base_dir, "save", sizeof(s_base_dir) - 1);
+        strncpy(s_base_dir, SERVER_DEFAULT_SAVE_DIR, sizeof(s_base_dir) - 1);
         snprintf(s_save_path, sizeof(s_save_path), "%s", SERVER_EXTENDED_PATH);
     }
 
+    ensure_save_directory(s_base_dir);
     server_backup_init(s_base_dir);
     s_last_periodic_sec = (uint64_t)time(NULL);
 
@@ -136,7 +136,7 @@ bool server_storage_save(void) {
         return false;
     }
 
-    ensure_save_directory();
+    ensure_save_directory(s_base_dir);
 
     char tmp_path[300];
     snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", s_save_path);

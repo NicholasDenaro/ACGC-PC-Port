@@ -23,10 +23,14 @@ extern "C" {
 
     /* Card slot for current town (A=0 home, B=1 visiting) */
     int mCD_GetThisLandSlotNo(void);
+    const char* pc_save_get_dir(void);
 }
 
 static const char* pc_nes_save_dir(void) {
-    return (mCD_GetThisLandSlotNo() == 1) ? "save/card_b" : "save/card_a";
+    static char nes_save_dir[300];
+    snprintf(nes_save_dir, sizeof(nes_save_dir), "%s/%s", pc_save_get_dir(),
+             (mCD_GetThisLandSlotNo() == 1) ? "card_b" : "card_a");
+    return nes_save_dir;
 }
 
 static void pc_sync_bbramp_to_prgram() {

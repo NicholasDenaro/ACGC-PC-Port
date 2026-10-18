@@ -64,6 +64,22 @@ static void aANT_wait(ANT_ACTOR* ant, GAME* game) {
         if ((u32)ant == catch_label) {
             aANT_setupAction(ant, aANT_ACT_CAUGHT);
         } else {
+#ifdef TARGET_PC
+            PLAYER_ACTOR* player = GET_PLAYER_ACTOR_NOW();
+            if (player != NULL) {
+                f32 catch_swing_timer = player->Get_Item_net_catch_swing_timer_proc != NULL
+                    ? player->Get_Item_net_catch_swing_timer_proc((ACTOR*)player, gamePT) : 0.0f;
+                xyz_t stop_net_pos;
+
+                if ((catch_swing_timer > 0.0f || mPlib_Check_StopNet(&stop_net_pos)) && ant->actor_class.player_distance_xz < mFI_UNIT_BASE_SIZE_F) {
+                    if (player->Set_Item_net_catch_request_force_proc != NULL) {
+                        player->Set_Item_net_catch_request_force_proc((ACTOR*)player, gamePT, (u32)ant, mPlayer_NET_CATCH_TYPE_ANT);
+                    }
+                } else if (player->Set_Item_net_catch_request_table_proc != NULL) {
+                    player->Set_Item_net_catch_request_table_proc((ACTOR*)player, gamePT, (u32)ant, mPlayer_NET_CATCH_TYPE_ANT, &ant->actor_class.world.position, 24.0f);
+                }
+            }
+#else
             f32 catch_swing_timer = GET_PLAYER_ACTOR_NOW()->Get_Item_net_catch_swing_timer_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), gamePT);
             xyz_t stop_net_pos;
 
@@ -72,6 +88,7 @@ static void aANT_wait(ANT_ACTOR* ant, GAME* game) {
             } else {
                 GET_PLAYER_ACTOR_NOW()->Set_Item_net_catch_request_table_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), gamePT, (u32)ant, mPlayer_NET_CATCH_TYPE_ANT, &ant->actor_class.world.position, 24.0f);
             }
+#endif
         }
     }
 }

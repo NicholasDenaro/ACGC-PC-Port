@@ -131,6 +131,10 @@ void pc_audio_start_producer_thread(void);
 void pc_audio_mq_init(void);
 void pc_audio_mq_shutdown(void);
 
+/* --- Save Directory Management --- */
+void pc_save_set_dir(const char* dir);
+const char* pc_save_get_dir(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -409,7 +409,8 @@ static void aNG2_pname_menu_open_wait(NPC_GUIDE2_ACTOR* guide2, GAME_PLAY* play)
 }
 
 static void aNG2_pname_menu_close_wait(NPC_GUIDE2_ACTOR* guide2, GAME_PLAY* play) {
-    if (play->submenu.open_flag == FALSE) {
+    if (play->submenu.open_flag == FALSE && play->submenu.menu_type == mSM_OVL_NONE &&
+        play->submenu.process_status == mSM_PROCESS_WAIT) {
         aNG2_setupAction(guide2, play, 8);
     }
 }
@@ -755,6 +756,16 @@ static void aNG2_scene_change_wait_init(NPC_GUIDE2_ACTOR* guide2, GAME_PLAY* pla
     Common_Set(submenu_disabled, TRUE);
     mBGMPsComp_make_ps_wipe(0x41C2);
     mBGMPsComp_scene_mode(18);
+
+#ifdef TARGET_PC
+    {
+        extern bool client_network_is_connected(void);
+        extern bool client_network_send_character_finalize(const Private_c* priv);
+        if (client_network_is_connected()) {
+            client_network_send_character_finalize(Common_Get(now_private));
+        }
+    }
+#endif
 }
 
 typedef void (*aNG2_INIT_PROC)(NPC_GUIDE2_ACTOR*, GAME_PLAY*);

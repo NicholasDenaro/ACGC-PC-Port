@@ -520,7 +520,7 @@ static int aNPC_setupActor_proc(GAME_PLAY* play, mActor_name_t name, s8 idx, int
 
 #ifndef aNPC_NPC2
 #ifdef TARGET_PC
-#define aNPC_ACTOR_CLASS_SLOT_SIZE 0xA50
+#define aNPC_ACTOR_CLASS_SLOT_SIZE 0x1000
 #else
 #define aNPC_ACTOR_CLASS_SLOT_SIZE 0x9D0
 #endif
@@ -649,28 +649,24 @@ static ACTOR* aNPC_get_actor_area_proc(size_t size, const char* actor_name, int 
     int* used = CLIP(npc_clip)->keep_actor_used;
     int i;
 
-    if (size > aNPC_ACTOR_CLASS_SLOT_SIZE) {
+    if (size <= aNPC_ACTOR_CLASS_SLOT_SIZE) {
+        for (i = 0; i < 9; i++) {
+            if (*actor != NULL && *used == FALSE) {
+                *used = TRUE;
+                return (ACTOR*)*actor;
+            }
+
+            actor++;
+            used++;
+        }
+    }
+
 #ifdef TARGET_PC
-        extern int g_pc_verbose;
-        if (g_pc_verbose) {
-            printf("[NPC] actor slot REJECTED: size=0x%x > slot=0x%x (%s:%d)\n", (unsigned)size,
-                   aNPC_ACTOR_CLASS_SLOT_SIZE, actor_name, line);
-        }
-#endif
-        return NULL;
-    }
-
-    for (i = 0; i < 9; i++) {
-        if (*actor != NULL && *used == FALSE) {
-            *used = TRUE;
-            return (ACTOR*)*actor;
-        }
-
-        actor++;
-        used++;
-    }
-
+    /* Fallback dynamically if slots are exhausted or class size exceeds slot buffer */
+    return (ACTOR*)zelda_malloc(size);
+#else
     return NULL;
+#endif
 }
 #endif
 
@@ -684,12 +680,17 @@ static void aNPC_free_actor_area_proc(ACTOR* actorx) {
     for (i = 0; i < 9; i++) {
         if (*actor == nactorx) {
             *used = FALSE;
-            break;
+            return;
         }
 
         actor++;
         used++;
     }
+
+#ifdef TARGET_PC
+    /* If not found in keep_actors slots, it was dynamically allocated */
+    zelda_free(actorx);
+#endif
 }
 #else
 static void aNPC_free_actor_area_proc(ACTOR* actorx) {

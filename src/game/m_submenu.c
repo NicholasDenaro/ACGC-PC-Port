@@ -209,6 +209,9 @@ extern void mSM_open_submenu_new2(Submenu* submenu, int type, int arg0, int arg1
     submenu->param1 = arg1;
     submenu->param2 = arg2;
     submenu->param3 = arg3;
+    if (type != mSM_OVL_NONE) {
+        submenu->open_flag = TRUE;
+    }
 }
 
 static void mSM_Reset_player_btn_type1(GAME_PLAY* play) {

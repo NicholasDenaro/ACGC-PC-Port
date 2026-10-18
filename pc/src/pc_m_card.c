@@ -47,12 +47,43 @@
 #include <dolphin/os.h>  /* OSReport */
 
 /* --- Path constants --- */
-#define PC_CARD_A_DIR     "save/card_a"
-#define PC_CARD_B_DIR     "save/card_b"
+extern const char* pc_save_get_dir(void);
+
+static const char* pc_m_card_get_dir(void) {
+    return pc_save_get_dir();
+}
+
+static const char* pc_m_card_get_card_a_dir(void) {
+    static char buf[300];
+    snprintf(buf, sizeof(buf), "%s/card_a", pc_save_get_dir());
+    return buf;
+}
+
+static const char* pc_m_card_get_card_b_dir(void) {
+    static char buf[300];
+    snprintf(buf, sizeof(buf), "%s/card_b", pc_save_get_dir());
+    return buf;
+}
+
 #define PC_GCI_FILENAME   "DobutsunomoriP_MURA.gci"
-#define PC_GCI_PATH       PC_CARD_A_DIR "/" PC_GCI_FILENAME
-#define PC_GCI_TMP_PATH   PC_CARD_A_DIR "/" PC_GCI_FILENAME ".tmp"
-#define PC_SAVE_DIR       "save"
+
+static const char* pc_m_card_get_gci_path(void) {
+    static char buf[300];
+    snprintf(buf, sizeof(buf), "%s/card_a/%s", pc_save_get_dir(), PC_GCI_FILENAME);
+    return buf;
+}
+
+static const char* pc_m_card_get_gci_tmp_path(void) {
+    static char buf[300];
+    snprintf(buf, sizeof(buf), "%s/card_a/%s.tmp", pc_save_get_dir(), PC_GCI_FILENAME);
+    return buf;
+}
+
+#define PC_CARD_A_DIR     (pc_m_card_get_card_a_dir())
+#define PC_CARD_B_DIR     (pc_m_card_get_card_b_dir())
+#define PC_GCI_PATH       (pc_m_card_get_gci_path())
+#define PC_GCI_TMP_PATH   (pc_m_card_get_gci_tmp_path())
+#define PC_SAVE_DIR       (pc_m_card_get_dir())
 #define PC_SAVE_MAX_BACKUPS 3
 
 /* Legacy paths for migration from flat save/ layout */
@@ -771,9 +802,12 @@ static void pc_save_migrate_legacy(void) {
 
 static int pc_save_scan_gci_dir(void) {
     /* Try common AC save filenames in card_a/ */
-    static const char* gci_names[] = {
-        PC_CARD_A_DIR "/DobutsunomoriP_MURA.gci",
-        PC_CARD_A_DIR "/8P-GAFE-DobutsunomoriP_MURA.gci",
+    char path1[300], path2[300];
+    snprintf(path1, sizeof(path1), "%s/DobutsunomoriP_MURA.gci", PC_CARD_A_DIR);
+    snprintf(path2, sizeof(path2), "%s/8P-GAFE-DobutsunomoriP_MURA.gci", PC_CARD_A_DIR);
+    const char* gci_names[] = {
+        path1,
+        path2,
         NULL
     };
     int i;
@@ -1018,8 +1052,11 @@ int mCD_InitGameStart_bg(int player_no, int card_private_idx, int start_cond, s3
                 OSReport("[PC] InitGameStart: OUTGOING_FOREIGNER — landed player_no=%d\n",
                          Common_Get(player_no));
             }
-        } else if (start_cond == mCD_START_COND_0 || start_cond == mCD_START_COND_2) {
+        } else if (start_cond == mCD_START_COND_0) {
             mSDI_StartDataInit(gamePT, player_no, mSDI_INIT_MODE_NEW);
+            pc_save_ready = 1;
+        } else if (start_cond == mCD_START_COND_2) {
+            mSDI_StartDataInit(gamePT, player_no, mSDI_INIT_MODE_NEW_PLAYER);
             pc_save_ready = 1;
         }
     }

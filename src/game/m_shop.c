@@ -215,6 +215,11 @@ static int mSP_GoodsExistAlready(mActor_name_t* goods_table, int count, mActor_n
 }
 
 extern int mSP_CollectCheck(mActor_name_t item) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (Common_Get(now_private) == NULL) {
+        return FALSE;
+    }
+#endif
     mActor_name_t ftr_item = mRmTp_Item1ItemNo2FtrItemNo_AtPlayerRoom(item, FALSE);
     u32* bitfield;
     int idx;
@@ -2071,7 +2076,7 @@ extern void mSP_get_sell_price(u32 amount) {
 static int mSP_GetNonePossessionItemCount_InList(mActor_name_t* list, int category, u32* collect_bitfield) {
     mActor_name_t* list_p;
 
-    if (list != NULL) {
+    if (list != NULL && collect_bitfield != NULL) {
         int count = 0;
 
         for (list_p = list; list_p[0] != EMPTY_NO; list_p++) {
@@ -2099,7 +2104,7 @@ static int mSP_GetNonePossessionItemCount_InList(mActor_name_t* list, int catego
 static mActor_name_t mSP_GetNonePossessionItem_InList(mActor_name_t* list, int category, u32* collect_bitfield) {
     int none_count = mSP_GetNonePossessionItemCount_InList(list, category, collect_bitfield);
 
-    if (none_count != 0 && list != NULL) {
+    if (none_count != 0 && list != NULL && collect_bitfield != NULL) {
         int selected_idx = RANDOM(none_count);
         mActor_name_t* list_p;
         int count = 0;
@@ -2132,14 +2137,14 @@ static mActor_name_t mSP_GetNonePossessionItem_InLotteryFurniture(int player_no)
     return mSP_GetNonePossessionItem_InList(mSP_ftr_list[mSP_LIST_LOTTERY], mSP_KIND_FURNITURE,
                                             (player_no >= 0 && player_no < PLAYER_NUM)
                                                 ? Save_Get(private_data[player_no]).furniture_collected_bitfield
-                                                : Common_Get(now_private)->furniture_collected_bitfield);
+                                                : (Common_Get(now_private) != NULL ? Common_Get(now_private)->furniture_collected_bitfield : NULL));
 }
 
 static mActor_name_t mSP_GetNonePossessionItem_InEventFurniture(int player_no) {
     return mSP_GetNonePossessionItem_InList(mSP_ftr_list[mSP_LIST_EVENT], mSP_KIND_FURNITURE,
                                             (player_no >= 0 && player_no < PLAYER_NUM)
                                                 ? Save_Get(private_data[player_no]).furniture_collected_bitfield
-                                                : Common_Get(now_private)->furniture_collected_bitfield);
+                                                : (Common_Get(now_private) != NULL ? Common_Get(now_private)->furniture_collected_bitfield : NULL));
 }
 
 /* @fabricated @unused */
@@ -2147,7 +2152,7 @@ static mActor_name_t mSP_GetNonePossessionItem_InEventWall(int player_no) {
     return mSP_GetNonePossessionItem_InList(mSP_ftr_list[mSP_LIST_EVENT], mSP_KIND_WALLPAPER,
                                             (player_no >= 0 && player_no < PLAYER_NUM)
                                                 ? Save_Get(private_data[player_no]).wall_collected_bitfield
-                                                : Common_Get(now_private)->wall_collected_bitfield);
+                                                : (Common_Get(now_private) != NULL ? Common_Get(now_private)->wall_collected_bitfield : NULL));
 }
 
 /* @fabricated @unused */
@@ -2155,7 +2160,7 @@ static mActor_name_t mSP_GetNonePossessionItem_InEventCarpet(int player_no) {
     return mSP_GetNonePossessionItem_InList(mSP_ftr_list[mSP_LIST_EVENT], mSP_KIND_CARPET,
                                             (player_no >= 0 && player_no < PLAYER_NUM)
                                                 ? Save_Get(private_data[player_no]).carpet_collected_bitfield
-                                                : Common_Get(now_private)->carpet_collected_bitfield);
+                                                : (Common_Get(now_private) != NULL ? Common_Get(now_private)->carpet_collected_bitfield : NULL));
 }
 
 /* @fabricated @unused */
@@ -2168,7 +2173,7 @@ static mActor_name_t mSP_GetNonePossessionItem_InABCFurniture(int player_no) {
     return mSP_GetNonePossessionItem_InList(
         mSP_GetItemList(mSP_ftr_list, abc_priorities, mSP_LISTTYPE_ABC), mSP_KIND_FURNITURE,
         (player_no >= 0 && player_no < PLAYER_NUM) ? Save_Get(private_data[player_no]).furniture_collected_bitfield
-                                                   : Common_Get(now_private)->furniture_collected_bitfield);
+                                                   : (Common_Get(now_private) != NULL ? Common_Get(now_private)->furniture_collected_bitfield : NULL));
 }
 
 typedef mActor_name_t (*mSP_GET_NONE_POSSESSION_ITEM_PROC)(int);

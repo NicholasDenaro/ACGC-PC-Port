@@ -573,7 +573,7 @@ extern void play_init(GAME* game) {
             /* Dedicated server town initialization: leave all 4 houses unowned and vacant */
             for (h = 0; h < PLAYER_NUM; h++) {
                 mPr_ClearPrivateInfo(Save_GetPointer(private_data[h]));
-                bzero(&Save_Get(homes[h]).ownerID, sizeof(PersonalID_c));
+                mPr_ClearPersonalID(&Save_Get(homes[h]).ownerID);
                 Save_Get(homes[h]).flags.has_saved = FALSE;
                 Save_Get(homes[h]).size_info.size = mHm_HOMESIZE_SMALL;
             }
@@ -637,7 +637,17 @@ extern void play_init(GAME* game) {
             }
         }
     }
-#ifndef TARGET_SERVER
+#ifdef TARGET_SERVER
+    static Private_c s_server_dummy_private;
+    static int s_server_dummy_private_init = 0;
+    if (!s_server_dummy_private_init) {
+        mPr_ClearPrivateInfo(&s_server_dummy_private);
+        s_server_dummy_private_init = 1;
+    }
+    if (Common_Get(now_private) == NULL) {
+        Common_Set(now_private, &s_server_dummy_private);
+    }
+#else
     if (Common_Get(now_private) == NULL) {
         Common_Set(now_private, Save_GetPointer(private_data[0]));
     }
@@ -984,10 +994,12 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
 
     mSM_submenu_ctrl(play);
 
-    game->doing_point = 2;
-    mDemo_Main(play);
-    game->doing_point = 3;
-    mEv_run(&play->event);
+    if (play->submenu.process_status == mSM_PROCESS_WAIT) {
+        game->doing_point = 2;
+        mDemo_Main(play);
+        game->doing_point = 3;
+        mEv_run(&play->event);
+    }
 
     game->doing_point = 4;
     mDemo_stock_clear();
@@ -1029,7 +1041,9 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
     game->doing_point = 1;
     mCoBG_CalcTimerDecalCircle();
     game->doing_point = 2;
-    mMsg_Main(game);
+    if (play->submenu.process_status == mSM_PROCESS_WAIT) {
+        mMsg_Main(game);
+    }
 
     fbdemo_fade_move(&play->color_fade, game_GameFrame);
 }
@@ -1113,7 +1127,7 @@ static void setupFog(GAME_PLAY* play, GRAPH* graph) {
     SET_POLY_OPA_DISP(game_play_set_fog(play, NOW_POLY_OPA_DISP));
     SET_POLY_XLU_DISP(game_play_set_fog(play, NOW_POLY_XLU_DISP));
 
-    #if defined(BUGFIXES) || defined(TARGET_PC)
+    #if defined(BUGFIXES) && !defined(TARGET_PC)
     // Apply fog to blocks
     SET_BG_OPA_DISP(game_play_set_fog(play, NOW_BG_OPA_DISP));
     SET_BG_XLU_DISP(game_play_set_fog(play, NOW_BG_XLU_DISP));

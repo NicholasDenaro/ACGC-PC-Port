@@ -13,7 +13,7 @@
 #include <unistd.h>
 #endif
 
-static char s_base_save_dir[256] = "save";
+static char s_base_save_dir[256] = "server_save";
 static char s_tier_dirs[BACKUP_TIER_COUNT][300];
 static const char* const s_tier_names[BACKUP_TIER_COUNT] = {
     "minute",

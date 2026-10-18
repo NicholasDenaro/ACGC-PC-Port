@@ -12,6 +12,7 @@
 #endif
 
 #include "network/net_packets.h"
+#include "m_private_h.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -45,6 +46,12 @@ typedef struct {
 
     /* Handshake acknowledgment world state */
     pkt_s2c_handshake_ack_t server_world_info;
+    bool is_new_player;
+    bool character_finalized;
+    bool is_resident;
+    int8_t resident_slot;
+    int8_t house_idx;
+    int8_t roommate_slot;
 } ClientNetworkContext;
 
 extern ClientNetworkContext g_client_net;
@@ -81,6 +88,30 @@ bool client_network_send_raw(uint8_t channel, const void* data, size_t len, bool
 
 /* Stream local controller input and player position to server */
 bool client_network_send_input(const pkt_c2s_input_t* input);
+
+/* Check if server acknowledged this client as a new player requiring Rover onboarding */
+bool client_network_is_new_player(void);
+
+/* Transmit finalized character appearance and name to server upon train arrival */
+bool client_network_send_character_finalize(const Private_c* priv);
+
+/* Check if this client is registered as a town resident */
+bool client_network_is_resident(void);
+
+/* Get resident slot (0..7) or -1 if visitor */
+int8_t client_network_get_resident_slot(void);
+
+/* Get house index (0..3) or -1 if visitor */
+int8_t client_network_get_house_idx(void);
+
+/* Get roommate slot (0 or 1) or -1 if visitor */
+int8_t client_network_get_roommate_slot(void);
+
+/* Set local resident state after claiming a house */
+void client_network_set_local_resident(uint8_t house_idx);
+
+/* Send house move-in request to server */
+bool client_network_send_movein_req(uint8_t house_idx);
 
 /* Self-test suite verifying client connection, handshake, ping/pong, input streaming, and disconnect */
 int client_network_run_tests(void);

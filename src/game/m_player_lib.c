@@ -1305,19 +1305,88 @@ extern void mPlib_change_player_face(GAME* game) {
     mPlib_change_player_face_pallet(game);
 }
 
-extern PLAYER_ACTOR* get_player_actor_withoutCheck(GAME_PLAY* play) {
-    if (play == NULL) {
-        return NULL;
-    }
 #ifdef TARGET_PC
-    for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
-        PLAYER_ACTOR* pa = (PLAYER_ACTOR*)a;
-        if (pa->player_no == 0 && !pa->is_dummy) {
-            return pa;
+static void* dummy_door_label(GAME* game) { return NULL; }
+static int dummy_int_zero(void) { return 0; }
+static u32 dummy_u32_zero(void) { return 0; }
+static f32 dummy_f32_zero(void) { return 0.0f; }
+static void dummy_void_stub(void) {}
+static mActor_name_t dummy_item_stub(ACTOR* a) { return EMPTY_NO; }
+
+static PLAYER_ACTOR s_fallback_player;
+static int s_fallback_player_inited = 0;
+
+static void init_fallback_player(void) {
+    if (s_fallback_player_inited) return;
+    memset(&s_fallback_player, 0, sizeof(s_fallback_player));
+    s_fallback_player.actor_class.world.position = (xyz_t){ -99999.0f, -99999.0f, -99999.0f };
+    s_fallback_player.actor_class.last_world_position = (xyz_t){ -99999.0f, -99999.0f, -99999.0f };
+    s_fallback_player.actor_class.eye.position = (xyz_t){ -99999.0f, -99999.0f, -99999.0f };
+    s_fallback_player.now_main_index = -1;
+    s_fallback_player.item_kind = -1;
+    s_fallback_player.is_dummy = 1;
+    s_fallback_player.player_no = -1;
+
+    s_fallback_player.get_door_label_proc = dummy_door_label;
+    s_fallback_player.Get_item_net_catch_label_proc = (u32 (*)(ACTOR*))dummy_u32_zero;
+    s_fallback_player.Change_item_net_catch_label_proc = (int (*)(ACTOR*, u32, s8))dummy_int_zero;
+    s_fallback_player.Check_StopNet_proc = (int (*)(ACTOR*, xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_HitAxe_proc = (int (*)(ACTOR*, xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_VibUnit_OneFrame_proc = (int (*)(ACTOR*, const xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_HitScoop_proc = (int (*)(ACTOR*, xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_DigScoop_proc = (int (*)(ACTOR*, xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_RotateOctagon_proc = (int (*)(GAME*))dummy_int_zero;
+    s_fallback_player.Check_end_stung_bee_proc = (int (*)(ACTOR*))dummy_int_zero;
+    s_fallback_player.Get_status_for_bee_proc = (int (*)(ACTOR*))dummy_int_zero;
+    s_fallback_player.Set_ScrollDemo_forWade_snowball_proc = (int (*)(ACTOR*, int, const xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_tree_shaken_proc = (int (*)(ACTOR*, const xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_tree_shaken_little_proc = (int (*)(ACTOR*, const xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_tree_shaken_big_proc = (int (*)(ACTOR*, const xyz_t*))dummy_int_zero;
+    s_fallback_player.Check_Label_main_wade_snowball_proc = (int (*)(GAME*, void*))dummy_int_zero;
+    s_fallback_player.Check_Label_main_push_snowball_proc = (int (*)(GAME*, void*))dummy_int_zero;
+    s_fallback_player.GetSnowballPos_forWadeSnowball_proc = (int (*)(ACTOR*, xyz_t*))dummy_int_zero;
+    s_fallback_player.CheckCondition_forWadeSnowball_proc = (int (*)(GAME*, const xyz_t*, s16))dummy_int_zero;
+    s_fallback_player.SetParam_for_push_snowball_proc = (int (*)(GAME*, const xyz_t*, s16, f32))dummy_int_zero;
+    s_fallback_player.Get_itemNo_forWindow_proc = dummy_item_stub;
+    s_fallback_player.check_cancel_event_without_priority_proc = (int (*)(GAME*))dummy_int_zero;
+    s_fallback_player.CheckScene_AbleSubmenu_proc = (int (*)())dummy_int_zero;
+    s_fallback_player.Check_stung_mosquito_proc = (int (*)(GAME*, void*))dummy_int_zero;
+    s_fallback_player.Check_able_force_speak_label_proc = (int (*)(GAME*, void*))dummy_int_zero;
+    s_fallback_player.check_able_change_camera_normal_index_proc = (int (*)(ACTOR*))dummy_int_zero;
+    s_fallback_player.check_request_change_item_proc = (int (*)(GAME*))dummy_int_zero;
+    s_fallback_player.check_cancel_request_change_proc_index_proc = (int (*)(int))dummy_int_zero;
+    s_fallback_player.able_submenu_request_main_index_proc = (int (*)(GAME*))dummy_int_zero;
+    s_fallback_player.Get_Item_net_catch_swing_timer_proc = (f32 (*)(ACTOR*, GAME*))dummy_f32_zero;
+    s_fallback_player.Set_Item_net_catch_request_table_proc = (int (*)(ACTOR*, GAME*, u32, s8, const xyz_t*, f32))dummy_int_zero;
+    s_fallback_player.Set_Item_net_catch_request_force_proc = (int (*)(ACTOR*, GAME*, u32, s8))dummy_int_zero;
+    s_fallback_player.Set_force_position_angle_proc = (void (*)(GAME*, const xyz_t*, const s_xyz*, u8))dummy_void_stub;
+    s_fallback_player.Get_force_position_angle_proc = (u8 (*)(GAME*, xyz_t*, s_xyz*))dummy_int_zero;
+    s_fallback_player.Get_WadeEndPos_proc = (int (*)(GAME*, xyz_t*))dummy_int_zero;
+
+    s_fallback_player_inited = 1;
+}
+#endif
+
+extern PLAYER_ACTOR* get_player_actor_withoutCheck(GAME_PLAY* play) {
+    if (play != NULL) {
+#ifdef TARGET_PC
+        for (ACTOR* a = play->actor_info.list[ACTOR_PART_PLAYER].actor; a != NULL; a = a->next_actor) {
+            PLAYER_ACTOR* pa = (PLAYER_ACTOR*)a;
+            if (pa->player_no == 0 && !pa->is_dummy) {
+                return pa;
+            }
+        }
+#endif
+        if (play->actor_info.list[ACTOR_PART_PLAYER].actor != NULL) {
+            return (PLAYER_ACTOR*)play->actor_info.list[ACTOR_PART_PLAYER].actor;
         }
     }
-#endif
+#ifdef TARGET_PC
+    init_fallback_player();
+    return &s_fallback_player;
+#else
     return (PLAYER_ACTOR*)play->actor_info.list[ACTOR_PART_PLAYER].actor;
+#endif
 }
 
 static int mPlib_check_DynamicLinkFile_m_player(void) {
@@ -1464,6 +1533,10 @@ extern void mPlib_request_main_release_creature_insect_from_submenu(int insect_t
         &change_data_from_submenu_p->request_main_data.release_creature;
     mPlayer_request_release_creature_insect_c* release_insect_p = &req_release_creature_p->data.insect;
     ACTOR* actorx = GET_PLAYER_ACTOR_NOW_ACTOR();
+
+    if (actorx == NULL) {
+        return;
+    }
 
     change_data_from_submenu_p->requested_main_index = mPlayer_INDEX_RELEASE_CREATURE;
     change_data_from_submenu_p->requested_index_pending = TRUE;
@@ -1715,16 +1788,24 @@ extern int mPlib_Get_unable_wade(void) {
 }
 
 extern int mPlib_Check_able_force_speak_label(GAME* game, ACTOR* label) {
-    if (Common_Get(player_actor_exists) == FALSE) {
+    if (Common_Get(player_actor_exists) == FALSE || game == NULL) {
         return FALSE;
     }
 
-    return GET_PLAYER_ACTOR_GAME(game)->Check_able_force_speak_label_proc(game, label);
+    PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
+    if (player == NULL || player->Check_able_force_speak_label_proc == NULL) {
+        return FALSE;
+    }
+
+    return player->Check_able_force_speak_label_proc(game, label);
 }
 
 extern void mPlib_Set_able_force_speak_label(ACTOR* label) {
     if (Common_Get(player_actor_exists)) {
-        GET_PLAYER_ACTOR_NOW()->able_force_speak_label = (u32)label;
+        PLAYER_ACTOR* player = GET_PLAYER_ACTOR_NOW();
+        if (player != NULL) {
+            player->able_force_speak_label = (u32)label;
+        }
     }
 }
 
@@ -2627,7 +2708,7 @@ static int mPlib_check_priority_event_type1(GAME* game) {
 extern int mPlib_check_player_open_umbrella(GAME* game) {
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
 
-    if (player->umbrella_actor != NULL) {
+    if (player != NULL && player->umbrella_actor != NULL) {
         UMBRELLA_ACTOR* umbrella_actor = (UMBRELLA_ACTOR*)player->umbrella_actor;
 
         if (umbrella_actor->opened_fully) {
@@ -2639,8 +2720,9 @@ extern int mPlib_check_player_open_umbrella(GAME* game) {
 }
 
 extern int mPlib_check_player_outdoor_start(GAME* game) {
-    if (mPlib_get_player_actor_main_index(game) == mPlayer_INDEX_OUTDOOR) {
-        mPlayer_main_outdoor_c* outdoor_p = &GET_PLAYER_ACTOR_GAME(game)->main_data.outdoor;
+    PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
+    if (player != NULL && player->now_main_index == mPlayer_INDEX_OUTDOOR) {
+        mPlayer_main_outdoor_c* outdoor_p = &player->main_data.outdoor;
 
         if (outdoor_p->is_demo) {
             return TRUE;
@@ -2651,8 +2733,9 @@ extern int mPlib_check_player_outdoor_start(GAME* game) {
 }
 
 extern int mPlib_check_label_player_demo_wait(GAME* game, void* label) {
-    if (mPlib_get_player_actor_main_index(game) == mPlayer_INDEX_DEMO_WAIT) {
-        mPlayer_main_demo_wait_c* demo_wait_p = &GET_PLAYER_ACTOR_GAME(game)->main_data.demo_wait;
+    PLAYER_ACTOR* player = GET_PLAYER_ACTOR_GAME(game);
+    if (player != NULL && player->now_main_index == mPlayer_INDEX_DEMO_WAIT) {
+        mPlayer_main_demo_wait_c* demo_wait_p = &player->main_data.demo_wait;
 
         if (demo_wait_p->label == (u32)label) {
             return TRUE;

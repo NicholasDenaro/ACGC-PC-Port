@@ -37,6 +37,12 @@ extern int mHS_get_pl_no(int house_no);
 extern int mHS_get_pl_no_detail(int home_no);
 extern int mHS_set_use(int player_no, int house_no);
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+#include "m_personal_id.h"
+extern int mHS_get_roommate_vacancies(int house_no);
+extern int mHS_assign_roommate(int house_no, const PersonalID_c* pid);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

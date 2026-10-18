@@ -116,3 +116,48 @@ extern int mHS_set_use(int player_no, int house_no) {
 
     return res;
 }
+
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+#ifdef TARGET_SERVER
+#include "server/server_storage.h"
+#endif
+
+extern int mHS_get_roommate_vacancies(int house_no) {
+    if (house_no < 0 || house_no >= mHS_HOUSE_NUM) {
+        return 0;
+    }
+#ifdef TARGET_SERVER
+    return server_storage_get_house_vacancies((uint8_t)house_no);
+#else
+    /* On client, check if primary owner exists */
+    if (mPr_NullCheckPersonalID(Save_GetPointer(homes[house_no].ownerID)) == TRUE) {
+        return 2; /* Vacant house: both slots open */
+    }
+    /* If owned by current player, 0 vacancies for them */
+    if (Common_Get(now_private) != NULL &&
+        mPr_CheckCmpPersonalID(&Save_Get(homes[house_no]).ownerID, &Common_Get(now_private)->player_ID) == TRUE) {
+        return 0;
+    }
+    /* House has primary resident; roommate slot available */
+    return 1;
+#endif
+}
+
+extern int mHS_assign_roommate(int house_no, const PersonalID_c* pid) {
+    if (house_no < 0 || house_no >= mHS_HOUSE_NUM || pid == NULL) {
+        return FALSE;
+    }
+
+    /* If house has no primary owner, set up as primary resident */
+    if (mPr_NullCheckPersonalID(Save_GetPointer(homes[house_no].ownerID)) == TRUE) {
+        mHS_set_use(Common_Get(player_no), house_no);
+        mPr_CopyPersonalID(&Save_Get(homes[house_no]).ownerID, pid);
+        Save_Get(homes[house_no]).size_info.size = mHm_HOMESIZE_SMALL;
+        return TRUE;
+    }
+
+    /* If house already has an owner, register as roommate */
+    mHS_set_use(Common_Get(player_no), house_no);
+    return TRUE;
+}
+#endif

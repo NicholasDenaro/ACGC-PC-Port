@@ -208,6 +208,20 @@ static void aBEE_fly(ACTOR* actorx, GAME* game) {
                     bee->catch_delay_frames = 0.0f;
                 }
             } else {
+#ifdef TARGET_PC
+                PLAYER_ACTOR* player = GET_PLAYER_ACTOR_NOW();
+                if (player != NULL) {
+                    f32 swing_timer = player->Get_Item_net_catch_swing_timer_proc != NULL
+                        ? player->Get_Item_net_catch_swing_timer_proc((ACTOR*)player, gamePT) : 0.0f;
+                    if ((swing_timer > 0.0f || mPlib_Check_StopNet(&pos)) && actorx->player_distance_xz < 40.0f) {
+                        if (player->Set_Item_net_catch_request_force_proc != NULL) {
+                            player->Set_Item_net_catch_request_force_proc((ACTOR*)player, gamePT, (u32)actorx, TRUE);
+                        }
+                    } else if (player->Set_Item_net_catch_request_table_proc != NULL) {
+                        player->Set_Item_net_catch_request_table_proc((ACTOR*)player, gamePT, (u32)actorx, TRUE, &actorx->world.position, 24.0f);
+                    }
+                }
+#else
                 f32 swing_timer;
 
                 swing_timer = GET_PLAYER_ACTOR_NOW()->Get_Item_net_catch_swing_timer_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), gamePT);
@@ -216,6 +230,7 @@ static void aBEE_fly(ACTOR* actorx, GAME* game) {
                 } else {
                     GET_PLAYER_ACTOR_NOW()->Set_Item_net_catch_request_table_proc(GET_PLAYER_ACTOR_NOW_ACTOR(), gamePT, (u32)actorx, TRUE, &actorx->world.position, 24.0f);
                 }
+#endif
             }
 
             aBEE_fly_move_common(bee, game);

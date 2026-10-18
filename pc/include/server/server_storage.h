@@ -13,7 +13,8 @@
 #define MAX_EXTENDED_HOUSES 4
 #define MAX_EXTENDED_VISITORS 32
 #define AUTH_TOKEN_SIZE 32
-#define SERVER_EXTENDED_PATH "save/server_extended.dat"
+#define SERVER_DEFAULT_SAVE_DIR "server_save"
+#define SERVER_EXTENDED_PATH "server_save/server_extended.dat"
 
 #ifdef __cplusplus
 extern "C" {

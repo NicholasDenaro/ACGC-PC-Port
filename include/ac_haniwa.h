@@ -21,6 +21,9 @@ enum haniwa_msg {
     aHNW_MSG_NORMAL,
     aHNW_MSG_OTHER_OWNER,
     aHNW_MSG_NEED_FRIEND,
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    aHNW_MSG_MOVE_IN,
+#endif
 
     aHNW_MSG_NUM
 };
@@ -50,6 +53,9 @@ enum haniwa_action {
     aHNW_ACTION_PL_APPROACH_DOOR,
     aHNW_ACTION_DOOR_OPEN_WAIT,
     aHNW_ACTION_DOOR_OPEN_TIMER,
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    aHNW_ACTION_MOVE_IN_CHECK,
+#endif
 
     aHNW_ACTION_NUM
 };

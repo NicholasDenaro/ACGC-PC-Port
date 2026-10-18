@@ -20,11 +20,17 @@
 static uint8_t s_client_token[CLIENT_TOKEN_SIZE];
 static bool s_token_loaded = false;
 
+extern const char* pc_save_get_dir(void);
+
+static void get_client_token_path(char* out_path, size_t max_len) {
+    snprintf(out_path, max_len, "%s/client_identity.bin", pc_save_get_dir());
+}
+
 static void ensure_save_directory(void) {
 #ifdef _WIN32
-    _mkdir("save");
+    _mkdir(pc_save_get_dir());
 #else
-    mkdir("save", 0755);
+    mkdir(pc_save_get_dir(), 0755);
 #endif
 }
 
@@ -80,8 +86,11 @@ bool client_identity_init(void) {
 
     ensure_save_directory();
 
+    char token_path[300];
+    get_client_token_path(token_path, sizeof(token_path));
+
     /* Try loading existing token from disk */
-    FILE* f = fopen(CLIENT_TOKEN_PATH, "rb");
+    FILE* f = fopen(token_path, "rb");
     if (f != NULL) {
         size_t n = fread(s_client_token, 1, CLIENT_TOKEN_SIZE, f);
         fclose(f);
@@ -110,9 +119,9 @@ bool client_identity_init(void) {
         return false;
     }
 
-    f = fopen(CLIENT_TOKEN_PATH, "wb");
+    f = fopen(token_path, "wb");
     if (f == NULL) {
-        fprintf(stderr, "[CLIENT IDENTITY ERROR] Failed to write %s!\n", CLIENT_TOKEN_PATH);
+        fprintf(stderr, "[CLIENT IDENTITY ERROR] Failed to write %s!\n", token_path);
         return false;
     }
 
@@ -120,7 +129,7 @@ bool client_identity_init(void) {
     fclose(f);
 
     if (written != CLIENT_TOKEN_SIZE) {
-        fprintf(stderr, "[CLIENT IDENTITY ERROR] Incomplete write to %s!\n", CLIENT_TOKEN_PATH);
+        fprintf(stderr, "[CLIENT IDENTITY ERROR] Incomplete write to %s!\n", token_path);
         return false;
     }
 

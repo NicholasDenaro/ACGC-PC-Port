@@ -17,7 +17,7 @@ void server_config_init_defaults(ServerConfig* config) {
     config->tickrate = SERVER_DEFAULT_TICKRATE;
     config->seed = 0;
     config->has_seed = false;
-    config->save_dir = "save";
+    config->save_dir = "server_save";
     config->town_name = NULL;
     config->verbose = false;
     config->spawn_dummy_player = false;

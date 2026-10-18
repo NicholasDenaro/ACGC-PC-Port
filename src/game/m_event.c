@@ -150,16 +150,23 @@ extern void mEv_ClearPersonalEventFlag(int player_no) {
 }
 
 extern void mEv_SetFirstJob() {
-    if (Common_Get(player_no) < PLAYER_NUM) {
+    u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
+    if (player_no < PLAYER_NUM) {
         u32 ev = mEv_SAVED_FIRSTJOB_PLR0;
 
-        ev += Common_Get(player_no);
+        ev += player_no;
         mEv_EventON(ev);
     }
 }
 
 extern int mEv_CheckRealArbeit() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
     int res = FALSE;
 
     if (player_no < PLAYER_NUM && (mEv_CheckEvent(mEv_SAVED_FIRSTJOB_PLR0 + player_no) == TRUE ||
@@ -172,6 +179,9 @@ extern int mEv_CheckRealArbeit() {
 
 extern int mEv_CheckArbeit() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
     int res = FALSE;
 
     if (player_no < PLAYER_NUM && (mEv_CheckEvent(mEv_SAVED_FIRSTJOB_PLR0 + player_no) == TRUE ||
@@ -185,6 +195,9 @@ extern int mEv_CheckArbeit() {
 
 extern int mEv_CheckFirstJob() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
     int res = FALSE;
 
     if (player_no < PLAYER_NUM) {
@@ -201,6 +214,9 @@ extern int mEv_CheckFirstJob() {
 
 extern void mEv_UnSetFirstJob() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
 
     if (player_no < PLAYER_NUM) {
         mEv_EventOFF(mEv_SAVED_FIRSTJOB_PLR0 + player_no);
@@ -214,6 +230,9 @@ static int l_wade_disabled_bak = FALSE;
 
 extern void mEv_SetFirstIntro() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
 
     if (player_no < PLAYER_NUM) {
         u32 ev = mEv_SAVED_FIRSTINTRO_PLR0;
@@ -230,6 +249,9 @@ extern void mEv_SetFirstIntro() {
 
 extern int mEv_CheckFirstIntro() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
     int res = FALSE;
 
     if (player_no < PLAYER_NUM) {
@@ -246,6 +268,9 @@ extern int mEv_CheckFirstIntro() {
 
 extern void mEv_UnSetFirstIntro() {
     u32 player_no = Common_Get(player_no);
+#ifdef TARGET_PC
+    if (player_no >= PLAYER_NUM) player_no = 0;
+#endif
 
     if (player_no < PLAYER_NUM) {
         u32 ev = mEv_SAVED_FIRSTINTRO_PLR0;

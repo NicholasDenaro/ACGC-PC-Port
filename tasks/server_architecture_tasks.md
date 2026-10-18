@@ -13,10 +13,10 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | **Phase 3** | Simulation Unpausing & Input Isolation | 4 | 4 | Implemented |
 | **Phase 4** | Multi-Player Entity Decoupling | 5 | 5 | Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 5 | 5 | Implemented |
-| **Phase 6** | Network Transport Layer (ENet / UDP) | 1 | 4 | In Progress |
+| **Phase 6** | Network Transport Layer (ENet / UDP) | 4 | 4 | Implemented |
 | **Phase 7** | World State Replication & Spatial Management | 0 | 5 | Not Implemented |
-| **Phase 8** | World Persistence & Save Journaling | 0 | 3 | Not Implemented |
-| **Total** | | **23** | **34** | **68% Complete** |
+| **Phase 8** | Resident Ownership, Extended Storage & Tiered Persistence | 6 | 6 | Implemented |
+| **Total** | | **32** | **37** | **86% Complete** |
 
 ---
 
@@ -267,14 +267,15 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Implement atomic file writes (`.tmp` + rename). Trigger autosave upon game mutations (debounced 1s) and every 60s. Maintain automated rolling backups in `save/backups/`: `minute/` (last 10m), `hour/` (last 24h), `daily/` (last 14d).
   - **Acceptance Criteria**: Save data writes atomically without hitching, and snapshots rotate through minute, hour, and daily backup folders.
 
-- [ ] **Task 8.5: First-Time Connection Train Ride & Rover Character Creation**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_start_data_init.c`, `pc/src/client/client_network.c`
-  - **Description**: When a client connects with an unassigned token, route them through the authentic Rover questionnaire on the train (`SCENE_START_DEMO`) to establish their name, gender, face, and clothing before arriving at the station as a Visitor.
+- [x] **Task 8.5: First-Time Connection Train Ride & Rover Character Creation**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_start_data_init.c`, `pc/src/client/client_network.c`, `pc/src/pc_m_card.c`, `src/actor/ac_animal_logo_misc.c`, `src/actor/npc/ac_npc_guide2_move.c_inc`, `pc/src/network/net_packer.c`, `pc/src/server/server_network.c`
+  - **Description**: When a client connects with an unassigned token, route them through the authentic Rover questionnaire on the train (`SCENE_START_DEMO2`) to establish their name, gender, face, and clothing before arriving at the station as a Visitor.
   - **Acceptance Criteria**: New players experience the train intro with Rover and customize their character on the server.
 
-- [ ] **Task 8.6: House Exterior Gyroid Move-In & Roommate Interaction**
-  - **State**: `Not Implemented`
-  - **Files**: `src/actor/ac_gyroid.c`, `src/game/m_house.c`, `pc/src/server/server_storage.c`
+- [x] **Task 8.6: House Exterior Gyroid Move-In & Roommate Interaction**
+  - **State**: `Implemented`
+  - **Files**: `src/actor/ac_haniwa.c`, `src/actor/ac_haniwa_move.c_inc`, `include/ac_haniwa.h`, `src/game/m_house.c`, `include/m_house.h`, `pc/src/server/server_network.c`, `pc/src/server/server_storage.c`, `pc/src/client/client_network.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
   - **Description**: Hook house exterior Gyroids to display a "Move In" prompt when spoken to by an eligible visitor. Check that the house has an open roommate slot (< 2 residents), assign the player to the house, and update mailbox/door permissions.
   - **Acceptance Criteria**: A visitor speaking to a house Gyroid can claim an open slot, becoming a permanent town resident and roommate.
+

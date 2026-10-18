@@ -160,8 +160,27 @@ static int aHNW_decide_msg_idx_dance(HANIWA_ACTOR* haniwa) {
     int player_is_owner = Common_Get(player_no) == mHS_get_pl_no(haniwa->house_idx);
     int res;
 
+#if defined(TARGET_PC)
+    if (client_network_is_connected()) {
+        if (client_network_is_resident()) {
+            player_is_owner = (client_network_get_house_idx() == house_idx);
+        } else {
+            player_is_owner = FALSE;
+        }
+    }
+#endif
+
     if (mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID) == TRUE) {
+#if defined(TARGET_PC)
+        /* If player is an unhoused visitor and house is vacant, offer move in */
+        if (!client_network_is_connected() || !client_network_is_resident()) {
+            res = aHNW_MSG_MOVE_IN;
+        } else {
+            res = aHNW_MSG_NO_OWNER;
+        }
+#else
         res = aHNW_MSG_NO_OWNER; /* no one owns this house */
+#endif
     } else if (player_is_owner == TRUE) {
         Haniwa_c* house_haniwa = &Save_Get(homes[house_idx]).haniwa;
         int house_arrange_idx = mHS_get_arrange_idx(Common_Get(player_no));
@@ -178,7 +197,17 @@ static int aHNW_decide_msg_idx_dance(HANIWA_ACTOR* haniwa) {
 
         /* player owns house but gyroid has bells from other players */
     } else {
+#if defined(TARGET_PC)
+        /* Check if visitor can move in as a roommate */
+        if ((!client_network_is_connected() || !client_network_is_resident()) &&
+            mHS_get_roommate_vacancies(house_idx) > 0) {
+            res = aHNW_MSG_MOVE_IN;
+        } else {
+            res = aHNW_MSG_OTHER_OWNER; /* another player owns house */
+        }
+#else
         res = aHNW_MSG_OTHER_OWNER; /* another player owns house */
+#endif
     }
 
     return res;
@@ -190,7 +219,10 @@ static void aHNW_set_talk_info_dance(ACTOR* actor) {
         MSG_2357, /* aHNW_MSG_PROCEEDS */
         MSG_2341, /* aHNW_MSG_NORMAL */
         MSG_2344, /* aHNW_MSG_OTHER_OWNER */
-        MSG_2350  /* aHNW_MSG_NEED_FRIEND */
+        MSG_2350, /* aHNW_MSG_NEED_FRIEND */
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        0x0926    /* aHNW_MSG_MOVE_IN */
+#endif
     };
 
     HANIWA_ACTOR* haniwa = (HANIWA_ACTOR*)actor;
@@ -208,6 +240,19 @@ static void aHNW_set_talk_info_dance(ACTOR* actor) {
             mMsg_Set_mail_str(mMsg_Get_base_window_p(), 0, house_haniwa->message, HANIWA_MESSAGE_LEN);
             break;
         }
+
+#if defined(TARGET_PC)
+        case aHNW_MSG_MOVE_IN: {
+            mChoice_c* choice_win = mChoice_Get_base_window_p();
+            static u8 str_move_in[mChoice_CHOICE_STRING_LEN] = "Move In";
+            static u8 str_cancel[mChoice_CHOICE_STRING_LEN]  = "Never mind";
+            mChoice_Set_choice_data(choice_win,
+                str_move_in, (int)strlen((char*)str_move_in),
+                str_cancel,  (int)strlen((char*)str_cancel),
+                NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+            break;
+        }
+#endif
     }
 
     mDemo_Set_msg_num(msg_no[msg_idx]);
@@ -219,7 +264,10 @@ static void aHNW_dance(HANIWA_ACTOR* haniwa, GAME* game) {
         aHNW_ACTION_CHECK_PROCEEDS,   /* aHNW_MSG_PROCEEDS */
         aHNW_ACTION_TALK_WITH_MASTER, /* aHNW_MSG_NORMAL */
         aHNW_ACTION_TALK_WITH_GUEST,  /* aHNW_MSG_OTHER_OWNER */
-        aHNW_ACTION_TALK_END_WAIT     /* aHNW_MSG_NEED_FRIEND */
+        aHNW_ACTION_TALK_END_WAIT,    /* aHNW_MSG_NEED_FRIEND */
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        aHNW_ACTION_MOVE_IN_CHECK     /* aHNW_MSG_MOVE_IN */
+#endif
     };
 
     ACTOR* actorx = (ACTOR*)haniwa;
@@ -513,6 +561,51 @@ static void aHNW_roof_check(HANIWA_ACTOR* haniwa, GAME* game) {
     }
 }
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+static void aHNW_move_in_check(HANIWA_ACTOR* haniwa, GAME* game) {
+    mMsg_Window_c* msg_win = mMsg_Get_base_window_p();
+    int order_value = mDemo_Get_OrderValue(mDemo_ORDER_NPC0, 9) || mDemo_Get_OrderValue(mDemo_ORDER_NPC0, 0);
+    int action = -1;
+
+    if (order_value && mMsg_Check_MainNormalContinue(msg_win) == TRUE) {
+        switch (mChoice_GET_CHOSENUM()) {
+            case mChoice_CHOICE0: {
+                int house_idx = haniwa->house_idx;
+
+#ifdef TARGET_PC
+                if (client_network_is_connected()) {
+                    client_network_send_movein_req((uint8_t)house_idx);
+                }
+                client_network_set_local_resident((uint8_t)house_idx);
+#endif
+
+                if (Common_Get(now_private) != NULL) {
+                    mHS_assign_roommate(house_idx, &Common_Get(now_private)->player_ID);
+                }
+
+                action = aHNW_ACTION_SAVE_END_WAIT;
+                mBGMPsComp_scene_mode(13);
+                mDemo_Set_talk_return_demo_wait(TRUE);
+                mPlib_Set_able_force_speak_label((ACTOR*)haniwa);
+                sAdo_SysTrgStart(0x0461);
+                break;
+            }
+
+            case mChoice_CHOICE1: {
+                action = aHNW_ACTION_TALK_END_WAIT;
+                break;
+            }
+        }
+
+        if (action != -1) {
+            mDemo_Set_OrderValue(mDemo_ORDER_NPC0, 9, 0);
+            mDemo_Set_OrderValue(mDemo_ORDER_NPC0, 0, 0);
+            aHNW_setupAction(haniwa, game, action);
+        }
+    }
+}
+#endif
+
 static void aHNW_save_end_wait(HANIWA_ACTOR* haniwa, GAME* game) {
     if (haniwa->playing_save_bgm == FALSE && mMsg_CHECK_MAINDISAPPEAR()) {
         haniwa->playing_save_bgm = TRUE;
@@ -656,6 +749,9 @@ static void aHNW_init_proc(HANIWA_ACTOR* actor, GAME* game, int action) {
         &aHNW_pl_approach_door_init,
         (HANIWA_PROC)&none_proc1,
         (HANIWA_PROC)&none_proc1,
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        (HANIWA_PROC)&none_proc1,
+#endif
     };
     // clang-format on
 
@@ -681,6 +777,9 @@ static void aHNW_setupAction(HANIWA_ACTOR* haniwa, GAME* game, int action) {
         &aHNW_pl_approach_door,
         &aHNW_door_open_wait,
         &aHNW_door_open_timer,
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        &aHNW_move_in_check,
+#endif
     };
 
     int house_idx = haniwa->house_idx;

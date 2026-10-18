@@ -124,7 +124,12 @@ static void aWeatherSnow_CheckSnowScroll(aWeather_Priv* priv, GAME_PLAY* play) {
 
         if (weather != NULL) {
             y = 230.0f + weather->pos.y;
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            f32 player_y = (player != NULL) ? player->actor_class.world.position.y : 0.0f;
+            if (priv->pos.y < (40.0f + player_y)) {
+#else
             if (priv->pos.y < (40.0f + player->actor_class.world.position.y)) {
+#endif
                 priv->pos.y = (y + (priv->pos.y - priv->currentY));
                 priv->currentY = y;
             }
@@ -189,7 +194,12 @@ void aWeatherSnow_draw(aWeather_Priv* priv, GAME* game) {
 
         work = GRAPH_ALLOC_TYPE(game->graph, Mtx, 1);
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        f32 player_y = (player != NULL) ? player->actor_class.world.position.y : 0.0f;
+        min = pos.y - (40.0f + player_y);
+#else
         min = pos.y - (40.0f + player->actor_class.world.position.y);
+#endif
 
         if (min < 0.0f) {
             min = 0.0f;

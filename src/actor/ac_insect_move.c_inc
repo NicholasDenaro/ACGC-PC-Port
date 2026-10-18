@@ -362,8 +362,16 @@ static void aINS_set_catch_range(ACTOR* actorx) {
         f32 catch_range = aINS_get_catch_range(actorx);
 
         if (!F32_IS_ZERO(catch_range)) {
+#ifdef TARGET_PC
+            PLAYER_ACTOR* player = GET_PLAYER_ACTOR_NOW();
+            if (player != NULL && player->Set_Item_net_catch_request_table_proc != NULL) {
+                player->Set_Item_net_catch_request_table_proc(
+                    (ACTOR*)player, gamePT, (u32)actorx, 0, &actorx->world.position, catch_range);
+            }
+#else
             GET_PLAYER_ACTOR_NOW()->Set_Item_net_catch_request_table_proc(
                 (ACTOR*)GET_PLAYER_ACTOR_NOW(), gamePT, (u32)actorx, 0, &actorx->world.position, catch_range);
+#endif
         }
     }
 }

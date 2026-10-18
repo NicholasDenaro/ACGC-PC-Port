@@ -405,6 +405,8 @@ int main(int argc, char* argv[]) {
                 }
                 snprintf(g_pc_net_host, sizeof(g_pc_net_host), "%s", arg_copy);
             }
+        } else if ((strcmp(argv[i], "--save-dir") == 0 || strcmp(argv[i], "-s") == 0) && i + 1 < argc) {
+            pc_save_set_dir(argv[++i]);
         }
     }
 

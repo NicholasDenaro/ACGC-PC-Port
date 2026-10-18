@@ -507,6 +507,71 @@ def tool_find_files(
         "files": results
     }
 
+def tool_resolve_crash_address(addresses, target="server", binary_path=None):
+    """Resolves crash memory addresses using addr2line inside the MSYS2 MinGW32 toolchain."""
+    if isinstance(addresses, (int, str)):
+        if isinstance(addresses, str):
+            # Split whitespace or comma separated addresses or parse from text
+            parsed = re.findall(r'(?:0x)?([0-9a-fA-F]{4,8})', addresses)
+            if parsed:
+                addrs = [f"0x{a}" if not a.startswith("0x") else a for a in parsed]
+            else:
+                addrs = [addresses.strip()]
+        else:
+            addrs = [hex(addresses)]
+    elif isinstance(addresses, (list, tuple)):
+        addrs = []
+        for a in addresses:
+            if isinstance(a, int):
+                addrs.append(hex(a))
+            elif isinstance(a, str):
+                p = re.findall(r'(?:0x)?([0-9a-fA-F]{4,8})', a)
+                if p:
+                    addrs.extend(f"0x{x}" for x in p)
+                else:
+                    addrs.append(a.strip())
+    else:
+        return {"success": False, "error": f"Invalid addresses format: {type(addresses)}"}
+
+    if not addrs:
+        return {"success": False, "error": "No addresses provided to resolve."}
+
+    if not binary_path:
+        t = str(target).lower().strip()
+        if t in ("server", "dedicated_server", "ac_server"):
+            exe_file = SERVER_EXE
+            rel_exe = "./AnimalCrossingServer.exe"
+        else:
+            exe_file = CLIENT_EXE
+            rel_exe = "./AnimalCrossing.exe"
+    else:
+        exe_file = os.path.abspath(binary_path)
+        rel_exe = os.path.basename(exe_file)
+
+    if not os.path.isfile(exe_file):
+        return {"success": False, "error": f"Binary not found: {exe_file}"}
+
+    addrs_str = " ".join(addrs)
+    cmd = f"addr2line -e {rel_exe} -f -C -p {addrs_str}"
+    code, out = run_msys2(cmd, timeout=30, cwd=BIN_DIR)
+
+    resolved = []
+    lines = [l.strip() for l in out.strip().split("\n") if l.strip()]
+    for idx, line in enumerate(lines):
+        addr_label = addrs[idx] if idx < len(addrs) else f"addr_{idx}"
+        resolved.append({
+            "address": addr_label,
+            "symbol_and_location": line
+        })
+
+    return {
+        "success": (code == 0),
+        "target": target,
+        "binary": os.path.basename(exe_file),
+        "raw_output": out.strip(),
+        "resolved": resolved
+    }
+
 PINNED_LOG_FILES = {
     "client": "game.log",
     "game": "game.log",
@@ -592,6 +657,20 @@ def tool_read_game_logs(
         total_lines = len(all_lines)
         query = search_query if search_query is not None else filter_pattern
 
+        def attach_crash_resolution(r):
+            c = r.get("content", "")
+            if "[FATAL CRASH]" in c or "Fault Address:" in c or "ExceptionCode" in c:
+                addrs = []
+                # Match [0x12345678] or Address=12345678 or Fault Address: 12345678
+                for m in re.finditer(r'(?:\[0x([0-9a-fA-F]+)\]|Address=([0-9a-fA-F]+)|Fault Address:\s*([0-9a-fA-F]+))', c):
+                    addr = m.group(1) or m.group(2) or m.group(3)
+                    if addr and addr not in addrs:
+                        addrs.append(addr)
+                if addrs:
+                    t = "server" if ("server" in str(target).lower() or "server" in log_path.lower()) else "client"
+                    r["resolved_crash_stack"] = tool_resolve_crash_address(addrs, target=t)
+            return r
+
         if query:
             if show_line_numbers is None:
                 show_line_numbers = True
@@ -649,7 +728,7 @@ def tool_read_game_logs(
                     blocks.append("\n".join(block_lines))
                     total_returned += (r_end - r_start)
 
-                return {
+                return attach_crash_resolution({
                     "success": True,
                     "log_path": log_path,
                     "total_lines": total_lines,
@@ -659,7 +738,7 @@ def tool_read_game_logs(
                     "returned_groups": len(ranges),
                     "returned_lines": total_returned,
                     "content": "\n---\n".join(blocks)
-                }
+                })
             else:
                 # Flat list of matched lines
                 if max_lines > 0 and len(match_indices) > max_lines:
@@ -675,7 +754,7 @@ def tool_read_game_logs(
                     else:
                         output_lines.append(line_text)
 
-                return {
+                return attach_crash_resolution({
                     "success": True,
                     "log_path": log_path,
                     "total_lines": total_lines,
@@ -683,7 +762,7 @@ def tool_read_game_logs(
                     "matches_found": len(match_indices),
                     "returned_lines": len(output_lines),
                     "content": "\n".join(output_lines)
-                }
+                })
 
         else:
             # Plain tail (no search query)
@@ -702,13 +781,13 @@ def tool_read_game_logs(
             else:
                 output_lines = selected_lines
 
-            return {
+            return attach_crash_resolution({
                 "success": True,
                 "log_path": log_path,
                 "total_lines": total_lines,
                 "returned_lines": len(output_lines),
                 "content": "\n".join(output_lines)
-            }
+            })
     except Exception as e:
         return {
             "success": False,
@@ -918,11 +997,40 @@ TOOLS = [
                 }
             }
         }
+    },
+    {
+        "name": "resolve_crash_address",
+        "description": "Resolves memory addresses / fault addresses from crash callstacks to source file lines and function names using addr2line.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "addresses": {
+                    "description": "Address or list of addresses/callstack hex strings (e.g. ['0x00496005', '0x0060739A'] or '0x00496005 0x0060739A').",
+                    "type": ["string", "array"]
+                },
+                "target": {
+                    "type": "string",
+                    "enum": ["server", "client"],
+                    "description": "Target executable: 'server' (AnimalCrossingServer.exe) or 'client' (AnimalCrossing.exe). Defaults to 'server'."
+                },
+                "binary_path": {
+                    "type": "string",
+                    "description": "Optional explicit path to the .exe binary."
+                }
+            },
+            "required": ["addresses"]
+        }
     }
 ]
 
 def handle_tool_call(name, arguments):
-    if name == "build_game":
+    if name == "resolve_crash_address":
+        return tool_resolve_crash_address(
+            addresses=arguments.get("addresses"),
+            target=arguments.get("target", "server"),
+            binary_path=arguments.get("binary_path")
+        )
+    elif name == "build_game":
         return tool_build_game(
             target=arguments.get("target", "all"),
             clean=arguments.get("clean", False)

@@ -208,9 +208,10 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     /* Query server extended storage for persistent client token */
     bool is_resident = false;
     int player_idx = server_storage_find_player((const uint8_t*)hs.auth_token, &is_resident);
+    bool is_new_player = (player_idx < 0);
 
     Private_c priv;
-    if (player_idx >= 0) {
+    if (!is_new_player) {
         if (is_resident) {
             ServerResident* res = server_storage_get_resident(player_idx);
             priv = res->private_data;
@@ -244,7 +245,7 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
         priv.exists = TRUE;
 
         player_idx = server_storage_register_visitor((const uint8_t*)hs.auth_token, &priv);
-        printf("[SERVER NET] Handshake registered new Visitor Slot %d.\n", player_idx);
+        printf("[SERVER NET] Handshake registered initial Visitor Slot %d (new player awaiting Rover questionnaire).\n", player_idx);
     }
 
     int slot = server_player_register(session->client_id, 0, &priv);
@@ -278,7 +279,7 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     session->face_type = hs.face_type;
     session->clothes_id = hs.clothes_id;
 
-    ack.status = NET_HS_OK;
+    ack.status = is_new_player ? NET_HS_OK_NEW_PLAYER : NET_HS_OK;
     ack.world_time = Common_Get(time.rtc_time);
     snprintf(ack.town_name, sizeof(ack.town_name), "%s", (const char*)Save_Get(land_info).name);
     ack.land_id = Save_Get(land_info).id;
@@ -289,11 +290,144 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     int slen = net_pack_handshake_ack(sbuf, sizeof(sbuf), &ack);
     if (slen > 0) {
         server_network_send_raw(session->client_id, NET_CH_RELIABLE, sbuf, slen, true);
+        enet_host_flush(s_server_host);
+        session->state = NET_SESSION_AUTHENTICATED;
+        printf("[SERVER NET] Handshake accepted: Client ID %u ('%s') assigned to slot %d%s\n",
+               session->client_id, hs.player_name, slot, is_new_player ? " (New Player / Rover Train Ride)" : "");
+    }
+}
+
+static void server_network_handle_character_finalize(ServerClientSession* session, const u8* data, size_t len) {
+    pkt_c2s_character_finalize_t fin;
+    if (net_unpack_character_finalize(data, len, &fin) <= 0) {
+        fprintf(stderr, "[SERVER NET WARNING] Malformed character finalize packet from Client ID %u\n", session->client_id);
+        return;
     }
 
-    session->state = NET_SESSION_AUTHENTICATED;
-    printf("[SERVER NET] Handshake accepted: Client ID %u ('%s') assigned to slot %d\n",
-           session->client_id, session->player_name, slot);
+    /* Update or register Visitor in server extended storage */
+    bool is_resident = false;
+    int player_idx = server_storage_find_player((const uint8_t*)fin.auth_token, &is_resident);
+    Private_c* priv_ptr = NULL;
+
+    if (player_idx >= 0) {
+        if (is_resident) {
+            ServerResident* res = server_storage_get_resident(player_idx);
+            priv_ptr = &res->private_data;
+        } else {
+            ServerVisitor* vis = server_storage_get_visitor(player_idx);
+            priv_ptr = &vis->private_data;
+        }
+    } else {
+        Private_c new_priv;
+        mPr_InitPrivateInfo(&new_priv);
+        mLd_CopyLandName(new_priv.player_ID.land_name, Save_Get(land_info).name);
+        new_priv.player_ID.player_id = 0x55AA;
+        new_priv.player_ID.land_id = Save_Get(land_info).id;
+        new_priv.inventory.wallet = 1000;
+        new_priv.exists = TRUE;
+        player_idx = server_storage_register_visitor((const uint8_t*)fin.auth_token, &new_priv);
+        ServerVisitor* vis = server_storage_get_visitor(player_idx);
+        priv_ptr = &vis->private_data;
+        is_resident = false;
+    }
+
+    if (priv_ptr != NULL) {
+        int name_len = (int)strlen(fin.player_name);
+        u8 formatted_name[PLAYER_NAME_LEN];
+        for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+            formatted_name[i] = (i < name_len) ? (u8)fin.player_name[i] : CHAR_SPACE;
+        }
+        mPr_CopyPlayerName(priv_ptr->player_ID.player_name, formatted_name);
+        priv_ptr->gender = fin.gender;
+        priv_ptr->face = fin.face_type;
+        priv_ptr->cloth.idx = 0;
+        priv_ptr->cloth.item = fin.clothes_id ? fin.clothes_id : 0x2400;
+
+        server_storage_mark_dirty();
+        printf("[SERVER NET] Character customized for Client ID %u: '%s' (Gender %u, Face %u, Clothes 0x%04X)\n",
+               session->client_id, fin.player_name, fin.gender, fin.face_type, fin.clothes_id);
+
+        ConnectedClient* cc = server_player_get(session->client_id);
+        if (cc != NULL) {
+            cc->private_data = *priv_ptr;
+        }
+    }
+
+    snprintf(session->player_name, sizeof(session->player_name), "%s", fin.player_name);
+    session->gender = fin.gender;
+    session->face_type = fin.face_type;
+    session->clothes_id = fin.clothes_id;
+
+    pkt_s2c_character_ack_t ack;
+    ack.status = 0;
+    ack.client_id = (u16)session->client_id;
+    ack.is_resident = is_resident ? 1 : 0;
+    ack.slot_idx = (u8)player_idx;
+
+    u8 sbuf[64];
+    int slen = net_pack_character_ack(sbuf, sizeof(sbuf), &ack);
+    if (slen > 0) {
+        server_network_send_raw(session->client_id, NET_CH_RELIABLE, sbuf, slen, true);
+    }
+}
+
+static void server_network_handle_movein_req(ServerClientSession* session, const u8* data, size_t len) {
+    pkt_c2s_movein_req_t req;
+    if (net_unpack_movein_req(data, len, &req) <= 0) {
+        return;
+    }
+
+    pkt_s2c_movein_ack_t ack;
+    memset(&ack, 0, sizeof(ack));
+    ack.client_id = (u16)session->client_id;
+    ack.house_idx = req.house_idx;
+
+    ConnectedClient* cc = server_player_get(session->client_id);
+    if (cc == NULL || req.house_idx >= MAX_EXTENDED_HOUSES) {
+        ack.status = NET_MOVEIN_ERROR;
+    } else if (cc->resident_idx >= 0) {
+        ack.status = NET_MOVEIN_ALREADY_RESIDENT;
+        printf("[SERVER NET] Move-in request rejected for Client ID %u: already resident of house %d\n",
+               session->client_id, cc->resident_idx / 2);
+    } else {
+        int vacancies = server_storage_get_house_vacancies(req.house_idx);
+        if (vacancies <= 0) {
+            ack.status = NET_MOVEIN_HOUSE_FULL;
+            printf("[SERVER NET] Move-in request rejected for Client ID %u: House %u is full\n",
+                   session->client_id, req.house_idx);
+        } else {
+            int resident_slot = -1;
+            bool ok = server_storage_promote_to_resident((const uint8_t*)req.auth_token, req.house_idx,
+                                                        &cc->private_data, &resident_slot);
+            if (!ok) {
+                ack.status = NET_MOVEIN_ERROR;
+            } else {
+                ack.status = NET_MOVEIN_OK;
+                ack.resident_slot = (u8)resident_slot;
+                ServerResident* res = server_storage_get_resident(resident_slot);
+                ack.roommate_slot = res ? res->roommate_slot : (u8)(resident_slot % 2);
+
+                cc->resident_idx = resident_slot;
+                memcpy(cc->auth_token, req.auth_token, 32);
+
+                /* Mirror primary resident to canonical .gci save */
+                if (mPr_NullCheckPersonalID(Save_GetPointer(homes[req.house_idx].ownerID)) == TRUE) {
+                    mPr_CopyPersonalID(&Save_Get(homes[req.house_idx]).ownerID, &cc->private_data.player_ID);
+                    Save_Get(homes[req.house_idx]).size_info.size = mHm_HOMESIZE_SMALL;
+                }
+
+                server_storage_mark_dirty();
+                printf("[SERVER NET] Client ID %u promoted to Resident Slot %d in House %u (Roommate %u)!\n",
+                       session->client_id, resident_slot, req.house_idx, ack.roommate_slot);
+            }
+        }
+    }
+
+    u8 sbuf[64];
+    int slen = net_pack_movein_ack(sbuf, sizeof(sbuf), &ack);
+    if (slen > 0) {
+        server_network_send_raw(session->client_id, NET_CH_RELIABLE, sbuf, slen, true);
+    }
 }
 
 void server_network_poll(void) {
@@ -379,6 +513,18 @@ void server_network_poll(void) {
                         case PKT_C2S_HANDSHAKE:
                             if (session->state == NET_SESSION_CONNECTING) {
                                 server_network_handle_handshake(session, event.packet->data, event.packet->dataLength);
+                            }
+                            break;
+
+                        case PKT_C2S_CHARACTER_FINALIZE:
+                            if (session->state >= NET_SESSION_AUTHENTICATED) {
+                                server_network_handle_character_finalize(session, event.packet->data, event.packet->dataLength);
+                            }
+                            break;
+
+                        case PKT_C2S_MOVEIN_REQ:
+                            if (session->state >= NET_SESSION_AUTHENTICATED) {
+                                server_network_handle_movein_req(session, event.packet->data, event.packet->dataLength);
                             }
                             break;
 
@@ -562,7 +708,7 @@ int server_network_run_tests(void) {
             }
         }
         TEST_NET_ASSERT(ack_received, "handshake ack received");
-        TEST_NET_ASSERT(ack.status == NET_HS_OK, "handshake ack status OK");
+        TEST_NET_ASSERT(ack.status == NET_HS_OK || ack.status == NET_HS_OK_NEW_PLAYER, "handshake ack status OK");
         TEST_NET_ASSERT(ack.client_id == session->client_id, "handshake ack client_id");
         TEST_NET_ASSERT(session->state == NET_SESSION_AUTHENTICATED, "session state authenticated");
         TEST_NET_ASSERT(server_network_get_authenticated_count() == 1, "authenticated count == 1");

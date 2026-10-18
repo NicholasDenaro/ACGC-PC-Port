@@ -217,7 +217,7 @@ int main(int argc, char** argv) {
             g_server_config.has_seed = true;
         } else if (strcmp(argv[i], "--town-name") == 0 && i + 1 < argc) {
             g_server_config.town_name = argv[++i];
-        } else if (strcmp(argv[i], "--save-dir") == 0 && i + 1 < argc) {
+        } else if ((strcmp(argv[i], "--save-dir") == 0 || strcmp(argv[i], "-s") == 0) && i + 1 < argc) {
             g_server_config.save_dir = argv[++i];
         } else if (strcmp(argv[i], "--spawn-dummy-player") == 0) {
             g_server_config.spawn_dummy_player = true;
@@ -317,6 +317,7 @@ int main(int argc, char** argv) {
     }
 
     server_storage_init(g_server_config.save_dir);
+    pc_save_set_dir(g_server_config.save_dir);
     server_runner_init();
 
     /* Boot game engine into headless gameplay */

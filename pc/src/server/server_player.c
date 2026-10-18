@@ -284,7 +284,7 @@ int server_spawn_dummy_player(GAME_PLAY* play, const char* name, xyz_t pos) {
     /* Position dummy player nearby Player 1 if pos is zero */
     if (pos.x == 0.0f && pos.z == 0.0f) {
         PLAYER_ACTOR* p1 = get_player_actor_withoutCheck(play);
-        if (p1 != NULL && (fabsf(p1->actor_class.world.position.x) > 1.0f || fabsf(p1->actor_class.world.position.z) > 1.0f)) {
+        if (p1 != NULL && !p1->is_dummy && (fabsf(p1->actor_class.world.position.x) > 1.0f || fabsf(p1->actor_class.world.position.z) > 1.0f)) {
             pos.x = p1->actor_class.world.position.x;
             pos.y = p1->actor_class.world.position.y;
             pos.z = p1->actor_class.world.position.z - 80.0f;
@@ -422,7 +422,7 @@ void server_player_tick(GAME_PLAY* play) {
 #ifndef TARGET_SERVER
     /* Bind Player 1 (Local Player) actor on client */
     PLAYER_ACTOR* host_actor = get_player_actor_withoutCheck(play);
-    if (host_actor != NULL) {
+    if (host_actor != NULL && !host_actor->is_dummy) {
         g_server_clients[0].player_actor = host_actor;
         host_actor->player_no = 0;
         host_actor->client_id = 1;
@@ -560,7 +560,7 @@ int server_spawn_dummy_player_north(void) {
     }
 
     PLAYER_ACTOR* p1 = get_player_actor_withoutCheck(play);
-    if (p1 == NULL) {
+    if (p1 == NULL || p1->is_dummy) {
         return -1;
     }
 

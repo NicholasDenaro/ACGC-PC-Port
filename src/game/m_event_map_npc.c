@@ -106,6 +106,9 @@ static int mEvMN_GetDataBaseIdx(u32 block_kind) {
 
     if (block_kind == mRF_BLOCKKIND_POOL) {
         res = mFI_GetPuleIdx();
+        if (res < 0) {
+            res = 0;
+        }
     }
 
     return res;
@@ -155,13 +158,17 @@ extern int mEvMN_GetEventSetUtInBlockMapIdx(int* block_ux, int* block_uz, int ma
     if (map_type >= 0 && map_type < mEvMN_TYPE_NUM) {
         data_p = l_event_set_table[map_type];
 
-        if (data_p != NULL) {
+        if (data_p != NULL && data_p->actor_info != NULL) {
             base_idx = mEvMN_GetDataBaseIdx(data_p->block_kind);
-            info_p = data_p->actor_info[base_idx];
-            pos_p = &info_p->pos_table[idx];
-            *block_ux = pos_p->ux;
-            *block_uz = pos_p->uz;
-            res = TRUE;
+            if (base_idx >= 0 && base_idx < data_p->map_max) {
+                info_p = data_p->actor_info[base_idx];
+                if (info_p != NULL && info_p->pos_table != NULL && idx >= 0 && idx < data_p->npc_max) {
+                    pos_p = &info_p->pos_table[idx];
+                    *block_ux = pos_p->ux;
+                    *block_uz = pos_p->uz;
+                    res = TRUE;
+                }
+            }
         }
     }
 
@@ -182,14 +189,18 @@ extern int mEvMN_GetEventSetUtInBlock(mActor_name_t* actor_name, int* block_ux, 
     if (map_idx != -1) {
         data_p = l_event_set_table[map_idx];
 
-        if (data_p != NULL) {
+        if (data_p != NULL && data_p->actor_info != NULL) {
             base_idx = mEvMN_GetDataBaseIdx(data_p->block_kind);
-            info_p = data_p->actor_info[base_idx];
-            pos_p = &info_p->pos_table[idx];
-            *actor_name = info_p->name_table[idx];
-            *block_ux = pos_p->ux;
-            *block_uz = pos_p->uz;
-            res = TRUE;
+            if (base_idx >= 0 && base_idx < data_p->map_max) {
+                info_p = data_p->actor_info[base_idx];
+                if (info_p != NULL && info_p->pos_table != NULL && info_p->name_table != NULL && idx >= 0 && idx < data_p->npc_max) {
+                    pos_p = &info_p->pos_table[idx];
+                    *actor_name = info_p->name_table[idx];
+                    *block_ux = pos_p->ux;
+                    *block_uz = pos_p->uz;
+                    res = TRUE;
+                }
+            }
         }
     }
 

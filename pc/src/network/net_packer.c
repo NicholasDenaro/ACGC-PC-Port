@@ -266,7 +266,7 @@ int net_pack_handshake(u8* buf, size_t buf_size, const pkt_c2s_handshake_t* pkt)
     w_u8(&w, pkt->gender);
     w_u8(&w, pkt->face_type);
     w_u16(&w, pkt->clothes_id);
-    w_str(&w, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+    w_bytes(&w, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
 
     return w.error ? -1 : (int)w.offset;
 }
@@ -287,7 +287,7 @@ int net_unpack_handshake(const u8* buf, size_t buf_size, pkt_c2s_handshake_t* pk
     pkt->gender = r_u8(&r);
     pkt->face_type = r_u8(&r);
     pkt->clothes_id = r_u16(&r);
-    r_str(&r, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+    r_bytes(&r, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
 
     return r.error ? -1 : (int)(hlen + r.offset);
 }
@@ -345,6 +345,150 @@ int net_unpack_handshake_ack(const u8* buf, size_t buf_size, pkt_s2c_handshake_a
     pkt->land_id = r_u16(&r);
     pkt->weather = r_u8(&r);
     pkt->starting_zone_id = r_u16(&r);
+
+    return r.error ? -1 : (int)(hlen + r.offset);
+}
+
+/* --- Character Finalization --- */
+
+int net_pack_character_finalize(u8* buf, size_t buf_size, const pkt_c2s_character_finalize_t* pkt) {
+    net_buf_writer_t w;
+    /* 2 (client_id) + NET_MAX_NAME_LEN (16) + 1 (gender) + 1 (face) + 2 (clothes) + NET_MAX_AUTH_TOKEN_LEN (36) = 58 */
+    u16 payload_size = 2 + NET_MAX_NAME_LEN + 1 + 1 + 2 + NET_MAX_AUTH_TOKEN_LEN;
+    net_header_t hdr = { NET_PACKET_MAGIC, PKT_C2S_CHARACTER_FINALIZE, NET_CH_RELIABLE, payload_size };
+    w_init(&w, buf, buf_size);
+    w_u16(&w, hdr.magic);
+    w_u8(&w, hdr.packet_id);
+    w_u8(&w, hdr.channel);
+    w_u16(&w, hdr.payload_size);
+
+    w_u16(&w, pkt->client_id);
+    w_str(&w, pkt->player_name, NET_MAX_NAME_LEN);
+    w_u8(&w, pkt->gender);
+    w_u8(&w, pkt->face_type);
+    w_u16(&w, pkt->clothes_id);
+    w_bytes(&w, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+
+    return w.error ? -1 : (int)w.offset;
+}
+
+int net_unpack_character_finalize(const u8* buf, size_t buf_size, pkt_c2s_character_finalize_t* pkt) {
+    net_buf_reader_t r;
+    net_header_t hdr;
+    int hlen = net_unpack_header(buf, buf_size, &hdr);
+    if (hlen < 0 || hdr.packet_id != PKT_C2S_CHARACTER_FINALIZE) return -1;
+    r_init(&r, buf + hlen, buf_size - hlen);
+
+    pkt->client_id = r_u16(&r);
+    r_str(&r, pkt->player_name, NET_MAX_NAME_LEN);
+    pkt->gender = r_u8(&r);
+    pkt->face_type = r_u8(&r);
+    pkt->clothes_id = r_u16(&r);
+    r_bytes(&r, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+
+    return r.error ? -1 : (int)(hlen + r.offset);
+}
+
+int net_pack_character_ack(u8* buf, size_t buf_size, const pkt_s2c_character_ack_t* pkt) {
+    net_buf_writer_t w;
+    /* 1 (status) + 2 (client_id) + 1 (is_resident) + 1 (slot_idx) = 5 */
+    u16 payload_size = 1 + 2 + 1 + 1;
+    net_header_t hdr = { NET_PACKET_MAGIC, PKT_S2C_CHARACTER_ACK, NET_CH_RELIABLE, payload_size };
+    w_init(&w, buf, buf_size);
+    w_u16(&w, hdr.magic);
+    w_u8(&w, hdr.packet_id);
+    w_u8(&w, hdr.channel);
+    w_u16(&w, hdr.payload_size);
+
+    w_u8(&w, pkt->status);
+    w_u16(&w, pkt->client_id);
+    w_u8(&w, pkt->is_resident);
+    w_u8(&w, pkt->slot_idx);
+
+    return w.error ? -1 : (int)w.offset;
+}
+
+int net_unpack_character_ack(const u8* buf, size_t buf_size, pkt_s2c_character_ack_t* pkt) {
+    net_buf_reader_t r;
+    net_header_t hdr;
+    int hlen = net_unpack_header(buf, buf_size, &hdr);
+    if (hlen < 0 || hdr.packet_id != PKT_S2C_CHARACTER_ACK) return -1;
+    r_init(&r, buf + hlen, buf_size - hlen);
+
+    pkt->status = r_u8(&r);
+    pkt->client_id = r_u16(&r);
+    pkt->is_resident = r_u8(&r);
+    pkt->slot_idx = r_u8(&r);
+
+    return r.error ? -1 : (int)(hlen + r.offset);
+}
+
+/* --- House Move-In --- */
+
+int net_pack_movein_req(u8* buf, size_t buf_size, const pkt_c2s_movein_req_t* pkt) {
+    net_buf_writer_t w;
+    /* 2 (client_id) + 1 (house_idx) + NET_MAX_AUTH_TOKEN_LEN (32) = 35 */
+    u16 payload_size = 2 + 1 + NET_MAX_AUTH_TOKEN_LEN;
+    net_header_t hdr = { NET_PACKET_MAGIC, PKT_C2S_MOVEIN_REQ, NET_CH_RELIABLE, payload_size };
+    w_init(&w, buf, buf_size);
+    w_u16(&w, hdr.magic);
+    w_u8(&w, hdr.packet_id);
+    w_u8(&w, hdr.channel);
+    w_u16(&w, hdr.payload_size);
+
+    w_u16(&w, pkt->client_id);
+    w_u8(&w, pkt->house_idx);
+    w_bytes(&w, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+
+    return w.error ? -1 : (int)w.offset;
+}
+
+int net_unpack_movein_req(const u8* buf, size_t buf_size, pkt_c2s_movein_req_t* pkt) {
+    net_buf_reader_t r;
+    net_header_t hdr;
+    int hlen = net_unpack_header(buf, buf_size, &hdr);
+    if (hlen < 0 || hdr.packet_id != PKT_C2S_MOVEIN_REQ) return -1;
+    r_init(&r, buf + hlen, buf_size - hlen);
+
+    pkt->client_id = r_u16(&r);
+    pkt->house_idx = r_u8(&r);
+    r_bytes(&r, pkt->auth_token, NET_MAX_AUTH_TOKEN_LEN);
+
+    return r.error ? -1 : (int)(hlen + r.offset);
+}
+
+int net_pack_movein_ack(u8* buf, size_t buf_size, const pkt_s2c_movein_ack_t* pkt) {
+    net_buf_writer_t w;
+    /* 1 (status) + 2 (client_id) + 1 (house_idx) + 1 (resident_slot) + 1 (roommate_slot) = 6 */
+    u16 payload_size = 1 + 2 + 1 + 1 + 1;
+    net_header_t hdr = { NET_PACKET_MAGIC, PKT_S2C_MOVEIN_ACK, NET_CH_RELIABLE, payload_size };
+    w_init(&w, buf, buf_size);
+    w_u16(&w, hdr.magic);
+    w_u8(&w, hdr.packet_id);
+    w_u8(&w, hdr.channel);
+    w_u16(&w, hdr.payload_size);
+
+    w_u8(&w, pkt->status);
+    w_u16(&w, pkt->client_id);
+    w_u8(&w, pkt->house_idx);
+    w_u8(&w, pkt->resident_slot);
+    w_u8(&w, pkt->roommate_slot);
+
+    return w.error ? -1 : (int)w.offset;
+}
+
+int net_unpack_movein_ack(const u8* buf, size_t buf_size, pkt_s2c_movein_ack_t* pkt) {
+    net_buf_reader_t r;
+    net_header_t hdr;
+    int hlen = net_unpack_header(buf, buf_size, &hdr);
+    if (hlen < 0 || hdr.packet_id != PKT_S2C_MOVEIN_ACK) return -1;
+    r_init(&r, buf + hlen, buf_size - hlen);
+
+    pkt->status = r_u8(&r);
+    pkt->client_id = r_u16(&r);
+    pkt->house_idx = r_u8(&r);
+    pkt->resident_slot = r_u8(&r);
+    pkt->roommate_slot = r_u8(&r);
 
     return r.error ? -1 : (int)(hlen + r.offset);
 }
@@ -923,6 +1067,58 @@ int net_packer_run_tests(void) {
         TEST_ASSERT(net_unpack_dialog_node(buf, len, &d_node_dec) > 0, "net_unpack_dialog_node");
         TEST_ASSERT(d_node_dec.client_id == 1 && d_node_dec.message_id == 0x0542, "dialog node msg");
         TEST_ASSERT(d_node_dec.num_choices == 3 && d_node_dec.options_bitmask == 0x07, "dialog node choices");
+    }
+
+    /* 10. Character Finalization & ACK */
+    {
+        pkt_c2s_character_finalize_t c_fin_orig;
+        pkt_c2s_character_finalize_t c_fin_dec;
+        memset(&c_fin_orig, 0, sizeof(c_fin_orig));
+        c_fin_orig.client_id = 4;
+        snprintf(c_fin_orig.player_name, sizeof(c_fin_orig.player_name), "RoverFan");
+        c_fin_orig.gender = 1;
+        c_fin_orig.face_type = 3;
+        c_fin_orig.clothes_id = 0x2405;
+        memcpy(c_fin_orig.auth_token, "e1f9ccb01d394307a52e93b4f65809ef", 32);
+
+        len = net_pack_character_finalize(buf, sizeof(buf), &c_fin_orig);
+        TEST_ASSERT(len > 0, "net_pack_character_finalize");
+        TEST_ASSERT(net_unpack_character_finalize(buf, len, &c_fin_dec) > 0, "net_unpack_character_finalize");
+        TEST_ASSERT(c_fin_dec.client_id == 4 && strcmp(c_fin_dec.player_name, "RoverFan") == 0, "character finalize name");
+        TEST_ASSERT(c_fin_dec.gender == 1 && c_fin_dec.face_type == 3 && c_fin_dec.clothes_id == 0x2405, "character finalize appearance");
+        TEST_ASSERT(memcmp(c_fin_dec.auth_token, "e1f9ccb01d394307a52e93b4f65809ef", 32) == 0, "character finalize token");
+
+        pkt_s2c_character_ack_t c_ack_orig = { 0, 4, 0, 2 };
+        pkt_s2c_character_ack_t c_ack_dec;
+        len = net_pack_character_ack(buf, sizeof(buf), &c_ack_orig);
+        TEST_ASSERT(len > 0, "net_pack_character_ack");
+        TEST_ASSERT(net_unpack_character_ack(buf, len, &c_ack_dec) > 0, "net_unpack_character_ack");
+        TEST_ASSERT(c_ack_dec.status == 0 && c_ack_dec.client_id == 4, "character ack status");
+        TEST_ASSERT(c_ack_dec.is_resident == 0 && c_ack_dec.slot_idx == 2, "character ack slot");
+    }
+
+    /* 11. House Move-In Request & ACK */
+    {
+        pkt_c2s_movein_req_t m_req_orig;
+        pkt_c2s_movein_req_t m_req_dec;
+        memset(&m_req_orig, 0, sizeof(m_req_orig));
+        m_req_orig.client_id = 5;
+        m_req_orig.house_idx = 2;
+        memcpy(m_req_orig.auth_token, "0123456789abcdef0123456789abcdef", 32);
+
+        len = net_pack_movein_req(buf, sizeof(buf), &m_req_orig);
+        TEST_ASSERT(len > 0, "net_pack_movein_req");
+        TEST_ASSERT(net_unpack_movein_req(buf, len, &m_req_dec) > 0, "net_unpack_movein_req");
+        TEST_ASSERT(m_req_dec.client_id == 5 && m_req_dec.house_idx == 2, "movein req header");
+        TEST_ASSERT(memcmp(m_req_dec.auth_token, "0123456789abcdef0123456789abcdef", 32) == 0, "movein req token");
+
+        pkt_s2c_movein_ack_t m_ack_orig = { NET_MOVEIN_OK, 5, 2, 4, 0 };
+        pkt_s2c_movein_ack_t m_ack_dec;
+        len = net_pack_movein_ack(buf, sizeof(buf), &m_ack_orig);
+        TEST_ASSERT(len > 0, "net_pack_movein_ack");
+        TEST_ASSERT(net_unpack_movein_ack(buf, len, &m_ack_dec) > 0, "net_unpack_movein_ack");
+        TEST_ASSERT(m_ack_dec.status == NET_MOVEIN_OK && m_ack_dec.client_id == 5, "movein ack status");
+        TEST_ASSERT(m_ack_dec.house_idx == 2 && m_ack_dec.resident_slot == 4 && m_ack_dec.roommate_slot == 0, "movein ack slots");
     }
 
     return 1; /* All tests passed */
