@@ -347,6 +347,7 @@ void client_network_poll(void) {
                                     if (ack.is_resident) {
                                         g_client_net.is_resident = true;
                                         g_client_net.resident_slot = (int8_t)ack.slot_idx;
+                                        g_client_net.house_idx = (int8_t)(ack.slot_idx / 2);
                                     }
                                     printf("[CLIENT NET] Character registered on server as %s (Slot %u)!\n",
                                            ack.is_resident ? "Resident" : "Visitor", ack.slot_idx);

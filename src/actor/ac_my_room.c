@@ -18,6 +18,10 @@
 #include "m_mark_room.h"
 #include "sys_matrix.h"
 #include "m_rcp.h"
+#include "m_field_info.h"
+#ifdef TARGET_PC
+#include "client/client_network.h"
+#endif
 
 enum {
     aMR_ICON_LEAF,
@@ -1655,11 +1659,38 @@ extern void aMR_SaveWaltzTempo2(void) {
 }
 
 static int aMR_CheckRoomOwner(u32 player_no, MY_ROOM_ACTOR* my_room) {
+#ifdef TARGET_PC
+    if (Common_Get(field_type) == mFI_FIELDTYPE2_PLAYER_ROOM) {
+        mActor_name_t field_id = mFI_GetFieldId();
+        int house_idx = mFI_GET_PLAYER_ROOM_NO(field_id);
+        if (house_idx >= 0 && house_idx < mHS_HOUSE_NUM) {
+            mHm_hs_c* home = Save_GetPointer(homes[house_idx]);
+            if (Common_Get(now_private) != NULL && !mPr_NullCheckPersonalID(&Common_Get(now_private)->player_ID)) {
+                if (!mPr_NullCheckPersonalID(&home->ownerID) &&
+                    mPr_CheckCmpPersonalID(&home->ownerID, &Common_Get(now_private)->player_ID) == TRUE) {
+                    return TRUE;
+                }
+            }
+            if (client_network_is_connected() && client_network_is_resident() &&
+                client_network_get_house_idx() == house_idx) {
+                return TRUE;
+            }
+        }
+        return FALSE;
+    }
+
+    if (my_room->scene == SCENE_COTTAGE_MY) {
+        return TRUE;
+    }
+
+    return FALSE;
+#else
     if (Common_Get(field_type) == mFI_FIELDTYPE2_PLAYER_ROOM || my_room->scene == SCENE_COTTAGE_MY) {
         return TRUE;
     }
 
     return FALSE;
+#endif
 }
 
 static void aMR_MakeRoomInfo(MY_ROOM_ACTOR* my_room) {

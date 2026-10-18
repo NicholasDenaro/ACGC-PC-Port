@@ -293,7 +293,25 @@ extern void mHm_SetNowHome() {
     mHm_hs_c* now_home = NULL;
 
     if (Common_Get(player_no) < PLAYER_NUM) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        int arrange_idx = mHS_get_arrange_idx(Common_Get(player_no));
+        if (arrange_idx >= 0 && arrange_idx < mHS_HOUSE_NUM) {
+            mHm_hs_c* home = Save_GetPointer(homes[arrange_idx]);
+            PersonalID_c* pid = Common_Get(now_private) ? &Common_Get(now_private)->player_ID : NULL;
+            int owns = FALSE;
+            if (pid != NULL && mPr_NullCheckPersonalID(pid) == FALSE) {
+                if (mPr_NullCheckPersonalID(&home->ownerID) == FALSE &&
+                    mPr_CheckCmpPersonalID(&home->ownerID, pid) == TRUE) {
+                    owns = TRUE;
+                }
+            }
+            if (owns) {
+                now_home = home;
+            }
+        }
+#else
         now_home = Save_GetPointer(homes[mHS_get_arrange_idx(Common_Get(player_no))]);
+#endif
     }
 
     Common_Set(now_home, now_home);

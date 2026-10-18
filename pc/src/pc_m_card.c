@@ -18,6 +18,7 @@
 #include "m_land.h"
 #include "m_private.h"
 #include "m_event.h"
+#include "client/client_network.h"
 #include "m_actor.h"
 #include "m_play.h"
 #include "m_time.h"
@@ -1032,15 +1033,6 @@ int mCD_InitGameStart_bg(int player_no, int card_private_idx, int start_cond, s3
                     memcpy(&Save_Get(island).landinfo, Save_GetPointer(land_info), sizeof(mLd_land_info_c));
                 }
 
-                /* Ensure House 0 is assigned and owned by Player 0 to allow Gyroid saving */
-                if (mPr_NullCheckPersonalID(&Save_Get(homes[0]).ownerID)) {
-                    mHS_set_use(0, 0);
-                    mHm_SetNowHome();
-                    Save_Get(homes[0]).flags.has_saved = TRUE;
-                    mEv_ClearPersonalEventFlag(0);
-                    mEv_UnSetFirstIntro();
-                    mEv_UnSetFirstJob();
-                }
 
                 /* Clear all cockroaches in all houses */
                 for (h = 0; h < PLAYER_NUM; h++) {

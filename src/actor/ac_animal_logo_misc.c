@@ -16,6 +16,9 @@
 #include "m_house.h"
 #include "m_quest.h"
 #include "m_bgm.h"
+#ifdef TARGET_PC
+#include "client/client_network.h"
+#endif
 
 extern void flash_rom_and_player_info_clear() {
     Save* save = Common_GetPointer(save);
@@ -160,6 +163,50 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
                 Save_Set(npc_force_go_home, TRUE);
             }
 
+#ifdef TARGET_PC
+            int has_home = FALSE;
+            int owned_house_idx = -1;
+            if (Now_Private != NULL && !mPr_NullCheckPersonalID(&Now_Private->player_ID)) {
+                for (int h = 0; h < mHS_HOUSE_NUM; h++) {
+                    if (!mPr_NullCheckPersonalID(&Save_Get(homes[h]).ownerID) &&
+                        mPr_CheckCmpPersonalID(&Save_Get(homes[h]).ownerID, &Now_Private->player_ID) == TRUE) {
+                        has_home = TRUE;
+                        owned_house_idx = h;
+                        break;
+                    }
+                }
+            }
+            if (client_network_is_connected() && client_network_is_resident()) {
+                int net_h = client_network_get_house_idx();
+                if (net_h >= 0 && net_h < mHS_HOUSE_NUM) {
+                    has_home = TRUE;
+                    owned_house_idx = net_h;
+                }
+            }
+
+            bzero(&door_data, sizeof(Door_data_c));
+            door_data.next_scene_id = SCENE_FG;
+            if (!has_home) {
+                door_data.exit_orientation = mSc_DIRECT_SOUTH;
+                door_data.exit_type = 0;
+                door_data.extra_data = 0;
+                door_data.exit_position.x = 2200;
+                door_data.exit_position.y = 0;
+                door_data.exit_position.z = 860;
+                door_data.door_actor_name = EMPTY_NO;
+                door_data.wipe_type = WIPE_TYPE_CIRCLE_RIGHT;
+            } else {
+                arrange_idx = owned_house_idx;
+                door_data.exit_orientation = drt[arrange_idx];
+                door_data.exit_type = 1;
+                door_data.extra_data = 1;
+                door_data.exit_position.x = homeX[arrange_idx];
+                door_data.exit_position.y = 0;
+                door_data.exit_position.z = homeZ[arrange_idx];
+                door_data.door_actor_name = HOUSE0 + arrange_idx;
+                door_data.wipe_type = WIPE_TYPE_TRIFORCE;
+            }
+#else
             arrange_idx = mHS_get_arrange_idx(0);
             bzero(&door_data, sizeof(Door_data_c));
             door_data.next_scene_id = SCENE_FG;
@@ -171,6 +218,7 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             door_data.exit_position.z = homeZ[arrange_idx];
             door_data.door_actor_name = HOUSE0 + arrange_idx;
             door_data.wipe_type = WIPE_TYPE_TRIFORCE;
+#endif
 
             Common_Set(door_data, door_data);
             Common_Get(door_data).next_scene_id = SCENE_FG + 1;

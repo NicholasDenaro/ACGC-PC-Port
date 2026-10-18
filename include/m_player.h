@@ -85,6 +85,9 @@ enum {
     mPlayer_COMPLETE_PAYMENT_TYPE_NONE,
     mPlayer_COMPLETE_PAYMENT_TYPE_ARBEIT,
     mPlayer_COMPLETE_PAYMENT_TYPE_HOUSE,
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    mPlayer_COMPLETE_PAYMENT_TYPE_MOVE_IN,
+#endif
 
     mPlayer_COMPLETE_PAYMENT_TYPE_NUM
 };
@@ -2321,6 +2324,7 @@ extern void Player_actor_draw(ACTOR*, GAME*);
 #ifdef TARGET_PC
 extern void Player_actor_force_wait(ACTOR*, GAME*);
 extern void Player_actor_force_outdoor(ACTOR*, GAME*);
+extern int pc_request_main_complete_payment(GAME* game);
 #endif
 
 #ifdef __cplusplus

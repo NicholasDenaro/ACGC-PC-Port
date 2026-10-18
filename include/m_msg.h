@@ -376,6 +376,12 @@ extern void mMsg_sound_unset_voice_silent(mMsg_Window_c* msg_p, int update_mode)
 #define mMsg_REQUEST_MAIN_APPEAR_WAIT_TYPE1() mMsg_request_main_appear_wait_type1(mMsg_Get_base_window_p());
 #define mMsg_REQUEST_MAIN_APPEAR_WAIT_TYPE2() mMsg_request_main_appear_wait_type2(mMsg_Get_base_window_p());
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+#define MSG_PC_MOVEIN_FLOW 0x3F90
+#define MSG_PC_MOVEIN_SUCCESS 0x3F91
+extern int pc_load_custom_msg(mMsg_Data_c* msg_data, int index, int cut);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

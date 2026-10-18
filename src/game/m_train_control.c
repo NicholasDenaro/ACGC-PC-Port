@@ -125,6 +125,19 @@ static u32 mTRC_get_depart_time() {
     u32 depart_time;
     int i = 0;
 
+#ifdef TARGET_PC
+    while (i < 24) {
+        u32 arrival = time_table[i] - HOUR_MIN_SEC_TO_SECS(0, 4, 10);
+        if (arrival > now_sec) {
+            depart_time = arrival;
+            break;
+        }
+        i++;
+    }
+    if (i >= 24) {
+        depart_time = time_table[24] - HOUR_MIN_SEC_TO_SECS(0, 4, 10);
+    }
+#else
     while (TRUE) {
         if (time_table[i] >= now_sec) {
             depart_time = time_table[i] - HOUR_MIN_SEC_TO_SECS(0, 4, 10);
@@ -132,6 +145,7 @@ static u32 mTRC_get_depart_time() {
         }
         i++;
     }
+#endif
 
     Common_Set(train_day, rtc_time->day);
     return depart_time;
@@ -269,8 +283,15 @@ static int mTRC_schedule(GAME_PLAY* play) {
 
             default: {
                 if (Common_Get(train_action) == mTRC_ACTION_NONE && mEv_CheckArbeit() == FALSE && mTRC_time_check()) {
+#ifdef TARGET_PC
+                    if (Common_Get(field_type) == mFI_FIELDTYPE2_FG) {
+                        mTRC_norm_init();
+                        res = 1;
+                    }
+#else
                     mTRC_norm_init();
                     res = 1;
+#endif
                 }
                 break;
             }

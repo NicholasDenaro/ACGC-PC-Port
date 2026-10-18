@@ -1857,3 +1857,9 @@ extern void Player_actor_draw(ACTOR* actorx, GAME* game) {
         }
     }
 }
+
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+int pc_request_main_complete_payment(GAME* game) {
+    return Player_actor_request_main_complete_payment(game, mPlayer_REQUEST_PRIORITY_44);
+}
+#endif

@@ -436,6 +436,7 @@ static void server_network_handle_movein_req(ServerClientSession* session, const
                 if (mPr_NullCheckPersonalID(Save_GetPointer(homes[req.house_idx].ownerID)) == TRUE) {
                     mPr_CopyPersonalID(&Save_Get(homes[req.house_idx]).ownerID, &cc->private_data.player_ID);
                     Save_Get(homes[req.house_idx]).size_info.size = mHm_HOMESIZE_SMALL;
+                    Save_Get(homes[req.house_idx]).flags.has_saved = TRUE;
                 }
 
                 server_storage_mark_dirty();

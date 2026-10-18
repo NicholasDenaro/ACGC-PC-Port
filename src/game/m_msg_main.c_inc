@@ -324,6 +324,15 @@ static int mMsg_Count_MsgData(u8* data) {
 
 static int mMsg_LoadMsgData(mMsg_Data_c* msg_data, int index, int cut) {
     if (msg_data != NULL) {
+#ifdef TARGET_PC
+        if (pc_load_custom_msg(msg_data, index, cut)) {
+            msg_data->msg_no = index;
+            msg_data->data_loaded = TRUE;
+            msg_data->msg_len = mMsg_Count_MsgData(msg_data->text_buf.data);
+            msg_data->cut = cut;
+            return TRUE;
+        }
+#endif
         u32 addr;
         u32 size;
 

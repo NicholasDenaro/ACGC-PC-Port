@@ -154,26 +154,175 @@ static void aHNW_wait(HANIWA_ACTOR* haniwa, GAME* game) {
     }
 }
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+static int s_movein_house_idx = 0;
+static int s_movein_had_prior_owner = 0;
+static char s_movein_prior_owner_name[PLAYER_NAME_LEN + 1] = { 0 };
+
+void pc_set_movein_dialogue_house(int house_idx) {
+    s_movein_house_idx = house_idx;
+}
+
+void pc_set_movein_prior_owner(int had_prior_owner, const char* name) {
+    s_movein_had_prior_owner = had_prior_owner;
+    memset(s_movein_prior_owner_name, 0, sizeof(s_movein_prior_owner_name));
+    if (name != NULL) {
+        strncpy(s_movein_prior_owner_name, name, PLAYER_NAME_LEN);
+        s_movein_prior_owner_name[PLAYER_NAME_LEN] = '\0';
+    }
+}
+
+int pc_load_custom_msg(mMsg_Data_c* msg_data, int index, int cut) {
+    if (msg_data == NULL) {
+        return FALSE;
+    }
+
+    if (index == MSG_PC_MOVEIN_SUCCESS) {
+        u8* buf = msg_data->text_buf.data;
+        int pos = 0;
+        if (s_movein_had_prior_owner) {
+            const char* l1 = "I'm moving in";
+            const char* l2_pfx = "with ";
+            const char* l2_sfx = "!";
+            while (*l1) buf[pos++] = (u8)(*l1++);
+            buf[pos++] = CHAR_NEW_LINE;
+            while (*l2_pfx) buf[pos++] = (u8)(*l2_pfx++);
+            for (int i = 0; s_movein_prior_owner_name[i] != '\0'; i++) {
+                buf[pos++] = (u8)s_movein_prior_owner_name[i];
+            }
+            while (*l2_sfx) buf[pos++] = (u8)(*l2_sfx++);
+        } else {
+            const char* l1 = "I'm moving in!";
+            while (*l1) buf[pos++] = (u8)(*l1++);
+        }
+
+        buf[pos++] = CHAR_CONTROL_CODE;
+        buf[pos++] = mFont_CONT_CODE_LAST;
+
+        while (pos < mMsg_MSG_BUF_MAX) {
+            buf[pos++] = 0;
+        }
+        return TRUE;
+    }
+
+    if (index != MSG_PC_MOVEIN_FLOW) {
+        return FALSE;
+    }
+
+    u8* buf = msg_data->text_buf.data;
+    int pos = 0;
+    int house_idx = s_movein_house_idx;
+    if (house_idx < 0 || house_idx >= mHS_HOUSE_NUM) {
+        house_idx = 0;
+    }
+
+    /* Page 1: Would you like to select this house? */
+    const char* p1_line1 = "Would you like to select";
+    const char* p1_line2 = "this house?";
+    while (*p1_line1) buf[pos++] = (u8)(*p1_line1++);
+    buf[pos++] = CHAR_NEW_LINE;
+    while (*p1_line2) buf[pos++] = (u8)(*p1_line2++);
+
+    /* Pause for button press (0x7F 0x04) + clear window (0x7F 0x02) */
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_BUTTON;
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_CLEAR;
+
+    /* Page 2: Occupancy status */
+    if (mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID) == TRUE) {
+        const char* p2_line1 = "Nobody lives in this house";
+        const char* p2_line2 = "right now! It is vacant.";
+        while (*p2_line1) buf[pos++] = (u8)(*p2_line1++);
+        buf[pos++] = CHAR_NEW_LINE;
+        while (*p2_line2) buf[pos++] = (u8)(*p2_line2++);
+    } else {
+        char owner_name[PLAYER_NAME_LEN + 1];
+        int name_len = 0;
+        memset(owner_name, 0, sizeof(owner_name));
+        for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+            u8 c = Save_Get(homes[house_idx]).ownerID.player_name[i];
+            if (c == 0 || c == CHAR_SPACE) break;
+            owner_name[name_len++] = (char)c;
+        }
+        if (name_len == 0) {
+            snprintf(owner_name, sizeof(owner_name), "Someone");
+        }
+        const char* p2_pfx = "This is ";
+        const char* p2_sfx = "'s house.";
+        const char* p2_line2 = "A roommate slot is open!";
+        while (*p2_pfx) buf[pos++] = (u8)(*p2_pfx++);
+        for (int i = 0; owner_name[i] != '\0'; i++) buf[pos++] = (u8)owner_name[i];
+        while (*p2_sfx) buf[pos++] = (u8)(*p2_sfx++);
+        buf[pos++] = CHAR_NEW_LINE;
+        while (*p2_line2) buf[pos++] = (u8)(*p2_line2++);
+    }
+
+    /* Pause for button press (0x7F 0x04) + clear window (0x7F 0x02) */
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_BUTTON;
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_CLEAR;
+
+    /* Page 3: "Do you want to move in?" with Choice Window */
+    const char* p3_line = "Do you want to move in?";
+    while (*p3_line) buf[pos++] = (u8)(*p3_line++);
+
+    /* Choice Window popup (0x7F 0x0D) + end of message (0x7F 0x00) */
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_SET_SELECT_WINDOW;
+    buf[pos++] = CHAR_CONTROL_CODE;
+    buf[pos++] = mFont_CONT_CODE_LAST;
+
+    /* Fill remainder of buffer with 0 */
+    while (pos < mMsg_MSG_BUF_MAX) {
+        buf[pos++] = 0;
+    }
+
+    return TRUE;
+}
+#endif
+
 static int aHNW_decide_msg_idx_dance(HANIWA_ACTOR* haniwa) {
     Haniwa_c* house_haniwa;
     int house_idx = haniwa->house_idx;
-    int player_is_owner = Common_Get(player_no) == mHS_get_pl_no(haniwa->house_idx);
+    int player_is_owner = FALSE;
     int res;
 
 #if defined(TARGET_PC)
-    if (client_network_is_connected()) {
-        if (client_network_is_resident()) {
-            player_is_owner = (client_network_get_house_idx() == house_idx);
-        } else {
-            player_is_owner = FALSE;
+    bool player_has_house = FALSE;
+
+    /* Check local save data: does current player match house owner, or own another house? */
+    if (Common_Get(now_private) != NULL && !mPr_NullCheckPersonalID(&Common_Get(now_private)->player_ID)) {
+        if (!mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID) &&
+            mPr_CheckCmpPersonalID(&Save_Get(homes[house_idx]).ownerID, &Common_Get(now_private)->player_ID) == TRUE) {
+            player_is_owner = TRUE;
+            player_has_house = TRUE;
+        }
+        for (int h = 0; h < mHS_HOUSE_NUM; h++) {
+            if (!mPr_NullCheckPersonalID(&Save_Get(homes[h]).ownerID) &&
+                mPr_CheckCmpPersonalID(&Save_Get(homes[h]).ownerID, &Common_Get(now_private)->player_ID) == TRUE) {
+                player_has_house = TRUE;
+                break;
+            }
         }
     }
+
+    /* Check network resident status if connected */
+    if (client_network_is_connected() && client_network_is_resident()) {
+        if (client_network_get_house_idx() == house_idx) {
+            player_is_owner = TRUE;
+        }
+        player_has_house = TRUE;
+    }
+#else
+    player_is_owner = (Common_Get(player_no) == mHS_get_pl_no(haniwa->house_idx));
 #endif
 
     if (mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID) == TRUE) {
 #if defined(TARGET_PC)
-        /* If player is an unhoused visitor and house is vacant, offer move in */
-        if (!client_network_is_connected() || !client_network_is_resident()) {
+        /* If player is unhoused and house is vacant, offer move in */
+        if (!player_has_house) {
             res = aHNW_MSG_MOVE_IN;
         } else {
             res = aHNW_MSG_NO_OWNER;
@@ -183,13 +332,17 @@ static int aHNW_decide_msg_idx_dance(HANIWA_ACTOR* haniwa) {
 #endif
     } else if (player_is_owner == TRUE) {
         Haniwa_c* house_haniwa = &Save_Get(homes[house_idx]).haniwa;
+        mHm_hs_c* house = Save_GetPointer(homes[house_idx]);
+#if !defined(TARGET_PC)
         int house_arrange_idx = mHS_get_arrange_idx(Common_Get(player_no));
-        mHm_hs_c* house = Save_GetPointer(homes[house_arrange_idx]);
+        house = Save_GetPointer(homes[house_arrange_idx]);
         if (house->flags.has_saved == FALSE && mEv_CheckFirstJob() == TRUE &&
             mNpc_GetFriendAnimalNum(&Common_Get(now_private)->player_ID) == 0) {
             res =
                 aHNW_MSG_NEED_FRIEND; /* player owns this house, but is in intro and has not spoken to any villagers */
-        } else if (house_haniwa->bells != 0) {
+        } else
+#endif
+        if (house_haniwa->bells != 0) {
             res = aHNW_MSG_PROCEEDS;
         } else {
             res = aHNW_MSG_NORMAL;
@@ -199,8 +352,7 @@ static int aHNW_decide_msg_idx_dance(HANIWA_ACTOR* haniwa) {
     } else {
 #if defined(TARGET_PC)
         /* Check if visitor can move in as a roommate */
-        if ((!client_network_is_connected() || !client_network_is_resident()) &&
-            mHS_get_roommate_vacancies(house_idx) > 0) {
+        if (!player_has_house && mHS_get_roommate_vacancies(house_idx) > 0) {
             res = aHNW_MSG_MOVE_IN;
         } else {
             res = aHNW_MSG_OTHER_OWNER; /* another player owns house */
@@ -221,7 +373,7 @@ static void aHNW_set_talk_info_dance(ACTOR* actor) {
         MSG_2344, /* aHNW_MSG_OTHER_OWNER */
         MSG_2350, /* aHNW_MSG_NEED_FRIEND */
 #if defined(TARGET_PC) || defined(TARGET_SERVER)
-        0x0926    /* aHNW_MSG_MOVE_IN */
+        MSG_PC_MOVEIN_FLOW /* aHNW_MSG_MOVE_IN */
 #endif
     };
 
@@ -244,12 +396,15 @@ static void aHNW_set_talk_info_dance(ACTOR* actor) {
 #if defined(TARGET_PC)
         case aHNW_MSG_MOVE_IN: {
             mChoice_c* choice_win = mChoice_Get_base_window_p();
-            static u8 str_move_in[mChoice_CHOICE_STRING_LEN] = "Move In";
-            static u8 str_cancel[mChoice_CHOICE_STRING_LEN]  = "Never mind";
+            static u8 str_yes[mChoice_CHOICE_STRING_LEN] = "Yes";
+            static u8 str_no[mChoice_CHOICE_STRING_LEN]  = "No";
             mChoice_Set_choice_data(choice_win,
-                str_move_in, (int)strlen((char*)str_move_in),
-                str_cancel,  (int)strlen((char*)str_cancel),
+                str_yes, (int)strlen((char*)str_yes),
+                str_no,  (int)strlen((char*)str_no),
                 NULL, 0, NULL, 0, NULL, 0, NULL, 0);
+            mChoice_no_b_set(choice_win);
+            mChoice_Clear_ChoseNum(choice_win);
+            pc_set_movein_dialogue_house(house_idx);
             break;
         }
 #endif
@@ -389,6 +544,14 @@ static void aHNW_talk_with_master2(HANIWA_ACTOR* haniwa, GAME* game) {
 
 static void aHNW_talk_end_wait(HANIWA_ACTOR* haniwa, GAME* game) {
     if (mDemo_Check(mDemo_TYPE_TALK, (ACTOR*)haniwa) == FALSE) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        if (Common_Get(complete_payment_type) == mPlayer_COMPLETE_PAYMENT_TYPE_MOVE_IN) {
+            if (pc_request_main_complete_payment(game)) {
+                aHNW_setupAction(haniwa, game, aHNW_ACTION_DANCE);
+            }
+            return;
+        }
+#endif
         aHNW_setupAction(haniwa, game, aHNW_ACTION_DANCE);
     }
 }
@@ -563,14 +726,34 @@ static void aHNW_roof_check(HANIWA_ACTOR* haniwa, GAME* game) {
 
 #if defined(TARGET_PC) || defined(TARGET_SERVER)
 static void aHNW_move_in_check(HANIWA_ACTOR* haniwa, GAME* game) {
-    mMsg_Window_c* msg_win = mMsg_Get_base_window_p();
-    int order_value = mDemo_Get_OrderValue(mDemo_ORDER_NPC0, 9) || mDemo_Get_OrderValue(mDemo_ORDER_NPC0, 0);
+    int choice_no = mChoice_GET_CHOSENUM();
     int action = -1;
 
-    if (order_value && mMsg_Check_MainNormalContinue(msg_win) == TRUE) {
-        switch (mChoice_GET_CHOSENUM()) {
-            case mChoice_CHOICE0: {
+    if (choice_no != -1) {
+        mChoice_CLEAR_CHOSENUM();
+        switch (choice_no) {
+            case mChoice_CHOICE0: { /* "Yes" - Claim house */
                 int house_idx = haniwa->house_idx;
+
+                int had_prior_owner = 0;
+                char prior_name[PLAYER_NAME_LEN + 1];
+                memset(prior_name, 0, sizeof(prior_name));
+
+                if (!mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID) &&
+                    (Common_Get(now_private) == NULL ||
+                     mPr_CheckCmpPersonalID(&Save_Get(homes[house_idx]).ownerID, &Common_Get(now_private)->player_ID) == FALSE)) {
+                    had_prior_owner = 1;
+                    int name_len = 0;
+                    for (int i = 0; i < PLAYER_NAME_LEN; i++) {
+                        u8 c = Save_Get(homes[house_idx]).ownerID.player_name[i];
+                        if (c == 0 || c == CHAR_SPACE) break;
+                        prior_name[name_len++] = (char)c;
+                    }
+                    if (name_len == 0) {
+                        snprintf(prior_name, sizeof(prior_name), "Someone");
+                    }
+                }
+                pc_set_movein_prior_owner(had_prior_owner, prior_name);
 
 #ifdef TARGET_PC
                 if (client_network_is_connected()) {
@@ -581,17 +764,31 @@ static void aHNW_move_in_check(HANIWA_ACTOR* haniwa, GAME* game) {
 
                 if (Common_Get(now_private) != NULL) {
                     mHS_assign_roommate(house_idx, &Common_Get(now_private)->player_ID);
+                    mHS_set_use(Common_Get(player_no), house_idx);
+                    Common_Set(now_home, house_idx);
+                    mHm_SetNowHome();
+                    Save_Get(homes[house_idx]).flags.has_saved = TRUE;
+                    mPr_SetItemCollectBit(Now_Private->cloth.item);
+                    mPr_SetItemCollectBit(FTR_START(FTR_SUM_CASSE01));
+                    mPr_SetItemCollectBit(ITM_CARPET_START + Save_Get(homes[house_idx]).floors[0].wall_floor.flooring_idx);
+                    mPr_SetItemCollectBit(ITM_WALL_START + Save_Get(homes[house_idx]).floors[0].wall_floor.wallpaper_idx);
+                    if (Now_Private->inventory.loan == 0) {
+                        Now_Private->inventory.loan = mPlayer_DEBT0;
+                    }
+                    mEv_ClearPersonalEventFlag(Common_Get(player_no));
+                    mEv_UnSetFirstIntro();
+                    mEv_UnSetFirstJob();
                 }
 
-                action = aHNW_ACTION_SAVE_END_WAIT;
-                mBGMPsComp_scene_mode(13);
-                mDemo_Set_talk_return_demo_wait(TRUE);
-                mPlib_Set_able_force_speak_label((ACTOR*)haniwa);
+                mMsg_REQUEST_MAIN_DISAPPEAR_WAIT_TYPE1();
+                action = aHNW_ACTION_TALK_END_WAIT;
+                Common_Set(complete_payment_type, mPlayer_COMPLETE_PAYMENT_TYPE_MOVE_IN);
                 sAdo_SysTrgStart(0x0461);
                 break;
             }
 
-            case mChoice_CHOICE1: {
+            case mChoice_CHOICE1: { /* "No" - Cancel */
+                mMsg_REQUEST_MAIN_DISAPPEAR_WAIT_TYPE1();
                 action = aHNW_ACTION_TALK_END_WAIT;
                 break;
             }
@@ -602,6 +799,8 @@ static void aHNW_move_in_check(HANIWA_ACTOR* haniwa, GAME* game) {
             mDemo_Set_OrderValue(mDemo_ORDER_NPC0, 0, 0);
             aHNW_setupAction(haniwa, game, action);
         }
+    } else if (mDemo_Check(mDemo_TYPE_TALK, (ACTOR*)haniwa) == FALSE) {
+        aHNW_setupAction(haniwa, game, aHNW_ACTION_DANCE);
     }
 }
 #endif
@@ -785,7 +984,20 @@ static void aHNW_setupAction(HANIWA_ACTOR* haniwa, GAME* game, int action) {
     int house_idx = haniwa->house_idx;
     int animation_state = haniwa->common_actor_class.anime.anime_no;
     int no_owner = mPr_NullCheckPersonalID(&Save_Get(homes[house_idx]).ownerID);
+#if defined(TARGET_PC)
+    int owner_is_player = FALSE;
+    if (!no_owner && Common_Get(now_private) != NULL && !mPr_NullCheckPersonalID(&Common_Get(now_private)->player_ID)) {
+        if (mPr_CheckCmpPersonalID(&Save_Get(homes[house_idx]).ownerID, &Common_Get(now_private)->player_ID) == TRUE) {
+            owner_is_player = TRUE;
+        }
+    }
+    if (client_network_is_connected() && client_network_is_resident() &&
+        client_network_get_house_idx() == house_idx) {
+        owner_is_player = TRUE;
+    }
+#else
     int owner_is_player = mHS_get_pl_no(house_idx) == Common_Get(player_no);
+#endif
 
     haniwa->common_actor_class.act = action;
     haniwa->action_proc = process[action];

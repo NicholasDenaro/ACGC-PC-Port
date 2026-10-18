@@ -77,7 +77,11 @@ static void aID_actor_ct(ACTOR* actorx, GAME* game) {
             aID_setupAction(intro_demo, play, aID_ACT_IN_HOUSE);
         }
     } else {
+#ifdef TARGET_PC
+        Actor_delete(actorx);
+#else
         aID_setupAction(intro_demo, play, aID_ACT_FIRST_JOB);
+#endif
     }
 }
 

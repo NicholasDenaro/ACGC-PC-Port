@@ -28,6 +28,17 @@ enum haniwa_msg {
     aHNW_MSG_NUM
 };
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+#ifndef MSG_PC_MOVEIN_FLOW
+#define MSG_PC_MOVEIN_FLOW 0x3F90
+#endif
+#ifndef MSG_PC_MOVEIN_SUCCESS
+#define MSG_PC_MOVEIN_SUCCESS 0x3F91
+#endif
+extern void pc_set_movein_dialogue_house(int house_idx);
+extern void pc_set_movein_prior_owner(int had_prior_owner, const char* name);
+#endif
+
 enum haniwa_handover {
     aHNW_HANDOVER_YES,
     aHNW_HANDOVER_NO,

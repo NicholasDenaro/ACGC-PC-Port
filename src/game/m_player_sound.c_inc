@@ -269,6 +269,10 @@ static u8 Player_actor_sound_Get_bgm_num_forCompletePayment(void) {
     switch (Common_Get(complete_payment_type)) {
         case mPlayer_COMPLETE_PAYMENT_TYPE_ARBEIT:
             return BGM_INTRO_CHORES_COMPLETE;
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        case mPlayer_COMPLETE_PAYMENT_TYPE_MOVE_IN:
+            return BGM_INTRO_SELECT_HOUSE;
+#endif
         default:
             return BGM_DEBT_PAID;
     }

@@ -503,6 +503,67 @@ static void aNPS2_make_door_data(Door_data_c* door_data, int type, NPC_P_SEL2_AC
     door_data->wipe_type = WIPE_TYPE_FADE_BLACK;
 
     if (type == aNPS2_DOOR_EXIT_TYPE_HOME) {
+#if defined(TARGET_PC)
+        int has_home = FALSE;
+        int owned_house_idx = -1;
+        if (Now_Private != NULL && !mPr_NullCheckPersonalID(&Now_Private->player_ID)) {
+            for (int h = 0; h < mHS_HOUSE_NUM; h++) {
+                if (!mPr_NullCheckPersonalID(&Save_Get(homes[h]).ownerID) &&
+                    mPr_CheckCmpPersonalID(&Save_Get(homes[h]).ownerID, &Now_Private->player_ID) == TRUE) {
+                    has_home = TRUE;
+                    owned_house_idx = h;
+                    break;
+                }
+            }
+        }
+        if (client_network_is_connected() && client_network_is_resident()) {
+            int net_h = client_network_get_house_idx();
+            if (net_h >= 0 && net_h < mHS_HOUSE_NUM) {
+                has_home = TRUE;
+                owned_house_idx = net_h;
+            }
+        }
+
+        if (!has_home) {
+            door_data->exit_position.x = 2200;
+            door_data->exit_position.y = 0;
+            door_data->exit_position.z = 860;
+            door_data->exit_orientation = mSc_DIRECT_SOUTH;
+            door_data->door_actor_name = EMPTY_NO;
+            door_data->exit_type = 0;
+            door_data->extra_data = 0;
+            Common_Get(transition).wipe_type = WIPE_TYPE_CIRCLE_RIGHT;
+            Now_Private->birthday_present_npc = EMPTY_NO;
+        } else {
+            int arrange_idx = owned_house_idx;
+            int pl_no = p_sel2->player_no;
+
+            door_data->exit_position.x = homeX[arrange_idx];
+            door_data->exit_position.z = homeZ[arrange_idx];
+            door_data->exit_orientation = drt[arrange_idx];
+            door_data->door_actor_name = HOUSE0 + arrange_idx;
+            Common_Get(transition).wipe_type = WIPE_TYPE_TRIFORCE;
+            Now_Private->birthday_present_npc = EMPTY_NO;
+
+            if ((Now_Private->state_flags & mPr_FLAG_BIRTHDAY_ACTIVE) != 0) {
+                Common_Set(demo_profiles[1], mAc_PROFILE_PRESENT_DEMO);
+                Now_Private->birthday_present_npc = aNPS2_decide_birthday_npc();
+                Now_Private->celebrated_birthday_year = Common_Get(time.rtc_time).year;
+            } else if (Common_Get(reset_flag) == TRUE) {
+                Common_Set(demo_profiles[1], mAc_PROFILE_RESET_DEMO);
+            } else if (!mSC_LightHouse_travel_check()) {
+                if (mSC_LightHouse_Event_Check(pl_no)) {
+                    Common_Set(demo_profiles[1], mAc_PROFILE_PRESENT_DEMO);
+                } else if (mPr_GetPossessionItemSum(Now_Private, EMPTY_NO) != 0) {
+                    if (mSM_CHECK_ALL_FISH_GET() && !mSC_trophy_get(mSC_TROPHY_GOLDEN_ROD)) {
+                        Common_Set(demo_profiles[1], mAc_PROFILE_PRESENT_DEMO);
+                    } else if (mSM_CHECK_ALL_INSECT_GET() && !mSC_trophy_get(mSC_TROPHY_GOLDEN_NET)) {
+                        Common_Set(demo_profiles[1], mAc_PROFILE_PRESENT_DEMO);
+                    }
+                }
+            }
+        }
+#else
         int arrange_idx = mHS_get_arrange_idx(p_sel2->player_no);
         int pl_no = p_sel2->player_no;
 
@@ -530,6 +591,7 @@ static void aNPS2_make_door_data(Door_data_c* door_data, int type, NPC_P_SEL2_AC
                 }
             }
         }
+#endif
     } else if (type == aNPS2_DOOR_EXIT_TYPE_DEMO2) {
         Common_Get(transition).wipe_type = WIPE_TYPE_FADE_BLACK;
         mGH_animal_return_init();

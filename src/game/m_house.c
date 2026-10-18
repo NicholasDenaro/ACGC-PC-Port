@@ -90,7 +90,11 @@ extern int mHS_set_use(int player_no, int house_no) {
 
     if (player_no < PLAYER_NUM && house_no < PLAYER_NUM) {
         now_player_no = mHS_get_pl_no(house_no);
-        if (mPr_NullCheckPersonalID(Save_GetPointer(homes[house_no].ownerID)) == TRUE) {
+        if (mPr_NullCheckPersonalID(Save_GetPointer(homes[house_no].ownerID)) == TRUE
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            || (Common_Get(now_private) != NULL && mPr_CheckCmpPersonalID(Save_GetPointer(homes[house_no].ownerID), &Common_Get(now_private)->player_ID) == TRUE)
+#endif
+        ) {
             if (now_player_no != player_no) {
                 plr_shift = player_no * 2;
                 new_shift = now_player_no * 2;
@@ -105,8 +109,8 @@ extern int mHS_set_use(int player_no, int house_no) {
                 Save_Set(house_arrangement,
                          (((house_arrangement & mask) | /* Clear old values */
                            (((house_arrangement >> plr_shift) & 3))
-                               << new_shift) |       /* move current player house idx to old player house idx */
-                          (house_no << plr_shift))); /* set current player new house idx */
+                                << new_shift) |       /* move current player house idx to old player house idx */
+                           (house_no << plr_shift))); /* set current player new house idx */
             }
 
             mHm_InitHomeInfo(Save_Get(homes + house_no), player_no);
@@ -157,7 +161,18 @@ extern int mHS_assign_roommate(int house_no, const PersonalID_c* pid) {
     }
 
     /* If house already has an owner, register as roommate */
-    mHS_set_use(Common_Get(player_no), house_no);
+    int player_no = Common_Get(player_no);
+    int now_player_no = mHS_get_pl_no(house_no);
+    if (player_no < PLAYER_NUM && now_player_no != player_no) {
+        int plr_shift = player_no * 2;
+        int new_shift = now_player_no * 2;
+        u32 house_arrangement = Save_Get(house_arrangement);
+        int mask = 0xffffffff ^ ((3 << plr_shift) | (3 << new_shift));
+        Save_Set(house_arrangement,
+                 (((house_arrangement & mask) |
+                   (((house_arrangement >> plr_shift) & 3) << new_shift)) |
+                  (house_no << plr_shift)));
+    }
     return TRUE;
 }
 #endif

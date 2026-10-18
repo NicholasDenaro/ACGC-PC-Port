@@ -70,6 +70,11 @@ static void Player_actor_Complete_payment_demo_ct(ACTOR* actorx) {
         case mPlayer_COMPLETE_PAYMENT_TYPE_ARBEIT:
             msg_no = 0x17B6;
             break;
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        case mPlayer_COMPLETE_PAYMENT_TYPE_MOVE_IN:
+            msg_no = MSG_PC_MOVEIN_SUCCESS;
+            break;
+#endif
         default:
             msg_no = 0x17B7;
             break;
