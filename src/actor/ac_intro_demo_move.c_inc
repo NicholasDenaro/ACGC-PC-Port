@@ -95,7 +95,7 @@ static void aID_go_out_of_station(INTRO_DEMO_ACTOR* intro_demo, GAME_PLAY* play)
         mEv_UnSetFirstJob();
         mEv_ClearPersonalEventFlag(Common_Get(player_no));
         mBGMPsComp_scene_mode(1);
-        mTRC_init(&play->game);
+        Common_Set(train_signal, FALSE);
         Actor_delete(&intro_demo->actor_class);
         return;
 #else

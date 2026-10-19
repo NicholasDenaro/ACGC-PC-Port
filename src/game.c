@@ -179,6 +179,20 @@ static void game_init_hyral(GAME* this, size_t size) {
 }
 
 extern void game_resize_hyral(GAME* this, int size) {
+#ifdef TARGET_PC
+    u8* old_hyral = (u8*)this->tha.buf_p;
+    THA_dt(&this->tha);
+    if (old_hyral != NULL) {
+        gamealloc_free(&this->gamealloc, old_hyral);
+    }
+    size_t alloc_sz = 16 * 1024 * 1024;
+    u8* hyral = (u8*)gamealloc_malloc(&this->gamealloc, alloc_sz);
+    if (hyral != NULL) {
+        THA_ct(&this->tha, (char*)hyral, alloc_sz);
+    } else {
+        THA_ct(&this->tha, NULL, 0);
+    }
+#else
     size_t max_size, free_size, alloc_size;
     u8* old_hyral;
     u8* hyral;
@@ -211,6 +225,7 @@ extern void game_resize_hyral(GAME* this, int size) {
         _dbg_hungup(__FILE__, 633);
 #endif
     }
+#endif
 }
 
 extern void game_ct(GAME* this, void (*init)(GAME*), GRAPH* graph) {

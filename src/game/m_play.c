@@ -655,6 +655,21 @@ extern void play_init(GAME* game) {
     printf("[SERVER] Loading scene %d...\n", Save_Get(scene_no));
 #endif
 
+#ifdef TARGET_PC
+    {
+        static void* s_pc_zelda_arena_buf_early = NULL;
+        if (s_pc_zelda_arena_buf_early == NULL) {
+            s_pc_zelda_arena_buf_early = malloc(192 * 1024 * 1024);
+        }
+        if (!zelda_MallocIsInitalized() && s_pc_zelda_arena_buf_early != NULL) {
+            zelda_InitArena(s_pc_zelda_arena_buf_early, 192 * 1024 * 1024);
+        }
+        if (my_malloc_current == NULL) {
+            my_malloc_current = &my_malloc_func;
+        }
+    }
+#endif
+
     Gameplay_Scene_Read(play, Save_Get(scene_no));
 
     mSM_submenu_ct(&play->submenu);

@@ -223,6 +223,12 @@ extern void mSc_data_bank_ct(GAME_PLAY* play, Object_Exchange_c* exchange) {
     exchange->exchange_id = -1;
 
     exchange_arena = (char*)THA_allocAlign(&play->game.tha, mSc_ARENA_SIZE, ~0x1F);
+#ifdef TARGET_PC
+    if (exchange_arena == NULL || (uintptr_t)exchange_arena == 0xFFFF6000) {
+        static char s_pc_exchange_arena[mSc_ARENA_SIZE] __attribute__((aligned(32)));
+        exchange_arena = s_pc_exchange_arena;
+    }
+#endif
     exchange->next_bank_ram_address = exchange_arena;
     exchange->start_address_save[0] = exchange_arena;
     exchange->start_address_save[1] = exchange_arena;

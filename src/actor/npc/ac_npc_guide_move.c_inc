@@ -831,6 +831,16 @@ static void aNGD_scene_change_wait_init(NPC_GUIDE_ACTOR* guide, GAME_PLAY* play)
     mRmTp_SetDefaultLightSwitchData(1);
     mBGMPsComp_make_ps_wipe(0x41C2);
     mBGMPsComp_scene_mode(18);
+#ifdef TARGET_PC
+    Common_Set(demo_profiles[0], mAc_PROFILE_INTRO_DEMO);
+    {
+        extern bool client_network_is_connected(void);
+        extern bool client_network_send_character_finalize(const Private_c* priv);
+        if (client_network_is_connected()) {
+            client_network_send_character_finalize(Common_Get(now_private));
+        }
+    }
+#endif
 }
 
 typedef void (*aNGD_INIT_PROC)(NPC_GUIDE_ACTOR*, GAME_PLAY*);

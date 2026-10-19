@@ -212,8 +212,9 @@ int MallocIsInitalized(void) {
 }
 
 void GetFreeArena(unsigned long* max, unsigned long* free_size, unsigned long* alloc) {
-    if (max) *max = malloc_arena_size;
-    if (free_size) *free_size = malloc_arena_size;
+    unsigned long sz = (malloc_arena_size > 0x100000) ? malloc_arena_size : (16 * 1024 * 1024);
+    if (max) *max = sz;
+    if (free_size) *free_size = sz;
     if (alloc) *alloc = 0;
 }
 

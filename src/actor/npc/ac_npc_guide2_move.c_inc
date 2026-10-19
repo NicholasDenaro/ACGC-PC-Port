@@ -758,6 +758,7 @@ static void aNG2_scene_change_wait_init(NPC_GUIDE2_ACTOR* guide2, GAME_PLAY* pla
     mBGMPsComp_scene_mode(18);
 
 #ifdef TARGET_PC
+    Common_Set(demo_profiles[0], mAc_PROFILE_INTRO_DEMO);
     {
         extern bool client_network_is_connected(void);
         extern bool client_network_send_character_finalize(const Private_c* priv);

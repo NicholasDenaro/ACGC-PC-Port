@@ -1033,6 +1033,12 @@ static int mPlib_Object_Exchange_keep_new(GAME_PLAY* play, s16 bank, u32 src, u3
     Object_Exchange_c* obj_ex = &play->object_exchange;
     Object_Bank_c* bank_p = &obj_ex->banks[obj_ex->bank_idx];
 
+#ifdef TARGET_PC
+    if (obj_ex->next_bank_ram_address == NULL || (uintptr_t)obj_ex->next_bank_ram_address == 0xFFFF6000) {
+        return -1;
+    }
+#endif
+
     bank_p->bank_id = bank;
     bank_p->dma_start = obj_ex->next_bank_ram_address;
     bank_p->ram_start = obj_ex->next_bank_ram_address;

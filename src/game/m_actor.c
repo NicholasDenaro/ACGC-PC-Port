@@ -365,10 +365,6 @@ extern void Actor_info_ct(GAME* game, Actor_info* actor_info, Actor_data* player
         dlftbl++;
     }
 
-    if (mEv_CheckFirstJob() == TRUE) {
-        Common_Set(demo_profiles[0], mAc_PROFILE_INTRO_DEMO); // force intro demo to spawn
-    }
-
     /* Spawn any demo actors */
     for (i = 0; i < 2; i++) {
         s16 demo_profile = Common_Get(demo_profiles[i]);

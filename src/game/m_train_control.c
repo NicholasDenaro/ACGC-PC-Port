@@ -121,6 +121,13 @@ static u32 mTRC_get_depart_time() {
     };
 
     lbRTC_time_c* rtc_time = Common_GetPointer(time.rtc_time);
+#ifdef TARGET_PC
+    lbRTC_time_c cur_time;
+    if (Common_Get(time.rtc_enabled) == TRUE && !Common_Get(time.rtc_crashed)) {
+        lbRTC_GetTime(&cur_time);
+        rtc_time = &cur_time;
+    }
+#endif
     u32 now_sec = mTRC_RTC_TIME_SECONDS(rtc_time);
     u32 depart_time;
     int i = 0;
@@ -224,6 +231,11 @@ static void mTRC_norm_init() {
     Common_Set(train_flag, TRUE);
     Common_Set(train_control_state, 0);
     Common_Set(train_last_control_state, 0);
+#ifdef TARGET_PC
+    /* Immediately advance train_start_timer so subsequent scene switches
+       or checks don't re-trigger a scheduled train before the next hour */
+    Common_Set(train_start_timer, mTRC_get_depart_time());
+#endif
 
     pos.x = 320.0f;
     pos.z = 740.0f;

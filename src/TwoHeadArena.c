@@ -60,13 +60,33 @@ extern void* THA_alloc(TwoHeadArena* this, size_t siz) {
 */
 
 extern void* THA_alloc16(TwoHeadArena* this, size_t siz) {
+#ifdef TARGET_PC
+  if (this == NULL || this->buf_p == NULL || this->tail_p == NULL) {
+    return NULL;
+  }
+#endif
   const int mask = ~(16 - 1);
   this->tail_p = (char*)((((u32)this->tail_p & mask) - siz) & mask);
+#ifdef TARGET_PC
+  if (this->tail_p < this->head_p) {
+    return NULL;
+  }
+#endif
   return this->tail_p;
 }
 
 extern void* THA_allocAlign(TwoHeadArena* this, size_t siz, int mask) {
+#ifdef TARGET_PC
+  if (this == NULL || this->buf_p == NULL || this->tail_p == NULL) {
+    return NULL;
+  }
+#endif
   this->tail_p = (char*)((((u32)this->tail_p & mask) - siz) & mask);
+#ifdef TARGET_PC
+  if (this->tail_p < this->head_p) {
+    return NULL;
+  }
+#endif
   return this->tail_p;
 }
 

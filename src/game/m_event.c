@@ -133,6 +133,11 @@ extern int mEv_CheckEvent(u32 event_kind) {
 }
 
 extern void mEv_ClearPersonalEventFlag(int player_no) {
+#ifdef TARGET_PC
+    if (player_no < 0 || player_no >= PLAYER_NUM) {
+        player_no = 0;
+    }
+#endif
     mEv_EventOFF(mEv_SAVED_FIRSTJOB_PLR0 + player_no);
     mEv_EventOFF(mEv_SAVED_FIRSTINTRO_PLR0 + player_no);
     mEv_EventOFF(mEv_SAVED_HRAWAIT_PLR0 + player_no);
