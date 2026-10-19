@@ -94,6 +94,14 @@ static void aID_go_out_of_station(INTRO_DEMO_ACTOR* intro_demo, GAME_PLAY* play)
         mEv_UnSetFirstIntro();
         mEv_UnSetFirstJob();
         mEv_ClearPersonalEventFlag(Common_Get(player_no));
+        mBGMPsComp_delete_ps_demo(BGM_INTRO_ARRIVE, 0x168);
+        mBGMPsComp_delete_ps_happening(BGM_INTRO_ARRIVE, 0x168);
+        mBGMPsComp_delete_ps_happening(BGM_INTRO_NEW_TOWN, 0x168);
+        mBGMPsComp_delete_ps_quiet();
+        if (intro_demo->station_master_actor_p != NULL) {
+            NPC_STATION_MASTER_ACTOR* master = (NPC_STATION_MASTER_ACTOR*)intro_demo->station_master_actor_p;
+            master->happening_sound = BGM_SILENCE;
+        }
         mBGMPsComp_scene_mode(1);
         Common_Set(train_signal, FALSE);
         Actor_delete(&intro_demo->actor_class);

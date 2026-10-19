@@ -95,6 +95,12 @@ static void aID_actor_dt(ACTOR* actorx, GAME* game) {
     if (intro_demo->first_field_bgm_state == 2) {
         mBGMPsComp_delete_ps_fieldSuddenEv(BGM_INTRO_FIND_SHOP, 0x168);
     }
+#ifdef TARGET_PC
+    mBGMPsComp_delete_ps_demo(BGM_INTRO_ARRIVE, 0x168);
+    mBGMPsComp_delete_ps_happening(BGM_INTRO_ARRIVE, 0x168);
+    mBGMPsComp_delete_ps_happening(BGM_INTRO_NEW_TOWN, 0x168);
+    mBGMPsComp_delete_ps_quiet();
+#endif
 }
 
 #include "../src/actor/ac_intro_demo_move.c_inc"

@@ -778,6 +778,13 @@ static void aHNW_move_in_check(HANIWA_ACTOR* haniwa, GAME* game) {
                     mEv_ClearPersonalEventFlag(Common_Get(player_no));
                     mEv_UnSetFirstIntro();
                     mEv_UnSetFirstJob();
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+                    mBGMPsComp_delete_ps_demo(BGM_INTRO_ARRIVE, 0x168);
+                    mBGMPsComp_delete_ps_happening(BGM_INTRO_ARRIVE, 0x168);
+                    mBGMPsComp_delete_ps_happening(BGM_INTRO_NEW_TOWN, 0x168);
+                    mBGMPsComp_delete_ps_quiet();
+                    mBGMPsComp_scene_mode(1);
+#endif
                 }
 
                 mMsg_REQUEST_MAIN_DISAPPEAR_WAIT_TYPE1();

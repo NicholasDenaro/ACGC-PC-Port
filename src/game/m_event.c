@@ -220,13 +220,17 @@ extern int mEv_CheckFirstJob() {
 extern void mEv_UnSetFirstJob() {
     u32 player_no = Common_Get(player_no);
 #ifdef TARGET_PC
-    if (player_no >= PLAYER_NUM) player_no = 0;
-#endif
-
+    int i;
+    for (i = 0; i < PLAYER_NUM; i++) {
+        mEv_EventOFF(mEv_SAVED_FIRSTJOB_PLR0 + i);
+        mEv_EventON(mEv_SAVED_HRAWAIT_PLR0 + i);
+    }
+#else
     if (player_no < PLAYER_NUM) {
         mEv_EventOFF(mEv_SAVED_FIRSTJOB_PLR0 + player_no);
         mEv_EventON(mEv_SAVED_HRAWAIT_PLR0 + player_no);
     }
+#endif
 }
 
 #ifdef TARGET_PC
@@ -255,7 +259,9 @@ extern void mEv_SetFirstIntro() {
 extern int mEv_CheckFirstIntro() {
     u32 player_no = Common_Get(player_no);
 #ifdef TARGET_PC
-    if (player_no >= PLAYER_NUM) player_no = 0;
+    if (player_no >= PLAYER_NUM) {
+        return FALSE;
+    }
 #endif
     int res = FALSE;
 
@@ -274,19 +280,18 @@ extern int mEv_CheckFirstIntro() {
 extern void mEv_UnSetFirstIntro() {
     u32 player_no = Common_Get(player_no);
 #ifdef TARGET_PC
-    if (player_no >= PLAYER_NUM) player_no = 0;
-#endif
-
+    int i;
+    for (i = 0; i < PLAYER_NUM; i++) {
+        mEv_EventOFF(mEv_SAVED_FIRSTINTRO_PLR0 + i);
+    }
+    g_mPlib_wade_disabled = l_wade_disabled_bak;
+#else
     if (player_no < PLAYER_NUM) {
         u32 ev = mEv_SAVED_FIRSTINTRO_PLR0;
         ev += player_no;
-#ifdef TARGET_PC
-        if (mEv_CheckFirstIntro()) {
-            g_mPlib_wade_disabled = l_wade_disabled_bak;
-        }
-#endif
         mEv_EventOFF(ev);
     }
+#endif
 }
 
 extern void mEv_SetGateway() {
