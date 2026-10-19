@@ -467,6 +467,48 @@ static void server_network_handle_movein_req(ServerClientSession* session, const
     }
 }
 
+static void server_network_handle_interact(ServerClientSession* session, const u8* data, size_t len, const pkt_c2s_interact_req_t* req) {
+    if (session == NULL || req == NULL) return;
+
+    if (req->action_type == NET_INTERACT_ENTER_DOOR) {
+        /* Relay door open animation to other clients across the acre/town */
+        server_network_broadcast_raw(NET_CH_RELIABLE, data, len, true, session->client_id);
+    } else if (req->action_type == NET_INTERACT_ZONE_CHANGE) {
+        int scene_id = (int)req->item_arg;
+        int room_idx = (int)req->target_actor_id;
+
+        ConnectedClient* cc = server_player_get(session->client_id);
+        if (cc == NULL) return;
+
+        uint32_t new_zone_id = 0;
+        if (scene_id == SCENE_FG || scene_id <= 0) {
+            new_zone_id = 0; /* Outdoors */
+        } else {
+            ZoneType ztype = server_zone_type_from_scene(scene_id);
+            extern struct game_s* gamePT;
+            ServerZone* zone = server_zone_find_or_create((GAME_PLAY*)gamePT, scene_id, ztype, room_idx);
+            if (zone != NULL) {
+                new_zone_id = zone->zone_id;
+            }
+        }
+
+        if (cc->zone_id != new_zone_id) {
+            printf("[SERVER NET] Client ID %u transferring zone: %u -> %u (scene %d, room %d)\n",
+                   session->client_id, cc->zone_id, new_zone_id, scene_id, room_idx);
+            ServerZone* old_zone = server_zone_get(cc->zone_id);
+            if (old_zone != NULL && session->player_slot >= 0) {
+                server_zone_remove_player(old_zone, session->player_slot);
+            }
+            cc->zone_id = new_zone_id;
+            ServerZone* new_zone = server_zone_get(new_zone_id);
+            if (new_zone != NULL && session->player_slot >= 0) {
+                server_zone_add_player(new_zone, session->player_slot);
+            }
+            server_spatial_update_client_acre(session->client_id, new_zone_id, 0, 0);
+        }
+    }
+}
+
 void server_network_poll(void) {
     if (s_server_host == NULL) {
         return;
@@ -579,6 +621,14 @@ void server_network_poll(void) {
                             if (net_unpack_input(event.packet->data, event.packet->dataLength, &inp) > 0) {
                                 session->state = NET_SESSION_ACTIVE;
                                 server_sync_on_client_input(session->client_id, &inp);
+                            }
+                            break;
+                        }
+
+                        case PKT_C2S_INTERACT_REQ: {
+                            pkt_c2s_interact_req_t req;
+                            if (net_unpack_interact_req(event.packet->data, event.packet->dataLength, &req) > 0) {
+                                server_network_handle_interact(session, event.packet->data, event.packet->dataLength, &req);
                             }
                             break;
                         }

@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 ConnectedClient g_server_clients[MAX_SERVER_CLIENTS] = {0};
 static int s_player_registry_initialized = 0;
@@ -195,7 +196,9 @@ PLAYER_ACTOR* server_player_spawn_actor(GAME_PLAY* play, int slot, xyz_t pos, s_
     /* Snap Y position to terrain surface if valid */
     f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(pos, 0.0f);
     if (ground_y > -1000.0f && ground_y < 10000.0f) {
-        pos.y = ground_y;
+        if (fabsf(ground_y - pos.y) <= 16.0f) {
+            pos.y = ground_y;
+        }
     }
 
     g_spawning_remote_player_slot = slot;
@@ -305,7 +308,9 @@ int server_spawn_dummy_player(GAME_PLAY* play, const char* name, xyz_t pos) {
     /* Snap ground Y */
     f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(pos, 0.0f);
     if (ground_y > -1000.0f && ground_y < 10000.0f) {
-        pos.y = ground_y;
+        if (fabsf(ground_y - pos.y) <= 16.0f) {
+            pos.y = ground_y;
+        }
     }
 
     if (client->player_actor == NULL) {

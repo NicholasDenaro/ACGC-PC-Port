@@ -369,6 +369,9 @@ static void aMHS_wait(STRUCTURE_ACTOR* my_house, GAME_PLAY* play) {
             break;
         case 4:
             if (mPlib_check_player_outdoor_start((GAME*)play)) {
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+                client_network_send_door_interact(my_house->action & 3, 1);
+#endif
                 aMHS_setup_animation(my_house, 0.5f);
                 aMHS_setup_action(my_house, aMHS_ACTION_OPEN_DOOR);
             }
@@ -379,16 +382,35 @@ static void aMHS_open_door_wait(STRUCTURE_ACTOR* my_house, GAME_PLAY* play) {
     ACTOR* actorx = (ACTOR*)my_house;
 
     if (actorx == (*GET_PLAYER_ACTOR_NOW()->get_door_label_proc)(gamePT)) {
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+        client_network_send_door_interact(my_house->action & 3, 1);
+#endif
         mBGMPsComp_make_ps_wipe(0x249);
         aMHS_setup_animation(my_house, 0.5f);
         aMHS_setup_action(my_house, aMHS_ACTION_OPEN_DOOR);
     }
 }
 
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+static u8 s_is_remote_door_open[4] = { 0, 0, 0, 0 };
+#endif
+
 static void aMHS_open_door(STRUCTURE_ACTOR* my_house, GAME_PLAY* play) {
     if (cKF_SkeletonInfo_R_play(&my_house->keyframe) != cKF_STATE_STOPPED) {
         aMHS_door_closed_flag[my_house->arg0] = FALSE;
     } else {
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+        int house_idx = my_house->action & 3;
+        if (s_is_remote_door_open[house_idx]) {
+            s_is_remote_door_open[house_idx] = 0;
+            aMHS_setup_action(my_house, aMHS_ACTION_WAIT);
+            aMHS_setup_animation(my_house, 0.0f);
+            cKF_SkeletonInfo_R_play(&my_house->keyframe);
+            my_house->arg2_f = 0;
+            my_house->request_type = 0;
+            return;
+        }
+#endif
         void* demo_class;
         INTRO_DEMO_ACTOR* intro_demo;
         int next_act;
@@ -436,6 +458,26 @@ static void aMHS_setup_action(STRUCTURE_ACTOR* my_house, int action) {
     aMHS_door_closed_flag[my_house->arg0] = TRUE;
     my_house->action_proc = process[action];
 }
+
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+void aMHS_remote_open_door(int house_idx) {
+    if (house_idx < 0 || house_idx >= 4 || gamePT == NULL) {
+        return;
+    }
+    GAME_PLAY* play = (GAME_PLAY*)gamePT;
+    for (ACTOR* a = play->actor_info.list[ACTOR_PART_ITEM].actor; a != NULL; a = a->next_actor) {
+        if (a->id == mAc_PROFILE_MYHOUSE) {
+            STRUCTURE_ACTOR* house = (STRUCTURE_ACTOR*)a;
+            if ((house->action & 3) == house_idx) {
+                s_is_remote_door_open[house_idx] = 1;
+                aMHS_setup_animation(house, 0.5f);
+                aMHS_setup_action(house, aMHS_ACTION_OPEN_DOOR);
+                break;
+            }
+        }
+    }
+}
+#endif
 
 static void aMHS_actor_move(ACTOR* actorx, GAME* game) {
     // clang-format off

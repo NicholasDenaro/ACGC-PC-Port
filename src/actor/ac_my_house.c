@@ -11,6 +11,9 @@
 #include "sys_matrix.h"
 #include "m_rcp.h"
 #include "libforest/gbi_extensions.h"
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+#include "client/client_network.h"
+#endif
 
 enum {
     aMHS_ACTION_WAIT,

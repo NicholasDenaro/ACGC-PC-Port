@@ -8,6 +8,7 @@
 #include "m_player_lib.h"
 #include "m_controller.h"
 #include "m_collision_bg.h"
+#include "m_field_info.h"
 #include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,7 +16,7 @@
 #include <math.h>
 
 #define CLIENT_SEND_INTERVAL_MS 33 /* ~30 Hz client transform streaming */
-#define REMOTE_TIMEOUT_MS 4000     /* 4 second timeout before despawning remote players */
+#define REMOTE_TIMEOUT_MS 600      /* 600ms timeout before despawning remote players */
 #define SNAP_DISTANCE_THRESHOLD 450.0f /* Max distance before snapping instead of lerping */
 
 ClientSyncContext g_client_sync = {0};
@@ -158,11 +159,36 @@ void client_sync_tick(GAME_PLAY* play) {
             break;
     }
 
+    /* Synchronize scene/zone state transitions with dedicated server */
+    static int s_last_synced_scene = -1;
+    static int s_last_synced_field = -1;
+    mActor_name_t cur_field = mFI_GetFieldId();
+    if (play->scene_id != s_last_synced_scene || cur_field != s_last_synced_field) {
+        s_last_synced_scene = play->scene_id;
+        s_last_synced_field = cur_field;
+        int house_idx = 0;
+        if (mFI_IS_PLAYER_ROOM(cur_field)) {
+            house_idx = (int)mFI_GET_PLAYER_ROOM_NO(cur_field);
+        }
+        client_network_send_zone_change(play->scene_id, house_idx);
+        client_sync_reset();
+    }
+
     uint32_t now = SDL_GetTicks();
 
     for (int i = 0; i < CLIENT_SYNC_MAX_REMOTE_PLAYERS; i++) {
         RemotePlayerState* remote = &g_client_sync.remote_players[i];
         if (!remote->is_active) {
+            continue;
+        }
+
+        /* If remote player is in a different zone than local player, hide/despawn actor */
+        bool same_zone = (play->scene_id == SCENE_FG) ? (remote->zone_id == 0) : (remote->zone_id > 0);
+        if (!same_zone) {
+            if (remote->player_actor != NULL) {
+                Actor_delete((ACTOR*)remote->player_actor);
+                remote->player_actor = NULL;
+            }
             continue;
         }
 
@@ -236,7 +262,9 @@ void client_sync_tick(GAME_PLAY* play) {
             /* Terrain surface snapping */
             f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(remote->current_pos, 0.0f);
             if (ground_y > -1000.0f && ground_y < 10000.0f) {
-                remote->current_pos.y = ground_y;
+                if (fabsf(ground_y - remote->target_pos.y) <= 16.0f) {
+                    remote->current_pos.y = ground_y;
+                }
             }
 
             /* Angle interpolation (Shortest angular distance Slerp) */

@@ -113,6 +113,12 @@ void client_network_set_local_resident(uint8_t house_idx);
 /* Send house move-in request to server */
 bool client_network_send_movein_req(uint8_t house_idx);
 
+/* Notify server of door interaction (e.g. entering house door) */
+bool client_network_send_door_interact(int house_idx, int is_open);
+
+/* Notify server of scene/zone change */
+bool client_network_send_zone_change(int scene_id, int room_idx);
+
 /* Self-test suite verifying client connection, handshake, ping/pong, input streaming, and disconnect */
 int client_network_run_tests(void);
 

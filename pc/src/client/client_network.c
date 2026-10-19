@@ -303,6 +303,39 @@ bool client_network_send_movein_req(uint8_t house_idx) {
     return false;
 }
 
+bool client_network_send_door_interact(int house_idx, int is_open) {
+    if (!client_network_is_connected()) return false;
+    pkt_c2s_interact_req_t req;
+    memset(&req, 0, sizeof(req));
+    req.client_id = g_client_net.client_id;
+    req.action_type = NET_INTERACT_ENTER_DOOR;
+    req.target_actor_id = HOUSE0 + house_idx;
+    req.item_arg = (u16)is_open;
+    u8 buf[128];
+    int len = net_pack_interact_req(buf, sizeof(buf), &req);
+    if (len > 0) {
+        return client_network_send_raw(NET_CH_RELIABLE, buf, len, true);
+    }
+    return false;
+}
+
+bool client_network_send_zone_change(int scene_id, int room_idx) {
+    if (!client_network_is_connected()) return false;
+    pkt_c2s_interact_req_t req;
+    memset(&req, 0, sizeof(req));
+    req.client_id = g_client_net.client_id;
+    req.action_type = NET_INTERACT_ZONE_CHANGE;
+    req.target_actor_id = (u32)(room_idx >= 0 ? room_idx : 0);
+    req.item_arg = (u16)scene_id;
+    u8 buf[128];
+    int len = net_pack_interact_req(buf, sizeof(buf), &req);
+    if (len > 0) {
+        printf("[CLIENT NET] Reporting scene change: scene=%d, room=%d\n", scene_id, room_idx);
+        return client_network_send_raw(NET_CH_RELIABLE, buf, len, true);
+    }
+    return false;
+}
+
 void client_network_poll(void) {
     if (g_client_net.host == NULL) {
         return;
@@ -426,6 +459,22 @@ void client_network_poll(void) {
                             pkt_s2c_entity_sync_t sync;
                             if (net_unpack_entity_sync(event.packet->data, event.packet->dataLength, &sync) > 0) {
                                 client_sync_handle_packet(&sync);
+                            }
+                            break;
+                        }
+
+                        case PKT_C2S_INTERACT_REQ: {
+                            pkt_c2s_interact_req_t req;
+                            if (net_unpack_interact_req(event.packet->data, event.packet->dataLength, &req) > 0) {
+                                if (req.action_type == NET_INTERACT_ENTER_DOOR && req.item_arg == 1) {
+                                    int house_idx = (int)(req.target_actor_id - HOUSE0);
+                                    if (house_idx >= 0 && house_idx < 4) {
+#ifndef TARGET_SERVER
+                                        extern void aMHS_remote_open_door(int house_idx);
+                                        aMHS_remote_open_door(house_idx);
+#endif
+                                    }
+                                }
                             }
                             break;
                         }
