@@ -1862,4 +1862,10 @@ extern void Player_actor_draw(ACTOR* actorx, GAME* game) {
 int pc_request_main_complete_payment(GAME* game) {
     return Player_actor_request_main_complete_payment(game, mPlayer_REQUEST_PRIORITY_44);
 }
+
+void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx) {
+    if (player != NULL && game != NULL && anim_idx >= 0 && anim_idx < mPlayer_ANIM_NUM) {
+        Player_actor_InitAnimation_Base1((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, -5.0f, mPlayer_PART_TABLE_NORMAL);
+    }
+}
 #endif

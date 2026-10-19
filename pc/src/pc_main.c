@@ -204,6 +204,10 @@ int pc_platform_poll_events(void) {
 
     pc_typing_update();
 
+    if (g_pc_net_connect) {
+        client_network_poll();
+    }
+
     while (SDL_PollEvent(&event)) {
         switch (event.type) {
             case SDL_QUIT:
@@ -478,6 +482,11 @@ int main(int argc, char* argv[]) {
     ac_entry();                         /* sets HotStartEntry = &entry */
     if (g_pc_net_connect) {
         client_network_connect(g_pc_net_host, g_pc_net_port);
+        uint32_t start_ms = SDL_GetTicks();
+        while (client_network_get_state() == CLIENT_NET_CONNECTING && (SDL_GetTicks() - start_ms) < 2000) {
+            client_network_poll();
+            SDL_Delay(5);
+        }
     }
     boot_main(argc, (const char**)argv); /* full init → HotStartEntry → game loop */
 

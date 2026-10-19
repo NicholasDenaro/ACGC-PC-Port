@@ -13,6 +13,7 @@
 #include "libultra/libultra.h"
 #include "m_cpak.h"
 #include "m_card.h"
+#include "m_home.h"
 #include "m_house.h"
 #include "m_quest.h"
 #include "m_bgm.h"
@@ -93,7 +94,22 @@ extern int decide_next_scene_no() {
         Common_Set(last_field_id, -1);
         next_scene_no = SCENE_PLAYERSELECT;
     } else {
+#if defined(TARGET_PC)
+        int player_sum = 0;
+        for (int p = 0; p < PLAYER_NUM; p++) {
+            if (!mPr_NullCheckPersonalID(&Save_Get(private_data[p]).player_ID) &&
+                Save_Get(private_data[p]).exists == TRUE) {
+                player_sum++;
+            }
+        }
+        if (player_sum == 0) {
+            next_scene_no = SCENE_START_DEMO2;
+        } else {
+            next_scene_no = SCENE_PLAYERSELECT_2;
+        }
+#else
         next_scene_no = SCENE_PLAYERSELECT_2;
+#endif
     }
 
     return next_scene_no;
@@ -109,11 +125,29 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
     mTD_rtc_reserve();
     mTM_clear_renew_is();
     mNpc_ClearAnimalInfo(mNpc_GetInAnimalP());
-#ifdef TARGET_PC
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
     {
         extern bool client_network_is_connected(void);
         extern bool client_network_is_new_player(void);
-        if (client_network_is_connected() && client_network_is_new_player()) {
+        extern ClientNetState client_network_get_state(void);
+        extern void client_network_poll(void);
+        if (client_network_get_state() == CLIENT_NET_CONNECTING) {
+            uint32_t start_ms = SDL_GetTicks();
+            while (client_network_get_state() == CLIENT_NET_CONNECTING && (SDL_GetTicks() - start_ms) < 2000) {
+                client_network_poll();
+                SDL_Delay(5);
+            }
+        }
+
+        int player_sum = 0;
+        for (int p = 0; p < PLAYER_NUM; p++) {
+            if (!mPr_NullCheckPersonalID(&Save_Get(private_data[p]).player_ID) &&
+                Save_Get(private_data[p]).exists == TRUE) {
+                player_sum++;
+            }
+        }
+
+        if ((client_network_is_connected() && client_network_is_new_player()) || player_sum == 0) {
             s32 result;
             Door_data_c door_data;
 
@@ -121,6 +155,15 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             mTD_rtc_set();
             extern void pc_sync_server_town_if_needed(void);
             pc_sync_server_town_if_needed();
+
+            /* Clear any foreign resident data in the local save so this new player starts fresh */
+            for (int p = 0; p < PLAYER_NUM; p++) {
+                mPr_ClearPrivateInfo(Save_GetPointer(private_data[p]));
+            }
+            mHm_ClearAllHomeInfo();
+            extern int pc_save_force_write(void);
+            pc_save_force_write();
+
             mCD_InitGameStart_bg(0, -1, mCD_START_COND_2, &result);
 
             bzero(&door_data, sizeof(Door_data_c));
@@ -143,9 +186,19 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             return;
         }
 
-        int player_exists = (mPr_NullCheckPlayerName(Save_Get(private_data[0]).player_ID.player_name) == FALSE) &&
-                            (Save_Get(private_data[0]).exists == TRUE);
-        if (g_pc_quick_start && player_exists && decide_next_scene_no() == SCENE_PLAYERSELECT_2) {
+        int p_idx = 0;
+        if (client_network_is_connected() && client_network_is_resident()) {
+            int net_h = client_network_get_house_idx();
+            if (net_h >= 0 && net_h < PLAYER_NUM) {
+                p_idx = net_h;
+            }
+        }
+        Common_Set(player_no, p_idx);
+        Common_Set(now_private, Save_GetPointer(private_data[p_idx]));
+
+        int player_exists = (mPr_NullCheckPlayerName(Save_Get(private_data[p_idx]).player_ID.player_name) == FALSE) &&
+                            (Save_Get(private_data[p_idx]).exists == TRUE);
+        if ((g_pc_quick_start || client_network_is_connected()) && player_exists && decide_next_scene_no() == SCENE_PLAYERSELECT_2) {
             s32 result;
             int arrange_idx;
             static s16 homeX[] = { 2128, 2352, 2128, 2352 };
@@ -156,7 +209,7 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
 
             g_pc_quick_start = 0;
             mTD_rtc_set();
-            mCD_InitGameStart_bg(0, -1, mCD_START_COND_1, &result);
+            mCD_InitGameStart_bg(p_idx, -1, mCD_START_COND_1, &result);
 
             if (lbRTC_IsOverTime(&Save_Get(save_check).time, Common_GetPointer(time.rtc_time)) == lbRTC_LESS) {
                 Save_Set(cheated_flag, TRUE);

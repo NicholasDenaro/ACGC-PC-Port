@@ -1040,6 +1040,8 @@ static void Game_play_move_fbdemo_not_move(GAME* game) {
     {
         extern void client_network_poll(void);
         client_network_poll();
+        extern void client_sync_tick(GAME_PLAY* play);
+        client_sync_tick(play);
         extern void server_player_tick(GAME_PLAY* play);
         server_player_tick(play);
     }

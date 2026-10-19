@@ -2325,6 +2325,7 @@ extern void Player_actor_draw(ACTOR*, GAME*);
 extern void Player_actor_force_wait(ACTOR*, GAME*);
 extern void Player_actor_force_outdoor(ACTOR*, GAME*);
 extern int pc_request_main_complete_payment(GAME* game);
+extern void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx);
 #endif
 
 #ifdef __cplusplus

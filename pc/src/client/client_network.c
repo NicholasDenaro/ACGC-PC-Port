@@ -1,6 +1,7 @@
 /* client_network.c - Client-side network controller and session manager */
 #include "client/client_network.h"
 #include "client/client_identity.h"
+#include "client/client_sync.h"
 #include "server/server_network.h"
 #include "server/server_storage.h"
 #include "network/net_packets.h"
@@ -47,6 +48,7 @@ bool client_network_init(void) {
     g_client_net.roommate_slot = -1;
 
     printf("[CLIENT NET] Client network subsystem initialized.\n");
+    client_sync_init();
     return true;
 }
 
@@ -55,6 +57,7 @@ void client_network_shutdown(void) {
         return;
     }
 
+    client_sync_reset();
     if (g_client_net.server_peer != NULL) {
         client_network_disconnect(0);
     }
@@ -402,9 +405,18 @@ void client_network_poll(void) {
                             pkt_disconnect_t dc;
                             net_unpack_disconnect(event.packet->data, event.packet->dataLength, &dc);
                             printf("[CLIENT NET] Disconnected by server (reason %u).\n", dc.reason);
+                            client_sync_reset();
                             g_client_net.state = CLIENT_NET_DISCONNECTED;
                             g_client_net.server_peer = NULL;
                             g_client_net.client_id = 0;
+                            break;
+                        }
+
+                        case PKT_S2C_ENTITY_SYNC: {
+                            pkt_s2c_entity_sync_t sync;
+                            if (net_unpack_entity_sync(event.packet->data, event.packet->dataLength, &sync) > 0) {
+                                client_sync_handle_packet(&sync);
+                            }
                             break;
                         }
 

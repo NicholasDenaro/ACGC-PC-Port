@@ -5,6 +5,7 @@
 #include "server/server_runner.h"
 #include "server/server_network.h"
 #include "server/server_storage.h"
+#include "server/server_sync.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
 #include "m_actor.h"
@@ -507,6 +508,9 @@ void server_player_tick(GAME_PLAY* play) {
             client->predicted_angle = client->player_actor->actor_class.shape_info.rotation;
         }
     }
+
+    /* Broadcast transform synchronization to nearby clients */
+    server_sync_tick(play);
 }
 
 Private_c* server_player_get_private_by_actor(PLAYER_ACTOR* actor) {

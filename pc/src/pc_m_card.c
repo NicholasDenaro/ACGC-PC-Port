@@ -832,10 +832,21 @@ void pc_sync_server_town_if_needed(void) {
     const char* server_gci = "server_save/card_a/DobutsunomoriP_MURA.gci";
     struct stat st;
     if (stat(server_gci, &st) == 0 && st.st_size > 0) {
-        pc_copy_file_if_not_exists(server_gci, PC_GCI_PATH);
-        if (pc_save_read_gci(PC_GCI_PATH)) {
-            pc_save_loaded = 1;
-            pc_save_ready = 1;
+        if (stat(PC_GCI_PATH, &st) != 0) {
+            pc_copy_file_if_not_exists(server_gci, PC_GCI_PATH);
+            if (pc_save_read_gci(PC_GCI_PATH)) {
+                for (int p = 0; p < PLAYER_NUM; p++) {
+                    mPr_ClearPrivateInfo(&common_data.save.save.private_data[p]);
+                }
+                mHm_ClearAllHomeInfo();
+                pc_save_force_write();
+                pc_save_loaded = 1;
+            }
+        } else {
+            if (pc_save_read_gci(PC_GCI_PATH)) {
+                pc_save_loaded = 1;
+                pc_save_ready = 1;
+            }
         }
     }
 }
@@ -862,9 +873,20 @@ static int pc_save_scan_gci_dir(void) {
             OSReport("[PC] GCI scan: found '%s'\n", gci_names[i]);
             if (i >= 2) {
                 pc_copy_file_if_not_exists(gci_names[i], PC_GCI_PATH);
-            }
-            if (pc_save_read_gci(gci_names[i])) {
-                return TRUE;
+                if (pc_save_read_gci(PC_GCI_PATH)) {
+                    for (int p = 0; p < PLAYER_NUM; p++) {
+                        mPr_ClearPrivateInfo(&common_data.save.save.private_data[p]);
+                    }
+                    mHm_ClearAllHomeInfo();
+                    pc_save_force_write();
+                    pc_save_loaded = 1;
+                    return TRUE;
+                }
+            } else {
+                if (pc_save_read_gci(gci_names[i])) {
+                    pc_save_loaded = 1;
+                    return TRUE;
+                }
             }
         }
     }

@@ -133,6 +133,24 @@ The `acgc-tools` MCP server provides specialized tools tailored for this codebas
 - **Examples**:
   ```json
   call_mcp_tool(ServerName="acgc-tools", ToolName="resolve_crash_address", Arguments={"target": "server", "addresses": ["0x00496005", "0x0060739A"]})
+### `inspect_save_file`
+- **When to use**: To inspect Animal Crossing GameCube save files (`.gci`), client identity tokens (`client_identity.bin`), and dedicated server extended databases (`server_extended.dat`) across save directories.
+- **What it provides**: Parses and displays town name/ID, 4 player slots (exists, name, PID, LID, wallet, loan, cloth), house ownership and size, client identity tokens, and server extended residents and visitors.
+- **Parameters**:
+  - `target` (*string*, optional): `"all"` (default), `"save"` / `"client"`, `"save2"` / `"client2"`, `"server"` / `"server_save"`, or an explicit directory or file path.
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="inspect_save_file", Arguments={"target": "all"})
+  ```
+
+### `clean_save_directory`
+- **When to use**: To reset test state by cleanly removing one of the save directories (`save`, `save2`, or `server_save`).
+- **What it provides**: Safely deletes the targeted folder from `pc/build32/bin/` and repo root without allowing arbitrary directory deletions.
+- **Parameters**:
+  - `target` (*string*, required): Must be strictly `"save"`, `"save2"`, or `"server_save"`.
+- **Examples**:
+  ```json
+  call_mcp_tool(ServerName="acgc-tools", ToolName="clean_save_directory", Arguments={"target": "save2"})
   ```
 
 ---

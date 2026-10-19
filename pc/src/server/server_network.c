@@ -5,6 +5,7 @@
 #include "server/server_spatial.h"
 #include "server/server_runner.h"
 #include "server/server_storage.h"
+#include "server/server_sync.h"
 #include "network/net_packets.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -47,6 +48,7 @@ bool server_network_init(uint16_t port) {
     }
 
     s_bound_port = port;
+    server_sync_init();
     printf("[SERVER NET] ENet listener started on 0.0.0.0:%u (Max Peers: %d, Channels: %d)\n",
            port, SERVER_NET_MAX_CLIENTS, NET_CH_COUNT);
     return true;
@@ -229,44 +231,43 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     /* Query server extended storage for persistent client token */
     bool is_resident = false;
     int player_idx = server_storage_find_player((const uint8_t*)hs.auth_token, &is_resident);
-    bool is_new_player = (player_idx < 0);
+    bool is_new_player = false;
 
     Private_c priv;
-    if (!is_new_player) {
-        if (is_resident) {
-            ServerResident* res = server_storage_get_resident(player_idx);
-            priv = res->private_data;
-            res->last_seen_time = (uint64_t)time(NULL);
-            printf("[SERVER NET] Handshake recognized Resident Slot %d in House %d (Roommate %d).\n",
-                   player_idx, res->house_idx, res->roommate_slot);
-        } else {
-            ServerVisitor* vis = server_storage_get_visitor(player_idx);
+    if (player_idx >= 0 && is_resident) {
+        ServerResident* res = server_storage_get_resident(player_idx);
+        priv = res->private_data;
+        res->last_seen_time = (uint64_t)time(NULL);
+        printf("[SERVER NET] Handshake recognized Resident Slot %d in House %d (Roommate %d).\n",
+               player_idx, res->house_idx, res->roommate_slot);
+    } else if (player_idx >= 0 && !is_resident) {
+        ServerVisitor* vis = server_storage_get_visitor(player_idx);
+        if (vis != NULL && vis->private_data.player_ID.player_name[0] != CHAR_SPACE &&
+            vis->private_data.player_ID.player_name[0] != '\0' &&
+            strncmp((const char*)vis->private_data.player_ID.player_name, "Player", 6) != 0) {
             priv = vis->private_data;
             vis->last_seen_time = (uint64_t)time(NULL);
-            printf("[SERVER NET] Handshake recognized returning Visitor Slot %d.\n", player_idx);
+            printf("[SERVER NET] Handshake recognized returning Visitor Slot %d ('%.8s').\n",
+                   player_idx, (char*)vis->private_data.player_ID.player_name);
+        } else {
+            is_new_player = true;
         }
     } else {
-        /* New player token: create initial profile and register as visitor */
-        mPr_InitPrivateInfo(&priv);
+        is_new_player = true;
+    }
 
-        int name_len = (int)strlen(hs.player_name);
-        u8 dummy_name[PLAYER_NAME_LEN];
-        for (int i = 0; i < PLAYER_NAME_LEN; i++) {
-            dummy_name[i] = (i < name_len) ? (u8)hs.player_name[i] : CHAR_SPACE;
-        }
-        mPr_CopyPlayerName(priv.player_ID.player_name, dummy_name);
-        mLd_CopyLandName(priv.player_ID.land_name, Save_Get(land_info).name);
-        priv.player_ID.player_id = hs.player_id ? hs.player_id : 0x55AA;
+    if (is_new_player) {
+        /* New player token: create initial temporary profile in memory while awaiting Rover */
+        mPr_InitPrivateInfo(&priv);
+        priv.player_ID.player_id = 0x55AA;
         priv.player_ID.land_id = Save_Get(land_info).id;
-        priv.gender = hs.gender;
-        priv.face = hs.face_type;
+        priv.gender = 0;
+        priv.face = 0;
         priv.cloth.idx = 0;
-        priv.cloth.item = hs.clothes_id ? hs.clothes_id : 0x2400;
+        priv.cloth.item = 0x2400;
         priv.inventory.wallet = 1000;
         priv.exists = TRUE;
-
-        player_idx = server_storage_register_visitor((const uint8_t*)hs.auth_token, &priv);
-        printf("[SERVER NET] Handshake registered initial Visitor Slot %d (new player awaiting Rover questionnaire).\n", player_idx);
+        printf("[SERVER NET] Handshake recognized new player (Rover train ride enabled).\n");
     }
 
     int slot = server_player_register(session->client_id, 0, &priv);
@@ -564,19 +565,7 @@ void server_network_poll(void) {
                             pkt_c2s_input_t inp;
                             if (net_unpack_input(event.packet->data, event.packet->dataLength, &inp) > 0) {
                                 session->state = NET_SESSION_ACTIVE;
-                                ConnectedClient* cc = server_player_get(session->client_id);
-                                if (cc != NULL) {
-                                    cc->predicted_pos.x = inp.player_x;
-                                    cc->predicted_pos.y = inp.player_y;
-                                    cc->predicted_pos.z = inp.player_z;
-                                    cc->last_ack_input_seq = inp.sequence;
-                                    if (cc->player_actor != NULL) {
-                                        cc->player_actor->actor_class.world.position.x = inp.player_x;
-                                        cc->player_actor->actor_class.world.position.y = inp.player_y;
-                                        cc->player_actor->actor_class.world.position.z = inp.player_z;
-                                    }
-                                    server_spatial_update_client_wpos(session->client_id, cc->zone_id, inp.player_x, inp.player_z);
-                                }
+                                server_sync_on_client_input(session->client_id, &inp);
                             }
                             break;
                         }

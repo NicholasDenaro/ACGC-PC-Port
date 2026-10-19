@@ -25,6 +25,12 @@ typedef struct {
     xyz_t predicted_pos;
     s_xyz predicted_angle;
     uint32_t last_ack_input_seq;
+    uint8_t auth_token[32];      /* Client persistent authentication token */
+    int resident_idx;            /* 0..7 if resident, -1 if visitor */
+    uint16_t current_tool_id;    /* Equipped tool item ID */
+    uint16_t anim_id;            /* Current animation index */
+    uint16_t anim_frame;         /* Animation sequence frame counter */
+    uint16_t state_flags;        /* State flags */
 } ConnectedClient;
 
 extern ConnectedClient g_server_clients[MAX_SERVER_CLIENTS];

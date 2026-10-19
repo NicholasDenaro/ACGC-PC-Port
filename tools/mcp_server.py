@@ -19,6 +19,10 @@ import threading
 import time
 import re
 import fnmatch
+import struct
+import shutil
+
+
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 BUILD_DIR = os.path.join(PROJECT_ROOT, "pc", "build32")
@@ -841,6 +845,424 @@ def tool_read_game_logs(
             "error": f"Failed to read log file {log_path}: {e}"
         }
 
+# --- Save File Inspection Tools ---
+
+def decode_ac_string(raw_bytes):
+    """Safely decodes an Animal Crossing ASCII string, stripping padding (0x20, 0x00, 0xFF)."""
+    if not raw_bytes or all(b in (0x00, 0x20, 0xFF) for b in raw_bytes):
+        return ""
+    stripped = raw_bytes.rstrip(b"\x00 \t\n\r\xff")
+    return "".join(chr(b) if 32 <= b <= 126 else f"\\x{b:02x}" for b in stripped)
+
+def parse_gci_data(data, file_path):
+    """Parses a GameCube .gci save file or raw save buffer."""
+    if len(data) < 64:
+        return {"error": "File too small to be a valid GCI file"}
+
+    game_code = data[:4].decode('ascii', errors='replace')
+    comment = data[8:40].decode('ascii', errors='replace').strip()
+
+    if data[:4] == b"GAFE" or len(data) >= 467008:
+        save_off = 64 + 0x26000
+    elif len(data) >= 0x72000:
+        save_off = 0x26000
+    else:
+        save_off = 0
+
+    if len(data) < save_off + 0x9CE8 + 4 * 0x26B0:
+        return {"error": f"GCI data too small ({len(data)} bytes)"}
+
+    save_data = data[save_off:]
+
+    ver, code, land_id = struct.unpack('>IIH', save_data[:10])
+    chk = struct.unpack('>H', save_data[18:20])[0]
+
+    land_name = decode_ac_string(save_data[0x9120:0x9128])
+    land_info_id = struct.unpack('>H', save_data[0x9128:0x912A])[0]
+
+    players = []
+    for p in range(4):
+        p_off = 0x20 + p * 0x2440
+        p_data = save_data[p_off:p_off + 0x2440]
+        p_name = decode_ac_string(p_data[:8])
+        p_town = decode_ac_string(p_data[8:16])
+        pid, lid = struct.unpack('>HH', p_data[16:20])
+        gender, face, reset = struct.unpack('bbb', p_data[20:23])
+        wallet, loan = struct.unpack('>II', p_data[0x8C:0x94])
+        exists = bool(p_data[0x1086])
+        cloth = struct.unpack('>H', p_data[0x1088:0x108A])[0]
+
+        players.append({
+            "slot": p,
+            "exists": exists,
+            "name": p_name,
+            "town": p_town,
+            "player_id": f"0x{pid:04X}" if pid != 0xFFFF else "EMPTY",
+            "land_id": f"0x{lid:04X}" if lid != 0xFFFF else "EMPTY",
+            "gender": "female" if gender == 1 else "male",
+            "wallet": wallet,
+            "loan": loan,
+            "cloth": f"0x{cloth:04X}"
+        })
+
+    homes = []
+    for h in range(4):
+        h_data = save_data[0x9CE8 + h * 0x26B0 : 0x9CE8 + (h+1) * 0x26B0]
+        owner_name = decode_ac_string(h_data[:8])
+        owner_town = decode_ac_string(h_data[8:16])
+        pid, lid = struct.unpack('>HH', h_data[16:20])
+        size = h_data[0x26]
+        occupied = bool(owner_name or (pid != 0xFFFF and pid != 0))
+
+        homes.append({
+            "house": h,
+            "occupied": occupied,
+            "owner_name": owner_name if occupied else "VACANT",
+            "owner_town": owner_town if occupied else "",
+            "owner_player_id": f"0x{pid:04X}" if pid != 0xFFFF else "EMPTY",
+            "owner_land_id": f"0x{lid:04X}" if lid != 0xFFFF else "EMPTY",
+            "size": size
+        })
+
+    return {
+        "file_path": file_path,
+        "file_size": len(data),
+        "game_code": game_code,
+        "comment": comment,
+        "town_name": land_name,
+        "town_id": f"0x{land_info_id:04X}",
+        "save_version": ver,
+        "checksum": f"0x{chk:04X}",
+        "players": players,
+        "homes": homes
+    }
+
+def parse_server_extended_data(data, file_path):
+    """Parses server_extended.dat database."""
+    if len(data) < 152:
+        return {"error": f"server_extended.dat too small ({len(data)} bytes)"}
+
+    magic, ver, crc, res, last_save = struct.unpack('<IIIIQ', data[:24])
+    if magic != 0x41434558:
+        return {"error": f"Invalid magic 0x{magic:08X} (expected 0x41434558 'ACEX')"}
+
+    houses = []
+    for h in range(4):
+        h_off = 24 + h * 32
+        shared_debt, total_paid = struct.unpack('<II', data[h_off:h_off+8])
+        houses.append({
+            "house": h,
+            "shared_debt": shared_debt,
+            "total_paid": total_paid
+        })
+
+    residents = []
+    res_base = 160
+    RES_SIZE = 9344
+    for r in range(8):
+        off = res_base + r * RES_SIZE
+        if off + RES_SIZE > len(data):
+            break
+        chunk = data[off:off+RES_SIZE]
+        token = chunk[:32].hex()
+        house_idx, roommate_slot, is_active, pad = chunk[32:36]
+        reg_time, seen_time = struct.unpack('<QQ', chunk[36:52])
+
+        p_name = decode_ac_string(chunk[64:72])
+        p_town = decode_ac_string(chunk[72:80])
+        pid, lid = struct.unpack('>HH', chunk[80:84])
+        wallet, loan = struct.unpack('>II', chunk[64+0x8C:64+0x94])
+
+        if is_active or p_name or token != "0"*64:
+            residents.append({
+                "slot": r,
+                "is_active": bool(is_active),
+                "house_idx": house_idx,
+                "roommate_slot": roommate_slot,
+                "auth_token": token,
+                "name": p_name,
+                "town": p_town,
+                "player_id": f"0x{pid:04X}" if pid != 0xFFFF else "EMPTY",
+                "land_id": f"0x{lid:04X}" if lid != 0xFFFF else "EMPTY",
+                "wallet": wallet,
+                "loan": loan,
+                "last_seen_epoch": seen_time
+            })
+
+    visitors = []
+    vis_base = 74912
+    VIS_SIZE = 9344
+    for v in range(32):
+        off = vis_base + v * VIS_SIZE
+        if off + VIS_SIZE > len(data):
+            break
+        chunk = data[off:off+VIS_SIZE]
+        token = chunk[:32].hex()
+        is_active = chunk[32]
+        first_time, seen_time = struct.unpack('<QQ', chunk[36:52])
+
+        p_name = decode_ac_string(chunk[64:72])
+        p_town = decode_ac_string(chunk[72:80])
+        pid, lid = struct.unpack('>HH', chunk[80:84])
+
+        if is_active or p_name or token != "0"*64:
+            visitors.append({
+                "slot": v,
+                "is_active": bool(is_active),
+                "auth_token": token,
+                "name": p_name,
+                "town": p_town,
+                "player_id": f"0x{pid:04X}" if pid != 0xFFFF else "EMPTY",
+                "land_id": f"0x{lid:04X}" if lid != 0xFFFF else "EMPTY",
+                "last_seen_epoch": seen_time
+            })
+
+    return {
+        "file_path": file_path,
+        "file_size": len(data),
+        "version": ver,
+        "checksum": f"0x{crc:08X}",
+        "last_save_epoch": last_save,
+        "houses": houses,
+        "active_residents_count": len([r for r in residents if r.get("is_active")]),
+        "residents": residents,
+        "active_visitors_count": len([v for v in visitors if v.get("is_active")]),
+        "visitors": visitors
+    }
+
+def tool_inspect_save_file(target="all"):
+    """
+    Inspects GameCube save files (.gci), client identity tokens (client_identity.bin),
+    and server extended databases (server_extended.dat) across all or targeted save directories.
+    """
+    target_str = str(target).strip() if target else "all"
+
+    # Identify directories to inspect
+    candidate_dirs = []
+
+    # Map aliases
+    alias_map = {
+        "save": ["pc/build32/bin/save", "save"],
+        "client": ["pc/build32/bin/save", "save"],
+        "save2": ["pc/build32/bin/save2", "save2"],
+        "client2": ["pc/build32/bin/save2", "save2"],
+        "server": ["pc/build32/bin/server_save", "server_save"],
+        "server_save": ["pc/build32/bin/server_save", "server_save"],
+    }
+
+    if target_str.lower() in alias_map:
+        rel_candidates = alias_map[target_str.lower()]
+        for rel in rel_candidates:
+            abs_p = os.path.abspath(os.path.join(PROJECT_ROOT, rel))
+            if os.path.isdir(abs_p):
+                candidate_dirs.append(abs_p)
+    elif target_str.lower() == "all":
+        # Scan standard directories in bin and root
+        check_names = ["save", "save2", "server_save"]
+        # Look for other save* directories in bin
+        if os.path.isdir(BIN_DIR):
+            for entry in os.listdir(BIN_DIR):
+                full = os.path.join(BIN_DIR, entry)
+                if os.path.isdir(full) and (entry.startswith("save") or entry == "server_save"):
+                    if full not in candidate_dirs:
+                        candidate_dirs.append(full)
+        for name in check_names:
+            root_p = os.path.abspath(os.path.join(PROJECT_ROOT, name))
+            if os.path.isdir(root_p) and root_p not in candidate_dirs:
+                candidate_dirs.append(root_p)
+    else:
+        # Custom directory or file path
+        custom_path = os.path.abspath(os.path.join(PROJECT_ROOT, target_str.replace("\\", "/")))
+        if os.path.isdir(custom_path):
+            candidate_dirs.append(custom_path)
+        elif os.path.isfile(custom_path):
+            # Inspect single file directly
+            if custom_path.endswith(".gci"):
+                try:
+                    with open(custom_path, "rb") as f:
+                        content = f.read()
+                    parsed = parse_gci_data(content, custom_path)
+                    return {"success": True, "target": target_str, "file_type": "gci", "data": parsed}
+                except Exception as e:
+                    return {"success": False, "error": f"Failed to parse GCI file {custom_path}: {e}"}
+            elif custom_path.endswith("server_extended.dat"):
+                try:
+                    with open(custom_path, "rb") as f:
+                        content = f.read()
+                    parsed = parse_server_extended_data(content, custom_path)
+                    return {"success": True, "target": target_str, "file_type": "server_extended", "data": parsed}
+                except Exception as e:
+                    return {"success": False, "error": f"Failed to parse server_extended file {custom_path}: {e}"}
+            elif custom_path.endswith("client_identity.bin"):
+                try:
+                    with open(custom_path, "rb") as f:
+                        tok = f.read()
+                    return {"success": True, "target": target_str, "file_type": "client_identity", "token_hex": tok.hex(), "bytes": len(tok)}
+                except Exception as e:
+                    return {"success": False, "error": f"Failed to read identity file: {e}"}
+            else:
+                return {"success": False, "error": f"Unsupported file type: {custom_path}"}
+        else:
+            return {"success": False, "error": f"Target path does not exist: {custom_path}"}
+
+    if not candidate_dirs:
+        return {"success": False, "error": f"No save directories found for target: {target_str}"}
+
+    results = []
+    summary_lines = []
+
+    for d in sorted(candidate_dirs):
+        rel_dir = os.path.relpath(d, PROJECT_ROOT).replace("\\", "/")
+        dir_res = {
+            "directory": rel_dir,
+            "absolute_path": d,
+            "identity": None,
+            "gci": None,
+            "server_extended": None
+        }
+
+        summary_lines.append(f"[DIR] {rel_dir}")
+
+        # Check client_identity.bin
+        id_path = os.path.join(d, "client_identity.bin")
+        if os.path.isfile(id_path):
+            try:
+                with open(id_path, "rb") as f:
+                    tok = f.read()
+                dir_res["identity"] = {
+                    "exists": True,
+                    "token_hex": tok.hex(),
+                    "token_short": tok.hex()[:16] + "..." if len(tok) >= 8 else tok.hex(),
+                    "size": len(tok),
+                    "modified": os.path.getmtime(id_path)
+                }
+                summary_lines.append(f"  [ID]  Token: {tok.hex()[:16]}... (32 bytes)")
+            except Exception as e:
+                dir_res["identity"] = {"exists": True, "error": str(e)}
+        else:
+            summary_lines.append("  [ID]  (none)")
+
+        # Check GCI files (card_a/DobutsunomoriP_MURA.gci or *.gci)
+        gci_candidates = [
+            os.path.join(d, "card_a", "DobutsunomoriP_MURA.gci"),
+            os.path.join(d, "DobutsunomoriP_MURA.gci"),
+        ]
+        if os.path.isdir(d):
+            for root_w, _, files_w in os.walk(d):
+                if "backups" in root_w:
+                    continue
+                for fw in files_w:
+                    if fw.endswith(".gci") and not fw.endswith(".tmp"):
+                        cand = os.path.join(root_w, fw)
+                        if cand not in gci_candidates:
+                            gci_candidates.append(cand)
+
+        found_gci = False
+        for gci_p in gci_candidates:
+            if os.path.isfile(gci_p):
+                try:
+                    with open(gci_p, "rb") as f:
+                        gci_bytes = f.read()
+                    parsed = parse_gci_data(gci_bytes, os.path.relpath(gci_p, PROJECT_ROOT).replace("\\", "/"))
+                    dir_res["gci"] = parsed
+                    found_gci = True
+
+                    summary_lines.append(f"  [GCI] File: {parsed.get('file_path')} (Town: {parsed.get('town_name', 'Unknown')}, TownID: {parsed.get('town_id', '?')})")
+                    for pl in parsed.get("players", []):
+                        if pl.get("exists") or pl.get("name"):
+                            summary_lines.append(f"        - Slot {pl['slot']}: \"{pl['name']}\" (Town: \"{pl['town']}\", PID: {pl['player_id']}, Exists: {pl['exists']}, Loan: {pl['loan']})")
+                        else:
+                            summary_lines.append(f"        - Slot {pl['slot']}: (EMPTY)")
+
+                    for hm in parsed.get("homes", []):
+                        if hm.get("occupied"):
+                            summary_lines.append(f"        - House {hm['house']}: Owner \"{hm['owner_name']}\" (PID: {hm['owner_player_id']}, Size: {hm['size']})")
+                    break
+                except Exception as e:
+                    dir_res["gci"] = {"error": f"Failed reading GCI {gci_p}: {e}"}
+
+        if not found_gci:
+            summary_lines.append("  [GCI] (none)")
+
+        # Check server_extended.dat
+        ext_path = os.path.join(d, "server_extended.dat")
+        if os.path.isfile(ext_path):
+            try:
+                with open(ext_path, "rb") as f:
+                    ext_bytes = f.read()
+                parsed_ext = parse_server_extended_data(ext_bytes, os.path.relpath(ext_path, PROJECT_ROOT).replace("\\", "/"))
+                dir_res["server_extended"] = parsed_ext
+                summary_lines.append(f"  [EXT] DB: {parsed_ext.get('file_path')} (Active Residents: {parsed_ext.get('active_residents_count', 0)}, Active Visitors: {parsed_ext.get('active_visitors_count', 0)})")
+                for r in parsed_ext.get("residents", []):
+                    if r.get("is_active"):
+                        summary_lines.append(f"        - Resident {r['slot']}: \"{r['name']}\" (House: {r['house_idx']}, Room: {r['roommate_slot']}, Token: {r['auth_token'][:12]}...)")
+                for v in parsed_ext.get("visitors", []):
+                    if v.get("is_active"):
+                        summary_lines.append(f"        - Visitor {v['slot']}: \"{v['name']}\" (Token: {v['auth_token'][:12]}...)")
+            except Exception as e:
+                dir_res["server_extended"] = {"error": f"Failed reading extended DB: {e}"}
+
+        results.append(dir_res)
+        summary_lines.append("")
+
+    return {
+        "success": True,
+        "target": target_str,
+        "count": len(results),
+        "directories": results,
+        "summary": "\n".join(summary_lines).strip()
+    }
+
+ALLOWED_CLEAN_TARGETS = {"save", "save2", "server_save"}
+
+def tool_clean_save_directory(target):
+    """
+    Safely deletes one of the 3 permitted save directories: 'save', 'save2', or 'server_save'.
+    Prevents deletion of any other files or directories.
+    """
+    target_clean = str(target).strip().lower()
+    if target_clean not in ALLOWED_CLEAN_TARGETS:
+        return {
+            "success": False,
+            "error": f"Invalid target '{target}'. Target must be strictly one of: {sorted(list(ALLOWED_CLEAN_TARGETS))}"
+        }
+
+    deleted_paths = []
+    candidates = [
+        os.path.join(BIN_DIR, target_clean),
+        os.path.join(PROJECT_ROOT, target_clean)
+    ]
+
+    for p in candidates:
+        abs_p = os.path.abspath(p)
+        if os.path.basename(abs_p).lower() != target_clean:
+            continue
+        if os.path.isdir(abs_p):
+            try:
+                shutil.rmtree(abs_p)
+                deleted_paths.append(os.path.relpath(abs_p, PROJECT_ROOT).replace("\\", "/"))
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": f"Failed to delete directory {abs_p}: {e}",
+                    "partially_deleted": deleted_paths
+                }
+
+    if not deleted_paths:
+        return {
+            "success": True,
+            "target": target_clean,
+            "message": f"Save directory '{target_clean}' does not exist or was already clean.",
+            "deleted_paths": []
+        }
+
+    return {
+        "success": True,
+        "target": target_clean,
+        "message": f"Successfully deleted save directory '{target_clean}'.",
+        "deleted_paths": deleted_paths
+    }
+
 # --- Tool Registry ---
 
 TOOLS = [
@@ -1089,6 +1511,34 @@ TOOLS = [
             },
             "required": ["addresses"]
         }
+    },
+    {
+        "name": "inspect_save_file",
+        "description": "Inspects Animal Crossing GameCube save files (.gci), client identity tokens (client_identity.bin), and server extended databases (server_extended.dat) across client and server save directories.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "description": "Target save directory or file to inspect: 'all' (default), 'save'/'client', 'save2'/'client2', 'server'/'server_save', or an explicit directory/file path."
+                }
+            }
+        }
+    },
+    {
+        "name": "clean_save_directory",
+        "description": "Safely removes one of the 3 allowed save directories: 'save', 'save2', or 'server_save' (in pc/build32/bin and repo root) to reset testing state.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "target": {
+                    "type": "string",
+                    "enum": ["save", "save2", "server_save"],
+                    "description": "Which save directory to delete: strictly 'save', 'save2', or 'server_save'."
+                }
+            },
+            "required": ["target"]
+        }
     }
 ]
 
@@ -1098,6 +1548,14 @@ def handle_tool_call(name, arguments):
             addresses=arguments.get("addresses"),
             target=arguments.get("target", "server"),
             binary_path=arguments.get("binary_path")
+        )
+    elif name == "inspect_save_file":
+        return tool_inspect_save_file(
+            target=arguments.get("target", "all")
+        )
+    elif name == "clean_save_directory":
+        return tool_clean_save_directory(
+            target=arguments.get("target")
         )
     elif name == "build_game":
         return tool_build_game(
@@ -1341,6 +1799,12 @@ def run_cli():
     stop_p.add_argument("--pid", type=int, default=None, help="Specific PID to terminate")
     stop_p.add_argument("-f", "--force", action="store_true", default=True, help="Force kill (default: True)")
 
+    inspect_p = subparsers.add_parser("inspect", help="Inspect GCI, client identity, or server extended save files")
+    inspect_p.add_argument("target", nargs="?", default="all", help="Target save directory or file (default: 'all')")
+
+    clean_p = subparsers.add_parser("clean-save", help="Safely delete save, save2, or server_save directory")
+    clean_p.add_argument("target", choices=["save", "save2", "server_save"], help="Which save directory to delete")
+
     args = parser.parse_args()
     if args.command == "build":
         res = tool_build_game(target=args.target, clean=args.clean)
@@ -1411,6 +1875,18 @@ def run_cli():
         res = tool_stop_game(target=args.target, pid=args.pid, force=args.force)
         print(json.dumps(res, indent=2))
         sys.exit(0 if res.get("success") else 1)
+    elif args.command == "inspect":
+        res = tool_inspect_save_file(target=args.target)
+        if not res.get("success"):
+            print(f"Error: {res.get('error', 'Unknown error')}")
+            sys.exit(1)
+        print(res.get("summary", ""))
+    elif args.command == "clean-save":
+        res = tool_clean_save_directory(target=args.target)
+        if not res.get("success"):
+            print(f"Error: {res.get('error', 'Unknown error')}")
+            sys.exit(1)
+        print(res.get("message", ""))
     else:
         parser.print_help()
 

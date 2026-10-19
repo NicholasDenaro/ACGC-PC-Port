@@ -215,8 +215,8 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Implement the 3×3 acre interest calculation based on each client's current acre coordinate. Filter entity broadcasts so clients only receive updates relevant to their immediate surroundings.
   - **Acceptance Criteria**: Actions occurring in Acre A-1 are not broadcast to players in Acre F-5, saving bandwidth.
 
-- [ ] **Task 7.2: High-Frequency Transform Sync (Unreliable Channel)**
-  - **State**: `Not Implemented`
+- [x] **Task 7.2: High-Frequency Transform Sync (Unreliable Channel)**
+  - **State**: `Implemented`
   - **Files**: `pc/src/server/server_sync.c`, `pc/src/client/client_sync.c`
   - **Description**: Stream player and mobile entity positions, yaw rotation, velocity, and animation indices at 20–30 Hz over ENet Channel 0. Implement client-side linear interpolation ($lerp$) to ensure smooth visual movement.
   - **Acceptance Criteria**: Remote players move smoothly on screen without jitter or rubber-banding.
