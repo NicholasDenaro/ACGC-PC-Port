@@ -25,6 +25,7 @@
 
 ConnectedClient g_server_clients[MAX_SERVER_CLIENTS] = {0};
 static int s_player_registry_initialized = 0;
+int g_spawning_remote_player_slot = -1;
 
 void server_player_init(void) {
     memset(g_server_clients, 0, sizeof(g_server_clients));
@@ -197,6 +198,7 @@ PLAYER_ACTOR* server_player_spawn_actor(GAME_PLAY* play, int slot, xyz_t pos, s_
         pos.y = ground_y;
     }
 
+    g_spawning_remote_player_slot = slot;
     ACTOR* actor = Actor_info_make_actor(
         &play->actor_info,
         (GAME*)play,
@@ -208,6 +210,7 @@ PLAYER_ACTOR* server_player_spawn_actor(GAME_PLAY* play, int slot, xyz_t pos, s_
         slot, /* arg = slot index */
         -1, -1
     );
+    g_spawning_remote_player_slot = -1;
 
     if (actor != NULL) {
         PLAYER_ACTOR* p_actor = (PLAYER_ACTOR*)actor;

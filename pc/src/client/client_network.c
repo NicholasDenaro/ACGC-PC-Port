@@ -143,6 +143,10 @@ bool client_network_connect(const char* host, uint16_t port) {
     g_client_net.last_activity_ms = g_client_net.connected_at_ms;
     g_client_net.last_ping_sent_ms = g_client_net.connected_at_ms;
     g_client_net.ping_rtt_ms = 0;
+    g_client_net.is_resident = false;
+    g_client_net.resident_slot = -1;
+    g_client_net.house_idx = -1;
+    g_client_net.roommate_slot = -1;
 
     printf("[CLIENT NET] Connecting to server %s:%u...\n", host, port);
     return true;
@@ -327,11 +331,17 @@ void client_network_poll(void) {
                                     g_client_net.client_id = ack.client_id;
                                     g_client_net.server_world_info = ack;
                                     g_client_net.is_new_player = (ack.status == NET_HS_OK_NEW_PLAYER);
+                                    if (ack.is_resident) {
+                                        g_client_net.is_resident = true;
+                                        g_client_net.house_idx = ack.house_idx;
+                                        g_client_net.resident_slot = ack.resident_slot;
+                                        g_client_net.roommate_slot = ack.roommate_slot;
+                                    }
                                     if (g_client_net.is_new_player) {
                                         printf("[CLIENT NET] Handshake OK! New player token recognized (Rover train intro enabled).\n");
                                     } else {
-                                        printf("[CLIENT NET] Handshake OK! Connected as Client ID %u (Town: '%s', Land: 0x%04X, Zone: %u)\n",
-                                               ack.client_id, ack.town_name, ack.land_id, ack.starting_zone_id);
+                                        printf("[CLIENT NET] Handshake OK! Connected as Client ID %u (Town: '%s', Land: 0x%04X, Zone: %u, Resident: %d, House: %d)\n",
+                                               ack.client_id, ack.town_name, ack.land_id, ack.starting_zone_id, ack.is_resident, ack.house_idx);
                                     }
                                 } else {
                                     printf("[CLIENT NET ERROR] Server rejected handshake (status code %u).\n", ack.status);

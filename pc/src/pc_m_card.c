@@ -838,7 +838,6 @@ void pc_sync_server_town_if_needed(void) {
                 for (int p = 0; p < PLAYER_NUM; p++) {
                     mPr_ClearPrivateInfo(&common_data.save.save.private_data[p]);
                 }
-                mHm_ClearAllHomeInfo();
                 pc_save_force_write();
                 pc_save_loaded = 1;
             }
@@ -877,7 +876,6 @@ static int pc_save_scan_gci_dir(void) {
                     for (int p = 0; p < PLAYER_NUM; p++) {
                         mPr_ClearPrivateInfo(&common_data.save.save.private_data[p]);
                     }
-                    mHm_ClearAllHomeInfo();
                     pc_save_force_write();
                     pc_save_loaded = 1;
                     return TRUE;

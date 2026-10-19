@@ -138,6 +138,10 @@ typedef struct {
     u16 land_id;
     u8  weather;
     u16 starting_zone_id;
+    u8  is_resident;
+    s8  house_idx;
+    s8  resident_slot;
+    s8  roommate_slot;
 } pkt_s2c_handshake_ack_t;
 
 /* Character Finalization Client -> Server (Rover Train Complete) */

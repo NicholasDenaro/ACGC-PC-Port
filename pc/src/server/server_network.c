@@ -308,6 +308,19 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     ack.weather = Common_Get(weather);
     ack.starting_zone_id = 0; /* Town outdoors */
 
+    if (is_resident && player_idx >= 0) {
+        ServerResident* res = server_storage_get_resident(player_idx);
+        ack.is_resident = 1;
+        ack.house_idx = (s8)res->house_idx;
+        ack.resident_slot = (s8)player_idx;
+        ack.roommate_slot = (s8)res->roommate_slot;
+    } else {
+        ack.is_resident = 0;
+        ack.house_idx = -1;
+        ack.resident_slot = -1;
+        ack.roommate_slot = -1;
+    }
+
     u8 sbuf[128];
     int slen = net_pack_handshake_ack(sbuf, sizeof(sbuf), &ack);
     if (slen > 0) {

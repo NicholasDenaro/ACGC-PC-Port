@@ -504,7 +504,7 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
         actor = actor_info->list[i].actor;
 
         while (actor != NULL) {
-#ifdef TARGET_PC
+#if defined(TARGET_SERVER)
             if (i == ACTOR_PART_PLAYER) {
                 PLAYER_ACTOR* pa = (PLAYER_ACTOR*)actor;
                 if (cur_zone != NULL && !(cur_zone->player_occupant_mask & (1u << pa->player_no))) {

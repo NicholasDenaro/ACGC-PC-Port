@@ -198,6 +198,10 @@ extern void mPlib_Set_change_color_request(void);
 #define GET_PLAYER_ACTOR_NOW_ACTOR() ((ACTOR*)GET_PLAYER_ACTOR_NOW())
 #define GET_PLAYER_ACTOR_GAME_ACTOR(game) ((ACTOR*)GET_PLAYER_ACTOR_GAME(game))
 
+#ifdef TARGET_PC
+extern int g_spawning_remote_player_slot;
+#endif
+
 #ifdef __cplusplus
 }
 #endif

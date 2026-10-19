@@ -294,8 +294,8 @@ int net_unpack_handshake(const u8* buf, size_t buf_size, pkt_c2s_handshake_t* pk
 
 int net_pack_handshake_ack(u8* buf, size_t buf_size, const pkt_s2c_handshake_ack_t* pkt) {
     net_buf_writer_t w;
-    /* 1 (status) + 2 (client_id) + 8 (lbRTC_time_c) + 16 (town_name) + 2 (land_id) + 1 (weather) + 2 (starting_zone_id) = 32 */
-    u16 payload_size = 1 + 2 + sizeof(lbRTC_time_c) + NET_MAX_NAME_LEN + 2 + 1 + 2;
+    /* 1 (status) + 2 (client_id) + 8 (lbRTC_time_c) + 16 (town_name) + 2 (land_id) + 1 (weather) + 2 (starting_zone_id) + 1 (is_resident) + 1 (house_idx) + 1 (resident_slot) + 1 (roommate_slot) = 36 */
+    u16 payload_size = 1 + 2 + sizeof(lbRTC_time_c) + NET_MAX_NAME_LEN + 2 + 1 + 2 + 1 + 1 + 1 + 1;
     net_header_t hdr = { NET_PACKET_MAGIC, PKT_S2C_HANDSHAKE_ACK, NET_CH_RELIABLE, payload_size };
     w_init(&w, buf, buf_size);
     w_u16(&w, hdr.magic);
@@ -319,6 +319,11 @@ int net_pack_handshake_ack(u8* buf, size_t buf_size, const pkt_s2c_handshake_ack
     w_u16(&w, pkt->land_id);
     w_u8(&w, pkt->weather);
     w_u16(&w, pkt->starting_zone_id);
+
+    w_u8(&w, pkt->is_resident);
+    w_s8(&w, pkt->house_idx);
+    w_s8(&w, pkt->resident_slot);
+    w_s8(&w, pkt->roommate_slot);
 
     return w.error ? -1 : (int)w.offset;
 }
@@ -345,6 +350,11 @@ int net_unpack_handshake_ack(const u8* buf, size_t buf_size, pkt_s2c_handshake_a
     pkt->land_id = r_u16(&r);
     pkt->weather = r_u8(&r);
     pkt->starting_zone_id = r_u16(&r);
+
+    pkt->is_resident = r_u8(&r);
+    pkt->house_idx = r_s8(&r);
+    pkt->resident_slot = r_s8(&r);
+    pkt->roommate_slot = r_s8(&r);
 
     return r.error ? -1 : (int)(hlen + r.offset);
 }
@@ -930,6 +940,10 @@ int net_packer_run_tests(void) {
         ack_orig.land_id = 0x5678;
         ack_orig.weather = 1;
         ack_orig.starting_zone_id = 0;
+        ack_orig.is_resident = 1;
+        ack_orig.house_idx = 3;
+        ack_orig.resident_slot = 7;
+        ack_orig.roommate_slot = 1;
 
         len = net_pack_handshake_ack(buf, sizeof(buf), &ack_orig);
         TEST_ASSERT(len > 0, "net_pack_handshake_ack");
@@ -938,6 +952,7 @@ int net_packer_run_tests(void) {
         TEST_ASSERT(ack_dec.world_time.year == 2026 && ack_dec.world_time.min == 30, "ack world_time");
         TEST_ASSERT(strcmp(ack_dec.town_name, "Animal") == 0, "ack town_name");
         TEST_ASSERT(ack_dec.land_id == 0x5678 && ack_dec.weather == 1, "ack land/weather");
+        TEST_ASSERT(ack_dec.is_resident == 1 && ack_dec.house_idx == 3, "ack residency");
     }
 
     /* 4. Input Stream */

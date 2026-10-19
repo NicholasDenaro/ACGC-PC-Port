@@ -517,9 +517,19 @@ static void Player_actor_init_value(ACTOR* actorx, GAME* game) {
     player->actor_class.scale.x = 0.01f;
     player->actor_class.scale.y = 0.01f;
     player->actor_class.scale.z = 0.01f;
+#ifdef TARGET_PC
+    if (g_spawning_remote_player_slot >= 0) {
+        player->balloon_actor = NULL;
+    } else {
+        player->balloon_actor = Actor_info_make_actor(&((GAME_PLAY*)game)->actor_info, game, mAc_PROFILE_BALLOON,
+                                                      actorx->world.position.x, actorx->world.position.y,
+                                                      actorx->world.position.z, 0, 0, 0, -1, -1, -1, EMPTY_NO, -1, -1, -1);
+    }
+#else
     player->balloon_actor = Actor_info_make_actor(&((GAME_PLAY*)game)->actor_info, game, mAc_PROFILE_BALLOON,
                                                   actorx->world.position.x, actorx->world.position.y,
                                                   actorx->world.position.z, 0, 0, 0, -1, -1, -1, EMPTY_NO, -1, -1, -1);
+#endif
     player->animation0_idx = -1;
     player->animation1_idx = -1;
     player->part_table_idx = -1;
@@ -640,6 +650,13 @@ static void Player_actor_init_value(ACTOR* actorx, GAME* game) {
 
 extern void Player_actor_ct(ACTOR* actorx, GAME* game) {
     GAME_PLAY* play = (GAME_PLAY*)game;
+#ifdef TARGET_PC
+    PLAYER_ACTOR* p_actor = (PLAYER_ACTOR*)actorx;
+    if (g_spawning_remote_player_slot >= 0) {
+        p_actor->player_no = g_spawning_remote_player_slot;
+        p_actor->is_dummy = 1;
+    }
+#endif
 
     if (mEv_IsTitleDemo()) {
         actorx->status_data.weight = 255;
@@ -650,12 +667,19 @@ extern void Player_actor_ct(ACTOR* actorx, GAME* game) {
     Player_actor_init_value(actorx, game);
     Common_Set(player_actor_exists, TRUE);
     Player_actor_Check_player_sunburn_for_ct(actorx); //
+#ifdef TARGET_PC
+    if (!p_actor->is_dummy && p_actor->player_no == 0) {
+        mPlib_change_player_face(game);                   //
+    }
+#else
     mPlib_change_player_face(game);                   //
+#endif
     Player_actor_ct_other_func1(actorx, game);        //
     Player_actor_set_eye_PositionAndAngle(actorx);    //
 #ifdef TARGET_PC
-    if (play->actor_info.list[ACTOR_PART_PLAYER].actor == NULL ||
-        play->actor_info.list[ACTOR_PART_PLAYER].actor == actorx) {
+    if (!p_actor->is_dummy && p_actor->player_no == 0 &&
+        (play->actor_info.list[ACTOR_PART_PLAYER].actor == NULL ||
+         play->actor_info.list[ACTOR_PART_PLAYER].actor == actorx)) {
         Camera2_request_main_normal(play, 1, 1);
     }
 #else
@@ -663,9 +687,14 @@ extern void Player_actor_ct(ACTOR* actorx, GAME* game) {
 #endif
     Shape_Info_init(actorx, 0.0f, &mAc_ActorShadowCircle, 18.0f, 18.0f);
     actorx->shape_info.ofs_y = 200.0f;
-    mPlib_Clear_change_data_from_submenu();       //
 #ifdef TARGET_PC
-    PLAYER_ACTOR* p_actor = (PLAYER_ACTOR*)actorx;
+    if (!p_actor->is_dummy && p_actor->player_no == 0) {
+        mPlib_Clear_change_data_from_submenu();       //
+    }
+#else
+    mPlib_Clear_change_data_from_submenu();       //
+#endif
+#ifdef TARGET_PC
     if (p_actor->player_no > 0 || p_actor->is_dummy) {
         p_actor->requested_main_index = mPlayer_INDEX_DMA;
         p_actor->requested_main_index_priority = 41;

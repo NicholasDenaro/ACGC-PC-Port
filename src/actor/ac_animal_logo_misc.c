@@ -131,9 +131,12 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
         extern bool client_network_is_new_player(void);
         extern ClientNetState client_network_get_state(void);
         extern void client_network_poll(void);
-        if (client_network_get_state() == CLIENT_NET_CONNECTING) {
+        if (client_network_get_state() == CLIENT_NET_CONNECTING ||
+            client_network_get_state() == CLIENT_NET_HANDSHAKING) {
             uint32_t start_ms = SDL_GetTicks();
-            while (client_network_get_state() == CLIENT_NET_CONNECTING && (SDL_GetTicks() - start_ms) < 2000) {
+            while ((client_network_get_state() == CLIENT_NET_CONNECTING ||
+                    client_network_get_state() == CLIENT_NET_HANDSHAKING) &&
+                   (SDL_GetTicks() - start_ms) < 2000) {
                 client_network_poll();
                 SDL_Delay(5);
             }
@@ -160,7 +163,6 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             for (int p = 0; p < PLAYER_NUM; p++) {
                 mPr_ClearPrivateInfo(Save_GetPointer(private_data[p]));
             }
-            mHm_ClearAllHomeInfo();
             extern int pc_save_force_write(void);
             pc_save_force_write();
 
@@ -186,12 +188,16 @@ extern void title_action_data_init_start_select(GAME_PLAY* play) {
             return;
         }
 
-        int p_idx = 0;
-        if (client_network_is_connected() && client_network_is_resident()) {
-            int net_h = client_network_get_house_idx();
-            if (net_h >= 0 && net_h < PLAYER_NUM) {
-                p_idx = net_h;
+        int p_idx = -1;
+        for (int p = 0; p < PLAYER_NUM; p++) {
+            if (!mPr_NullCheckPersonalID(&Save_Get(private_data[p]).player_ID) &&
+                Save_Get(private_data[p]).exists == TRUE) {
+                p_idx = p;
+                break;
             }
+        }
+        if (p_idx < 0) {
+            p_idx = 0;
         }
         Common_Set(player_no, p_idx);
         Common_Set(now_private, Save_GetPointer(private_data[p_idx]));
