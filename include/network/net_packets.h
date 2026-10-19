@@ -187,6 +187,7 @@ typedef struct {
     s8  stick_y;
     u32 button_mask;
     u16 current_tool_id;
+    u16 anim_id;
     f32 player_x;
     f32 player_y;
     f32 player_z;

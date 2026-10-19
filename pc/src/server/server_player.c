@@ -508,10 +508,10 @@ void server_player_tick(GAME_PLAY* play) {
         }
     }
 
-    /* Update predicted position and angle for each active client */
+    /* Update predicted position and angle for dummy actors only (network clients stream via server_sync) */
     for (int i = 0; i < MAX_SERVER_CLIENTS; i++) {
         ConnectedClient* client = &g_server_clients[i];
-        if (client->is_connected && client->player_actor != NULL) {
+        if (client->is_connected && client->is_dummy && client->player_actor != NULL) {
             client->predicted_pos = client->player_actor->actor_class.world.position;
             client->predicted_angle = client->player_actor->actor_class.shape_info.rotation;
         }
@@ -584,7 +584,9 @@ int server_spawn_dummy_player_north(void) {
 
     f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(pos, 0.0f);
     if (ground_y > -1000.0f && ground_y < 10000.0f) {
-        pos.y = ground_y;
+        if (fabsf(ground_y - pos.y) <= 16.0f) {
+            pos.y = ground_y;
+        }
     }
 
 #ifndef TARGET_SERVER

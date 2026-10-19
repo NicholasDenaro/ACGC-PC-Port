@@ -507,8 +507,8 @@ int net_unpack_movein_ack(const u8* buf, size_t buf_size, pkt_s2c_movein_ack_t* 
 
 int net_pack_input(u8* buf, size_t buf_size, const pkt_c2s_input_t* pkt) {
     net_buf_writer_t w;
-    /* 4 (seq) + 2 (client_id) + 1 (stick_x) + 1 (stick_y) + 4 (buttons) + 2 (tool) + 12 (xyz) + 2 (angle_y) = 28 */
-    u16 payload_size = 4 + 2 + 1 + 1 + 4 + 2 + 12 + 2;
+    /* 4 (seq) + 2 (client_id) + 1 (stick_x) + 1 (stick_y) + 4 (buttons) + 2 (tool) + 2 (anim) + 12 (xyz) + 2 (angle_y) = 30 */
+    u16 payload_size = 4 + 2 + 1 + 1 + 4 + 2 + 2 + 12 + 2;
     net_header_t hdr = { NET_PACKET_MAGIC, PKT_C2S_INPUT, NET_CH_UNRELIABLE, payload_size };
     w_init(&w, buf, buf_size);
     w_u16(&w, hdr.magic);
@@ -522,6 +522,7 @@ int net_pack_input(u8* buf, size_t buf_size, const pkt_c2s_input_t* pkt) {
     w_s8(&w, pkt->stick_y);
     w_u32(&w, pkt->button_mask);
     w_u16(&w, pkt->current_tool_id);
+    w_u16(&w, pkt->anim_id);
     w_f32(&w, pkt->player_x);
     w_f32(&w, pkt->player_y);
     w_f32(&w, pkt->player_z);
@@ -543,6 +544,7 @@ int net_unpack_input(const u8* buf, size_t buf_size, pkt_c2s_input_t* pkt) {
     pkt->stick_y = r_s8(&r);
     pkt->button_mask = r_u32(&r);
     pkt->current_tool_id = r_u16(&r);
+    pkt->anim_id = r_u16(&r);
     pkt->player_x = r_f32(&r);
     pkt->player_y = r_f32(&r);
     pkt->player_z = r_f32(&r);
@@ -957,14 +959,14 @@ int net_packer_run_tests(void) {
 
     /* 4. Input Stream */
     {
-        pkt_c2s_input_t orig = { 1024, 1, -45, 80, 0x00000009, 0x2410, 1234.5f, 50.0f, -678.9f, 0x4000 };
+        pkt_c2s_input_t orig = { 1024, 1, -45, 80, 0x00000009, 0x2410, 5, 1234.5f, 50.0f, -678.9f, 0x4000 };
         pkt_c2s_input_t dec;
         len = net_pack_input(buf, sizeof(buf), &orig);
         TEST_ASSERT(len > 0, "net_pack_input");
         TEST_ASSERT(net_unpack_input(buf, len, &dec) > 0, "net_unpack_input");
         TEST_ASSERT(dec.sequence == orig.sequence && dec.client_id == orig.client_id, "input seq/client");
         TEST_ASSERT(dec.stick_x == orig.stick_x && dec.stick_y == orig.stick_y, "input sticks");
-        TEST_ASSERT(dec.button_mask == orig.button_mask && dec.current_tool_id == orig.current_tool_id, "input buttons/tool");
+        TEST_ASSERT(dec.button_mask == orig.button_mask && dec.current_tool_id == orig.current_tool_id && dec.anim_id == orig.anim_id, "input buttons/tool/anim");
         TEST_ASSERT(FLOAT_EQ(dec.player_x, orig.player_x) &&
                     FLOAT_EQ(dec.player_y, orig.player_y) &&
                     FLOAT_EQ(dec.player_z, orig.player_z), "input positions");

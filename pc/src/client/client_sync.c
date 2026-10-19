@@ -131,6 +131,9 @@ void client_sync_send_local(GAME_PLAY* play) {
 
     Private_c* priv = Common_Get(now_private);
     inp.current_tool_id = (priv != NULL) ? priv->equipment : EMPTY_NO;
+    inp.anim_id = (u16)((player->animation0_idx >= 0 && player->animation0_idx < mPlayer_ANIM_NUM)
+                            ? player->animation0_idx
+                            : mPlayer_ANIM_WAIT1);
 
     client_network_send_input(&inp);
     g_client_sync.last_send_ms = now;
@@ -140,9 +143,6 @@ void client_sync_tick(GAME_PLAY* play) {
     if (play == NULL) {
         return;
     }
-
-    /* Transmit local transform stream to server */
-    client_sync_send_local(play);
 
     /* Skip remote player actor interpolation during title or intro menus */
     switch (play->scene_id) {
@@ -172,6 +172,11 @@ void client_sync_tick(GAME_PLAY* play) {
         }
         client_network_send_zone_change(play->scene_id, house_idx);
         client_sync_reset();
+    }
+
+    /* Transmit local transform stream to server only when not fading/wiping out of scene */
+    if (play->fb_fade_type != FADE_TYPE_OUT && play->fb_wipe_mode == WIPE_MODE_NONE) {
+        client_sync_send_local(play);
     }
 
     uint32_t now = SDL_GetTicks();
@@ -276,12 +281,15 @@ void client_sync_tick(GAME_PLAY* play) {
             remote->player_actor->actor_class.shape_info.rotation.y = remote->current_angle_y;
             remote->player_actor->actor_class.world.angle.y = remote->current_angle_y;
 
-            /* Select animation based on velocity / displacement */
-            int desired_anim = mPlayer_ANIM_WAIT1;
-            if (dist > 3.2f) {
-                desired_anim = mPlayer_ANIM_RUN1;
-            } else if (dist > 0.35f) {
-                desired_anim = mPlayer_ANIM_WALK1;
+            /* Select animation from network state, or fallback to displacement */
+            int desired_anim = remote->target_anim_id;
+            if (desired_anim <= 0 || desired_anim >= mPlayer_ANIM_NUM) {
+                desired_anim = mPlayer_ANIM_WAIT1;
+                if (dist > 3.2f) {
+                    desired_anim = mPlayer_ANIM_RUN1;
+                } else if (dist > 0.35f) {
+                    desired_anim = mPlayer_ANIM_WALK1;
+                }
             }
 
             if (desired_anim != remote->current_anim_id) {
@@ -289,6 +297,32 @@ void client_sync_tick(GAME_PLAY* play) {
                 extern void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx);
                 pc_player_set_animation(remote->player_actor, (GAME*)play, desired_anim);
             }
+        }
+    }
+}
+
+void client_sync_notify_remote_door_open(uint16_t client_id) {
+    for (int i = 0; i < CLIENT_SYNC_MAX_REMOTE_PLAYERS; i++) {
+        RemotePlayerState* remote = &g_client_sync.remote_players[i];
+        if (remote->is_active && remote->client_id == client_id) {
+            remote->target_anim_id = mPlayer_ANIM_INTO_S1;
+            break;
+        }
+    }
+}
+
+void client_sync_notify_remote_zone_change(uint16_t client_id, int scene_id, int room_idx) {
+    (void)scene_id;
+    (void)room_idx;
+    for (int i = 0; i < CLIENT_SYNC_MAX_REMOTE_PLAYERS; i++) {
+        RemotePlayerState* remote = &g_client_sync.remote_players[i];
+        if (remote->is_active && remote->client_id == client_id) {
+            if (remote->player_actor != NULL) {
+                Actor_delete((ACTOR*)remote->player_actor);
+                remote->player_actor = NULL;
+            }
+            remote->is_active = false;
+            break;
         }
     }
 }

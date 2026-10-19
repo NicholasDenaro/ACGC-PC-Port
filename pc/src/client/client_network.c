@@ -474,6 +474,9 @@ void client_network_poll(void) {
                                         aMHS_remote_open_door(house_idx);
 #endif
                                     }
+                                    client_sync_notify_remote_door_open(req.client_id);
+                                } else if (req.action_type == NET_INTERACT_ZONE_CHANGE) {
+                                    client_sync_notify_remote_zone_change(req.client_id, (int)req.item_arg, (int)req.target_actor_id);
                                 }
                             }
                             break;

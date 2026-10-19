@@ -505,6 +505,8 @@ static void server_network_handle_interact(ServerClientSession* session, const u
                 server_zone_add_player(new_zone, session->player_slot);
             }
             server_spatial_update_client_acre(session->client_id, new_zone_id, 0, 0);
+            /* Broadcast zone change so observing clients immediately despawn the remote actor */
+            server_network_broadcast_raw(NET_CH_RELIABLE, data, len, true, session->client_id);
         }
     }
 }

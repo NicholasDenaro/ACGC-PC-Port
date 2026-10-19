@@ -37,9 +37,11 @@ void server_sync_on_client_input(uint32_t client_id, const pkt_c2s_input_t* inpu
     float dz = input->player_z - cc->predicted_pos.z;
     float dist = sqrtf(dx * dx + dz * dz);
 
-    /* Determine gait and animation index */
+    /* Determine gait and animation index (prefer client-reported animation0_idx) */
     uint16_t anim_id = mPlayer_ANIM_WAIT1;
-    if (dist > 4.0f) {
+    if (input->anim_id > 0 && input->anim_id < mPlayer_ANIM_NUM) {
+        anim_id = input->anim_id;
+    } else if (dist > 4.0f) {
         anim_id = mPlayer_ANIM_RUN1;
     } else if (dist > 0.35f) {
         anim_id = mPlayer_ANIM_WALK1;

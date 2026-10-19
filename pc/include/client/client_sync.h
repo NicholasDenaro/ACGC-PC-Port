@@ -65,6 +65,12 @@ void client_sync_tick(GAME_PLAY* play);
 /* Get number of currently active remote players */
 int client_sync_get_active_count(void);
 
+/* Notify sync state of remote player door interaction */
+void client_sync_notify_remote_door_open(uint16_t client_id);
+
+/* Notify sync state of remote player zone/scene transition */
+void client_sync_notify_remote_zone_change(uint16_t client_id, int scene_id, int room_idx);
+
 #ifdef __cplusplus
 }
 #endif

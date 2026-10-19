@@ -1814,6 +1814,20 @@ extern void Player_actor_move(ACTOR* actorx, GAME* game) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     int idx;
 
+#if defined(TARGET_SERVER)
+    if (player->now_main_index != mPlayer_INDEX_DMA) {
+        return;
+    }
+#elif defined(TARGET_PC)
+    if ((player->is_dummy || player->player_no > 0) && player->now_main_index != mPlayer_INDEX_DMA) {
+        Player_actor_CulcAnimation_Base(actorx);
+        Player_actor_set_eye_pattern_normal(actorx);
+        Player_actor_Excute_Corect_forStand(actorx, game);
+        Player_actor_Set_force_shadow_position_fromWorldPosition(actorx);
+        Player_actor_set_eye_PositionAndAngle(actorx);
+        return;
+    }
+#endif
     Player_actor_move_other_func1(actorx, game); //
     idx = player->now_main_index;
     if (mPlayer_MAIN_INDEX_VALID(idx) == FALSE || proc[idx] == NULL) {
@@ -1894,7 +1908,20 @@ int pc_request_main_complete_payment(GAME* game) {
 
 void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx) {
     if (player != NULL && game != NULL && anim_idx >= 0 && anim_idx < mPlayer_ANIM_NUM) {
-        Player_actor_InitAnimation_Base1((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, -5.0f, mPlayer_PART_TABLE_NORMAL);
+        if (anim_idx == mPlayer_ANIM_INTO_S1 || anim_idx == mPlayer_ANIM_OPEN1) {
+            cKF_SkeletonInfo_R_Animation_Set_base_shape_trs(&player->keyframe0, 0.0f, 1000.0f, 0.0f, 0, 0, 0x4000);
+            player->keyframe0.animation_enabled = cKF_ANIMATION_TRANS_XZ | cKF_ANIMATION_ROT_Y;
+            Player_actor_InitAnimation_Base2((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, -5.0f, cKF_FRAMECONTROL_STOP, mPlayer_PART_TABLE_NORMAL);
+        } else if (anim_idx == mPlayer_ANIM_GO_OUT_S1 || anim_idx == mPlayer_ANIM_GO_OUT_O1) {
+            cKF_SkeletonInfo_R_Animation_Set_base_shape_trs(&player->keyframe0, 0.0f, 1000.0f, 0.0f, 0, 0, 0);
+            player->keyframe0.animation_enabled = cKF_ANIMATION_TRANS_XZ;
+            Player_actor_InitAnimation_Base2((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, -5.0f, cKF_FRAMECONTROL_STOP, mPlayer_PART_TABLE_NORMAL);
+        } else {
+            if (player->keyframe0.animation_enabled != 0) {
+                cKF_SkeletonInfo_R_AnimationMove_dt(&player->keyframe0);
+            }
+            Player_actor_InitAnimation_Base1((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, -5.0f, mPlayer_PART_TABLE_NORMAL);
+        }
     }
 }
 #endif

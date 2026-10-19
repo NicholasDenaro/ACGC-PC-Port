@@ -62,6 +62,9 @@ static void aMHS_goto_next_pl_scene(GAME_PLAY* play, STRUCTURE_ACTOR* my_house) 
     door_data.door_actor_name = EMPTY_NO;
     door_data.wipe_type = WIPE_TYPE_TRIFORCE;
 
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+    client_network_send_zone_change(door_data.next_scene_id, my_house->action & 3);
+#endif
     goto_other_scene(play, &door_data, 0);
     play->fb_fade_type = FADE_TYPE_DEMO;
 }

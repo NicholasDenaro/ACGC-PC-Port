@@ -62,7 +62,12 @@ static int Player_actor_Movement_Outdoor(ACTOR* actor, int calc) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actor;
     cKF_SkeletonInfo_R_AnimationMove_base(&actor->world.position, NULL, &actor->scale,
                                           actor->world.angle.y, &player->keyframe0);
-    actor->world.position.y = mCoBG_GetBgY_OnlyCenter_FromWpos2(actor->world.position, 0.0f);
+    {
+        f32 ground_y = mCoBG_GetBgY_OnlyCenter_FromWpos2(actor->world.position, 0.0f);
+        if (fabsf(ground_y - actor->world.position.y) <= 16.0f) {
+            actor->world.position.y = ground_y;
+        }
+    }
     Player_actor_Set_force_shadow_position_fromWorldPosition(actor);
 #else
     Player_actor_Set_force_shadow_position_fromAnimePosition(actor);
