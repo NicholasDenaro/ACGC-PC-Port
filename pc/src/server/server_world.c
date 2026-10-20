@@ -1049,10 +1049,13 @@ int server_world_run_tests(void) {
 
     /* 5. Shop synchronization tests (Task 7.4) */
     Shop_c orig_shop = Save_Get(shop);
+    lbRTC_time_c orig_rtc = Common_Get(time.rtc_time);
     memset(&Save_Get(shop), 0, sizeof(Shop_c));
-    Save_Get(shop).exchange_time.year = 2026;
-    Save_Get(shop).exchange_time.month = 10;
-    Save_Get(shop).exchange_time.day = 20;
+    Save_Get(shop).exchange_time = Common_Get(time.rtc_time);
+    if (Save_Get(shop).exchange_time.year == 0) {
+        Save_Get(shop).exchange_time.year = 2026;
+    }
+    Common_Get(time.rtc_time) = Save_Get(shop).exchange_time;
     Save_Get(shop).items[0] = ITM_SHOVEL;
     Save_Get(shop).items[1] = ITM_SAPLING;
     Save_Get(shop).items[2] = ITM_WHITE_PANSY_BAG;
@@ -1085,6 +1088,7 @@ int server_world_run_tests(void) {
     TEST_WORLD_ASSERT(Save_Get(shop).sales_sum == sales_after_cloth, "duplicate purchase of sold-out item rejected");
 
     Save_Get(shop) = orig_shop;
+    Common_Get(time.rtc_time) = orig_rtc;
 
     printf("[SERVER WORLD TEST] All authoritative foreground mutation tests passed!\n");
     return 1;

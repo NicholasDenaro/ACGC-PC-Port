@@ -16,6 +16,20 @@
 #include "pc_settings.h"
 #endif
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+#include "client/client_network.h"
+
+/* Connected multiplayer clients must not roll their own shop stock; the dedicated server is authoritative
+ * and pushes Shop_c via PKT_S2C_SHOP_SYNC. */
+static int mSP_IsNetworkClient(void) {
+#ifndef TARGET_SERVER
+    return client_network_is_connected() ? TRUE : FALSE;
+#else
+    return FALSE;
+#endif
+}
+#endif
+
 extern mActor_name_t* mSP_ftr_list[];
 extern mActor_name_t* mSP_binsen_list[];
 extern mActor_name_t* mSP_cloth_list[];
@@ -1142,8 +1156,16 @@ extern void mSP_SetShopRareFurnitureChirashi(int player_no, mActor_name_t* goods
     int shop_level = mSP_GetShopLevel();
     int is_rare_item = FALSE;
     mActor_name_t rare_item = EMPTY_NO;
-    int arrange_idx = mHS_get_arrange_idx(p);
+    int arrange_idx;
     lbRTC_time_c* rtc_time = Common_GetPointer(time.rtc_time);
+
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    /* Dedicated server has no local player (player_no == -1) */
+    if (player_no < 0 || player_no >= PLAYER_NUM) {
+        return;
+    }
+#endif
+    arrange_idx = mHS_get_arrange_idx(p);
 
     if (player_no != mHS_get_pl_no_detail(arrange_idx)) {
         mCkRh_SavePlayTime(player_no);
@@ -1259,6 +1281,11 @@ extern void mSP_SetRenewalChiraswhi_AppoDay() {
 }
 
 extern void mSP_ExchangeLineUp_InGame(GAME* game) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (mSP_IsNetworkClient()) {
+        return;
+    }
+#endif
     if (mSP_CheckExchangeDay2()) {
         if (mSP_CheckExchangeMonth()) {
             mSP_LotteryLineUp_GameAlloc(game);
@@ -1461,12 +1488,22 @@ static void mSP_InitGoods() {
 }
 
 extern void mSP_ExchangeLineUp_ZeldaMalloc() {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (mSP_IsNetworkClient()) {
+        return;
+    }
+#endif
     mSP_InitGoods();
     mSP_MakeGoodsList(NULL);
     mSP_SetExchangeDay();
 }
 
 extern void mSP_LotteryLineUp_ZeldaMalloc() {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (mSP_IsNetworkClient()) {
+        return;
+    }
+#endif
     mSP_MakeLotteryList(NULL);
 }
 

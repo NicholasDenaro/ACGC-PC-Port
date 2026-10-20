@@ -227,20 +227,11 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Handle digging holes, burying items, planting seeds/trees, picking fruit, picking flowers, and cutting trees authoritatively on the server. Broadcast `PKT_S2C_FG_DELTA` to update all nearby clients.
   - **Acceptance Criteria**: When Player 1 digs a hole or chops a tree, the modification appears instantaneously on Player 2's screen.
 
-- [ ] **Task 7.4: Economy & Shop Synchronization**
-  - **State**: `In Progress`
-  - **Files**: `include/network/net_packets.h`, `pc/src/network/net_packer.c`, `pc/include/server/server_world.h`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `src/actor/ac_shop_design.c`, `src/actor/npc/ac_npc_shop_common.c`, `src/actor/npc/ac_npc_shop_mastersp_talk.c_inc`, `src/game/m_shop.c`, `src/game/m_play.c`
-  - **Description**: Synchronize Nook's shelf stock, `sales_sum`, and purchase limits across all clients. Keep tools (shovel, net, rod, axe), saplings (regular and cedar), and flower bags in unlimited daily stock (never depleting to sold-out signs, matching stationery behavior) so all players in multiplayer can purchase tools and plants freely. When a limited item (furniture, clothing, carpet, wallpaper, umbrella, diary, paint, signboard) is purchased, mark its shelf slot sold-out authoritatively on the server and broadcast the update to all clients in the shop.
-  - **Current Progress**:
-    - **Completed**:
-      - Added `PKT_S2C_SHOP_SYNC`, `pkt_s2c_shop_sync_t`, and `NET_INTERACT_SHOP_BUY` / `NET_INTERACT_SHOP_PLUS_SALES` / `NET_INTERACT_SHOP_LOTTERY` in `include/network/net_packets.h` and `pc/src/network/net_packer.c`.
-      - Implemented server-side shop initialization/validation, `server_world_send_shop_sync`, `server_world_handle_shop_sync_packet`, `server_world_notify_shop_purchase`, `server_world_notify_shop_plus_sales`, `server_world_notify_shop_lottery`, `server_world_reapply_cached_shop`, and unit tests in `pc/src/server/server_world.c` and `pc/include/server/server_world.h`.
-      - Wired `PKT_S2C_SHOP_SYNC` reception in `pc/src/client/client_network.c` and `NET_INTERACT_SHOP_*` dispatch in `pc/src/server/server_network.c`.
-    - **Remaining**:
-      - Hook `aSD_ReportGoodsSales` and implement `aSD_ApplyRemoteSale` in `src/actor/ac_shop_design.c` (keep tools, saplings, and flower bags unlimited; notify server on purchase; apply live remote sold-out updates in shop).
-      - Guard `aNSC_sell_answer0` against double-buying an already sold-out item and hook `aNSC_buy_check` / `aNSC_order_check` (`mSP_PlusSales`) in `src/actor/npc/ac_npc_shop_common.c` and lottery wins in `src/actor/npc/ac_npc_shop_mastersp_talk.c_inc`.
-      - Guard `mSP_SetShopRareFurnitureChirashi` (`player_no < 0`) and prevent connected clients from overwriting server shop stock in `src/game/m_shop.c`, and initialize `mSP_ShopGameStartCt` / `mSP_ExchangeLineUp_InGame` on server boot in `src/game/m_play.c`.
-      - Run `compile_check` and `run_server_test`.
+- [x] **Task 7.4: Economy & Shop Synchronization**
+  - **State**: `Implemented` (pending in-game two-client verification)
+  - **Files**: `include/network/net_packets.h`, `pc/src/network/net_packer.c`, `pc/include/server/server_world.h`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `src/actor/ac_shop_design.c`, `src/actor/npc/ac_npc_shop_common.c`, `src/actor/npc/ac_npc_shop_mastersp_talk.c_inc`, `src/game/m_shop.c`
+  - **Description**: Server owns `Save.shop`. Clients report purchases (`NET_INTERACT_SHOP_BUY`), sales to Nook / catalog orders (`NET_INTERACT_SHOP_PLUS_SALES`), and lottery wins (`NET_INTERACT_SHOP_LOTTERY`); the server validates stock, updates `Shop_c`, and broadcasts `PKT_S2C_SHOP_SYNC` (also sent on connect and on entering a shop scene). Remote clients apply sold-out visuals live (`aSD_ApplyRemoteSale`) and cache/reapply server shop state on field init. Connected clients no longer roll their own daily stock (`m_shop.c`). Tools, saplings, and flower bags never deplete on PC/server builds; paper is unlimited as before.
+  - **Remaining caveats**: A tiny race window exists if two players buy the same item within one network round-trip (server rejects the duplicate and resyncs, but the loser may briefly keep the item locally).
   - **Acceptance Criteria**: Tools, saplings, and flower bags never sell out when purchased; limited daily items (such as furniture or clothing) immediately become sold-out for all players when bought by any player.
 
 - [ ] **Task 7.5: Dynamic Entity Lifecycle Synchronization (Bugs & Fish)**
@@ -260,6 +251,12 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Files**: `src/actor/ac_my_indoor.c`, `src/actor/ac_my_room.c`, `src/game/m_field_info.c`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
   - **Description**: Synchronize interior room layouts (`Save.homes[i].floors`), including placing, picking up, rotating, and pushing/pulling furniture, as well as changing wallpaper/carpet and toggling interactive furniture states across all players inside the room and persisting changes to the server save.
   - **Acceptance Criteria**: When a player places, picks up, rotates, or pushes/pulls furniture inside a player house, the change is replicated in real time to other players in the house and persists across reconnects.
+
+- [ ] **Task 7.8: Able Sisters (Needlework) Shop & Custom Design Synchronization**
+  - **State**: `Not Implemented`
+  - **Files**: `src/actor/npc/ac_npc_needlework_talk.c_inc`, `src/actor/ac_needlework_indoor.c`, `src/game/m_needlework.c`, `src/game/m_needlework_ovl.c`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
+  - **Description**: Able Sisters has no shelf stock, but its shared design slots (`Save.needlework.original_design`, swapped via `needlework_indoor_clip`) and design purchases (`mSP_money_check` / `mSP_get_sell_price` with `aNNW_DESIGN_PRICE`) are currently local to each client. Make the server authoritative over the shop's design slots so changes by one player are visible to others inside the shop, persist in the server save, and validate/deduct design purchases server-side. Also send a needlework state sync when a client enters `SCENE_NEEDLEWORK`.
+  - **Acceptance Criteria**: When a player changes or buys a design at Able Sisters, other players in the shop see the updated clothing/umbrella designs, and the change persists across reconnects and server restarts.
 
 ---
 

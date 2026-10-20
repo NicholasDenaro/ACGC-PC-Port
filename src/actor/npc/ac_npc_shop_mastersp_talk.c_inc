@@ -254,6 +254,12 @@ static void aSHM_give_player(NPC_SHOP_MASTERSP_ACTOR* shop_mastersp, GAME_PLAY* 
     mDemo_Set_OrderValue(mDemo_ORDER_NPC1, 1, aHOI_REQUEST_PUTAWAY);
     mDemo_Set_OrderValue(mDemo_ORDER_NPC1, 2, FALSE);
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    {
+        extern void server_world_notify_shop_lottery(int lottery_idx, u16 sold_item);
+        server_world_notify_shop_lottery(shop_mastersp->result, item_p[shop_mastersp->result]);
+    }
+#endif
     item_p[shop_mastersp->result] = RSV_SHOP_SOLD_FTR;
     aSHM_change_talk_proc(shop_mastersp, aSHM_TALK_STOP_PLAYER);
     aSHM_set_start_avoid_pos(shop_mastersp, shop_mastersp->root + 1);

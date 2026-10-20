@@ -1,3 +1,7 @@
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+extern void server_world_notify_shop_plus_sales(u32 sum);
+#endif
+
 enum aNSC_action {
     aNSC_ACTION_EMPTY,
     aNSC_ACTION_SAY_HELLO_APPROACH,
@@ -2218,6 +2222,9 @@ static void aNSC_buy_check(NPC_SHOP_COMMON_ACTOR* shop_common, GAME_PLAY* play) 
                     } else {
                         mActor_name_t item = Now_Private->inventory.pockets[submenu_item->slot_no];
                         mSP_PlusSales(shop_common->money / 2);
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+                        server_world_notify_shop_plus_sales(shop_common->money / 2);
+#endif
                         if (counter == 1) {
                             next = aNSC_buy_item_only_one(&bells, item, (u8*)submenu_item, shop_common->money);
                         } else if (play->submenu.selected_item_num > 1) {
@@ -2356,6 +2363,9 @@ static void aNSC_order_check(NPC_SHOP_COMMON_ACTOR* shop_common, GAME_PLAY* play
                         aNSC_set_ftr_order(shop_common);
                         aNSC_get_sell_price(price);
                         mSP_PlusSales(price);
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+                        server_world_notify_shop_plus_sales(price);
+#endif
                     }
                     break;
                 case mChoice_CHOICE1:

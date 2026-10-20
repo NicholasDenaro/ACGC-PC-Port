@@ -357,7 +357,14 @@ static mActor_name_t aSD_UnitNum2ItemNo(int ux, int uz) {
     }
 }
 
-static int aSD_ReportGoodsSales(int ux, int uz) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+/* Sold-out marker produced by the most recent local sale (reported to the server for synchronization) */
+static mActor_name_t s_aSD_last_sold_rsv = EMPTY_NO;
+
+extern void server_world_notify_shop_purchase(int ux, int uz, u16 sold_item, u16 sold_rsv_item, u32 price);
+#endif
+
+static int aSD_ReportGoodsSales_local(int ux, int uz) {
     mActor_name_t item = aSD_UnitNum2ItemNo(ux, uz);
     u32 price = mSP_ItemNo2ItemPrice(item);
     mActor_name_t rsv_item = EMPTY_NO;
@@ -369,9 +376,19 @@ static int aSD_ReportGoodsSales(int ux, int uz) {
         if (item == ITM_HUKUBUKURO_BAG) {
             mSP_ShopSaleReport(item, shop_design->goods_list, shop_design->goods_list_max, RSV_SHOP_SOLD_PLANT);
             mFI_UtNumtoFGSet_common(RSV_SHOP_SOLD_PLANT, ux, uz, FALSE);
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            s_aSD_last_sold_rsv = RSV_SHOP_SOLD_PLANT;
+#endif
             return FALSE;
         } else if ((item >= ITM_SAPLING && item <= ITM_CEDAR_SAPLING) ||
                    (item >= ITM_WHITE_PANSY_BAG && item <= ITM_YELLOW_TULIP_BAG) || item == ITM_FOOD_CANDY) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            /* Multiplayer: saplings and flower bags have unlimited stock and never sell out (candy still depletes) */
+            if (item != ITM_FOOD_CANDY) {
+                return TRUE;
+            }
+            s_aSD_last_sold_rsv = RSV_SHOP_SOLD_PLANT;
+#endif
             if (mSP_ShopSaleReport(item, shop_design->goods_list, shop_design->goods_list_max, RSV_SHOP_SOLD_PLANT)) {
                 return TRUE;
             } else {
@@ -379,6 +396,9 @@ static int aSD_ReportGoodsSales(int ux, int uz) {
                 return FALSE;
             }
         } else if (item >= ITM_CLOTH_START && item <= ITM_CLOTH_END) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            s_aSD_last_sold_rsv = RSV_SHOP_SOLD_CLOTH;
+#endif
             mSP_ShopSaleReport(item, shop_design->goods_list, shop_design->goods_list_max, RSV_SHOP_SOLD_CLOTH);
             Common_Get(clip).shop_manekin_clip->change2naked_manekin_proc(ux, uz);
             mFI_UtNumtoFGSet_common(RSV_NO, ux, uz, FALSE);
@@ -420,7 +440,12 @@ static int aSD_ReportGoodsSales(int ux, int uz) {
             } else if (item == ITM_SIGNBOARD) {
                 rsv_item = RSV_SHOP_SOLD_SIGNBOARD;
             } else {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+                /* Multiplayer: shovel, net, rod and axe have unlimited stock and never sell out */
+                return TRUE;
+#else
                 rsv_item = RSV_SHOP_SOLD_TOOL;
+#endif
             }
         }
 
@@ -437,6 +462,9 @@ static int aSD_ReportGoodsSales(int ux, int uz) {
         }
 
         if (rsv_item != EMPTY_NO) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            s_aSD_last_sold_rsv = rsv_item;
+#endif
             if (mSP_ShopSaleReport(item, shop_design->goods_list, shop_design->goods_list_max, rsv_item)) {
                 return TRUE;
             }
@@ -449,3 +477,54 @@ static int aSD_ReportGoodsSales(int ux, int uz) {
         return FALSE;
     }
 }
+
+static int aSD_ReportGoodsSales(int ux, int uz) {
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    mActor_name_t item = aSD_UnitNum2ItemNo(ux, uz);
+    u32 price = mSP_ItemNo2ItemPrice(item);
+    int res;
+
+    s_aSD_last_sold_rsv = EMPTY_NO;
+    res = aSD_ReportGoodsSales_local(ux, uz);
+    server_world_notify_shop_purchase(ux, uz, item, s_aSD_last_sold_rsv, price);
+    return res;
+#else
+    return aSD_ReportGoodsSales_local(ux, uz);
+#endif
+}
+
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+/* Applies a sale made by another player to the live shop floor (called when PKT_S2C_SHOP_SYNC arrives). */
+void aSD_ApplyRemoteSale(int ux, int uz, mActor_name_t sold_item, mActor_name_t sold_rsv_item) {
+    if (Common_Get(clip).shop_design_clip == NULL) {
+        return;
+    }
+
+    /* Already sold locally (we were the buyer) or tile no longer holds the item */
+    if (aSD_UnitNum2ItemNo(ux, uz) != sold_item) {
+        return;
+    }
+
+    if (sold_item >= ITM_CLOTH_START && sold_item <= ITM_CLOTH_END) {
+        if (Common_Get(clip).shop_manekin_clip != NULL) {
+            Common_Get(clip).shop_manekin_clip->change2naked_manekin_proc(ux, uz);
+        }
+        mFI_UtNumtoFGSet_common(RSV_NO, ux, uz, FALSE);
+        return;
+    }
+
+    if (ITEM_IS_FTR(sold_item) && Common_Get(clip).my_room_clip != NULL) {
+        mActor_name_t ftr_item;
+        int ftrID;
+
+        Common_Get(clip).my_room_clip->unitNum2ftrItemNoftrId_proc(&ftr_item, &ftrID, ux, uz, mCoBG_LAYER0);
+        Common_Get(clip).my_room_clip->ftrId2extinguishFtr_proc(ftrID);
+    } else if (sold_item >= ITM_UMBRELLA_START && sold_item <= (ITM_UMBRELLA_END - 1)) {
+        if (Common_Get(clip).shop_umbrella_clip != NULL) {
+            Common_Get(clip).shop_umbrella_clip->delete_umbrella_proc(ux, uz);
+        }
+    }
+
+    mFI_UtNumtoFGSet_common(sold_rsv_item, ux, uz, FALSE);
+}
+#endif
