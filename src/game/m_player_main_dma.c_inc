@@ -39,10 +39,11 @@ static void Player_actor_request_proc_index_fromDma(ACTOR* actorx, GAME* game) {
                 actor->requested_main_index = mPlayer_INDEX_WAIT;
                 actor->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_43;
                 actor->requested_main_index_changed = TRUE;
-                actor->requested_main_index_data.wait.morph_speed = -5.0f;
+                actor->requested_main_index_data.wait.morph_speed = 0.0f;
                 actor->requested_main_index_data.wait.flags = 0;
                 actor->requested_main_index_data.wait._04 = 0.0f;
                 Player_actor_change_proc_index(actorx, game);
+                Player_actor_CulcAnimation_Base(actorx);
                 return;
             }
 #endif

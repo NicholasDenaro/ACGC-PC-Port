@@ -466,15 +466,17 @@ void client_network_poll(void) {
                         case PKT_C2S_INTERACT_REQ: {
                             pkt_c2s_interact_req_t req;
                             if (net_unpack_interact_req(event.packet->data, event.packet->dataLength, &req) > 0) {
-                                if (req.action_type == NET_INTERACT_ENTER_DOOR && req.item_arg == 1) {
+                                if (req.action_type == NET_INTERACT_ENTER_DOOR && (req.item_arg == 1 || req.item_arg == 2)) {
                                     int house_idx = (int)(req.target_actor_id - HOUSE0);
                                     if (house_idx >= 0 && house_idx < 4) {
 #ifndef TARGET_SERVER
-                                        extern void aMHS_remote_open_door(int house_idx);
-                                        aMHS_remote_open_door(house_idx);
+                                        extern void aMHS_remote_open_door(int house_idx, int is_out);
+                                        aMHS_remote_open_door(house_idx, req.item_arg == 2 ? 1 : 0);
 #endif
                                     }
-                                    client_sync_notify_remote_door_open(req.client_id);
+                                    if (req.item_arg == 1) {
+                                        client_sync_notify_remote_door_open(req.client_id);
+                                    }
                                 } else if (req.action_type == NET_INTERACT_ZONE_CHANGE) {
                                     client_sync_notify_remote_zone_change(req.client_id, (int)req.item_arg, (int)req.target_actor_id);
                                 }

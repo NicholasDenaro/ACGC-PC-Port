@@ -34,7 +34,7 @@ void client_sync_reset(void) {
         }
     }
     memset(&g_client_sync, 0, sizeof(g_client_sync));
-    g_client_sync.last_send_ms = SDL_GetTicks();
+    g_client_sync.last_send_ms = 0;
 }
 
 void client_sync_handle_packet(const pkt_s2c_entity_sync_t* pkt) {
@@ -113,7 +113,7 @@ void client_sync_send_local(GAME_PLAY* play) {
     }
 
     PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
-    if (player == NULL || player->is_dummy) {
+    if (player == NULL || player->is_dummy || player->now_main_index == mPlayer_INDEX_DMA) {
         return;
     }
 
@@ -175,7 +175,7 @@ void client_sync_tick(GAME_PLAY* play) {
     }
 
     /* Transmit local transform stream to server only when not fading/wiping out of scene */
-    if (play->fb_fade_type != FADE_TYPE_OUT && play->fb_wipe_mode == WIPE_MODE_NONE) {
+    if (play->game.pad_initialized && play->fb_fade_type != FADE_TYPE_OUT && play->fb_fade_type != FADE_TYPE_DEMO) {
         client_sync_send_local(play);
     }
 
@@ -292,7 +292,8 @@ void client_sync_tick(GAME_PLAY* play) {
                 }
             }
 
-            if (desired_anim != remote->current_anim_id) {
+            if (remote->player_actor->now_main_index != mPlayer_INDEX_DMA &&
+                (desired_anim != remote->current_anim_id || remote->player_actor->animation0_idx != desired_anim)) {
                 remote->current_anim_id = desired_anim;
                 extern void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx);
                 pc_player_set_animation(remote->player_actor, (GAME*)play, desired_anim);

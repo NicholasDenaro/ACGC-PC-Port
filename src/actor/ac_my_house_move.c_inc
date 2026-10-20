@@ -373,7 +373,7 @@ static void aMHS_wait(STRUCTURE_ACTOR* my_house, GAME_PLAY* play) {
         case 4:
             if (mPlib_check_player_outdoor_start((GAME*)play)) {
 #if defined(TARGET_PC) && !defined(TARGET_SERVER)
-                client_network_send_door_interact(my_house->action & 3, 1);
+                client_network_send_door_interact(my_house->action & 3, 2);
 #endif
                 aMHS_setup_animation(my_house, 0.5f);
                 aMHS_setup_action(my_house, aMHS_ACTION_OPEN_DOOR);
@@ -463,7 +463,7 @@ static void aMHS_setup_action(STRUCTURE_ACTOR* my_house, int action) {
 }
 
 #if defined(TARGET_PC) && !defined(TARGET_SERVER)
-void aMHS_remote_open_door(int house_idx) {
+void aMHS_remote_open_door(int house_idx, int is_out) {
     if (house_idx < 0 || house_idx >= 4 || gamePT == NULL) {
         return;
     }
@@ -473,6 +473,8 @@ void aMHS_remote_open_door(int house_idx) {
             STRUCTURE_ACTOR* house = (STRUCTURE_ACTOR*)a;
             if ((house->action & 3) == house_idx) {
                 s_is_remote_door_open[house_idx] = 1;
+                house->request_type = is_out ? 4 : 0;
+                house->arg2_f = is_out ? 1 : 0;
                 aMHS_setup_animation(house, 0.5f);
                 aMHS_setup_action(house, aMHS_ACTION_OPEN_DOOR);
                 break;

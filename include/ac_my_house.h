@@ -18,7 +18,7 @@ struct my_house_actor_s {
 extern ACTOR_PROFILE MyHouse_Profile;
 
 #ifdef TARGET_PC
-void aMHS_remote_open_door(int house_idx);
+void aMHS_remote_open_door(int house_idx, int is_out);
 #endif
 
 #ifdef __cplusplus
