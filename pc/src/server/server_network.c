@@ -509,13 +509,22 @@ static void server_network_handle_interact(ServerClientSession* session, const u
             server_spatial_update_client_acre(session->client_id, new_zone_id, 0, 0);
             /* Broadcast zone change so observing clients immediately despawn the remote actor */
             server_network_broadcast_raw(NET_CH_RELIABLE, data, len, true, session->client_id);
+
+            /* Refresh authoritative shop state when entering Nook's shop */
+            if (scene_id == SCENE_SHOP0 || scene_id == SCENE_CONVENI || scene_id == SCENE_SUPER ||
+                scene_id == SCENE_DEPART || scene_id == SCENE_DEPART_2) {
+                server_world_send_shop_sync(session->client_id, 0, 0, 0, EMPTY_NO, EMPTY_NO);
+            }
         }
     } else if (req->action_type == NET_INTERACT_DIG ||
                req->action_type == NET_INTERACT_FILL_HOLE ||
                req->action_type == NET_INTERACT_SHAKE_TREE ||
                req->action_type == NET_INTERACT_CUT_TREE ||
                req->action_type == NET_INTERACT_PICK_ITEM ||
-               req->action_type == NET_INTERACT_DROP_ITEM) {
+               req->action_type == NET_INTERACT_DROP_ITEM ||
+               req->action_type == NET_INTERACT_SHOP_BUY ||
+               req->action_type == NET_INTERACT_SHOP_PLUS_SALES ||
+               req->action_type == NET_INTERACT_SHOP_LOTTERY) {
         server_world_handle_fg_interact(session->client_id, req);
     }
 }

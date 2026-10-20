@@ -469,6 +469,11 @@ void client_network_poll(void) {
                             break;
                         }
 
+                        case PKT_S2C_SHOP_SYNC: {
+                            server_world_handle_shop_sync_packet(event.packet->data, event.packet->dataLength);
+                            break;
+                        }
+
                         case PKT_C2S_INTERACT_REQ: {
                             pkt_c2s_interact_req_t req;
                             if (net_unpack_interact_req(event.packet->data, event.packet->dataLength, &req) > 0) {

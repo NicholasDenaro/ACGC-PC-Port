@@ -39,6 +39,27 @@ void server_world_handle_fg_interact(u16 client_id, const pkt_c2s_interact_req_t
 void server_world_handle_fg_packet(const u8* data, size_t len);
 void server_world_apply_client_fg_delta(const pkt_s2c_fg_delta_t* delta);
 
+/* --- Economy & Shop Synchronization (Task 7.4) --- */
+
+/* Client/Engine hook: restore cached server Shop_c state into Save_Get(shop) */
+void server_world_reapply_cached_shop(void);
+
+/* Client/Engine hook: notify server when local player purchases an item from Nook's shop floor */
+void server_world_notify_shop_purchase(int ux, int uz, u16 sold_item, u16 sold_rsv_item, u32 price);
+
+/* Client/Engine hook: notify server when local player sells items to Nook or orders from catalog */
+void server_world_notify_shop_plus_sales(u32 sum);
+
+/* Client/Engine hook: notify server when local player wins a monthly lottery item */
+void server_world_notify_shop_lottery(int lottery_idx, u16 sold_item);
+
+/* Server-side: send or broadcast authoritative Shop_c state (client_id == 0 broadcasts to all) */
+void server_world_send_shop_sync(u16 client_id, int has_sale_event, int ut_x, int ut_z,
+                                 u16 sold_item, u16 sold_rsv_item);
+
+/* Client-side: handle incoming PKT_S2C_SHOP_SYNC from server */
+void server_world_handle_shop_sync_packet(const u8* data, size_t len);
+
 /* Self-test suite for authoritative foreground mutations and delta broadcast */
 int server_world_run_tests(void);
 

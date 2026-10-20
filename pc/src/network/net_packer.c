@@ -729,6 +729,110 @@ int net_unpack_fg_delta(const u8* buf, size_t buf_size, pkt_s2c_fg_delta_t* pkt)
     return r.error ? -1 : (int)(hlen + r.offset);
 }
 
+/* --- Shop Sync --- */
+
+int net_pack_shop_sync(u8* buf, size_t buf_size, const pkt_s2c_shop_sync_t* pkt) {
+    net_buf_writer_t w;
+    int i;
+    /* 39*2 (items) + 2 (rare) + 3*2 (lottery) + 1 (grab_bag) + 2 (shop_info) + 1 (visitor)
+     * + 4 (sales_sum) + 8 (exchange_time) + 8 (renewal_time) + 5 (priority)
+     * + 1 (has_sale_event) + 1 (ut_x) + 1 (ut_z) + 2 (sold_item) + 2 (sold_rsv_item) = 122 */
+    u16 payload_size = (NET_SHOP_GOODS_COUNT * 2) + 2 + (NET_SHOP_LOTTERY_COUNT * 2) + 1 + 2 + 1 + 4 + 8 + 8 +
+                       NET_SHOP_PRIORITY_COUNT + 1 + 1 + 1 + 2 + 2;
+    net_header_t hdr = { NET_PACKET_MAGIC, PKT_S2C_SHOP_SYNC, NET_CH_RELIABLE, payload_size };
+
+    w_init(&w, buf, buf_size);
+    w_u16(&w, hdr.magic);
+    w_u8(&w, hdr.packet_id);
+    w_u8(&w, hdr.channel);
+    w_u16(&w, hdr.payload_size);
+
+    for (i = 0; i < NET_SHOP_GOODS_COUNT; i++) {
+        w_u16(&w, pkt->items[i]);
+    }
+    w_u16(&w, pkt->rare_item);
+    for (i = 0; i < NET_SHOP_LOTTERY_COUNT; i++) {
+        w_u16(&w, pkt->lottery_items[i]);
+    }
+    w_s8(&w, pkt->flowers_candy_grab_bag_count);
+    w_u8(&w, pkt->shop_info_raw0);
+    w_u8(&w, pkt->shop_info_raw1);
+    w_u8(&w, pkt->visitor_flag);
+    w_u32(&w, pkt->sales_sum);
+
+    w_u16(&w, pkt->exchange_time.year);
+    w_u8(&w, pkt->exchange_time.month);
+    w_u8(&w, pkt->exchange_time.day);
+    w_u8(&w, pkt->exchange_time.hour);
+    w_u8(&w, pkt->exchange_time.min);
+    w_u8(&w, pkt->exchange_time.sec);
+    w_u8(&w, pkt->exchange_time.weekday);
+
+    w_u16(&w, pkt->renewal_time.year);
+    w_u8(&w, pkt->renewal_time.month);
+    w_u8(&w, pkt->renewal_time.day);
+    w_u8(&w, pkt->renewal_time.hour);
+    w_u8(&w, pkt->renewal_time.min);
+    w_u8(&w, pkt->renewal_time.sec);
+    w_u8(&w, pkt->renewal_time.weekday);
+
+    w_bytes(&w, pkt->priority_packed, NET_SHOP_PRIORITY_COUNT);
+    w_u8(&w, pkt->has_sale_event);
+    w_u8(&w, pkt->sale_ut_x);
+    w_u8(&w, pkt->sale_ut_z);
+    w_u16(&w, pkt->sold_item);
+    w_u16(&w, pkt->sold_rsv_item);
+
+    return w.error ? -1 : (int)w.offset;
+}
+
+int net_unpack_shop_sync(const u8* buf, size_t buf_size, pkt_s2c_shop_sync_t* pkt) {
+    net_buf_reader_t r;
+    net_header_t hdr;
+    int i;
+    int hlen = net_unpack_header(buf, buf_size, &hdr);
+    if (hlen < 0 || hdr.packet_id != PKT_S2C_SHOP_SYNC) return -1;
+    r_init(&r, buf + hlen, buf_size - hlen);
+
+    for (i = 0; i < NET_SHOP_GOODS_COUNT; i++) {
+        pkt->items[i] = r_u16(&r);
+    }
+    pkt->rare_item = r_u16(&r);
+    for (i = 0; i < NET_SHOP_LOTTERY_COUNT; i++) {
+        pkt->lottery_items[i] = r_u16(&r);
+    }
+    pkt->flowers_candy_grab_bag_count = r_s8(&r);
+    pkt->shop_info_raw0 = r_u8(&r);
+    pkt->shop_info_raw1 = r_u8(&r);
+    pkt->visitor_flag = r_u8(&r);
+    pkt->sales_sum = r_u32(&r);
+
+    pkt->exchange_time.year = r_u16(&r);
+    pkt->exchange_time.month = r_u8(&r);
+    pkt->exchange_time.day = r_u8(&r);
+    pkt->exchange_time.hour = r_u8(&r);
+    pkt->exchange_time.min = r_u8(&r);
+    pkt->exchange_time.sec = r_u8(&r);
+    pkt->exchange_time.weekday = r_u8(&r);
+
+    pkt->renewal_time.year = r_u16(&r);
+    pkt->renewal_time.month = r_u8(&r);
+    pkt->renewal_time.day = r_u8(&r);
+    pkt->renewal_time.hour = r_u8(&r);
+    pkt->renewal_time.min = r_u8(&r);
+    pkt->renewal_time.sec = r_u8(&r);
+    pkt->renewal_time.weekday = r_u8(&r);
+
+    r_bytes(&r, pkt->priority_packed, NET_SHOP_PRIORITY_COUNT);
+    pkt->has_sale_event = r_u8(&r);
+    pkt->sale_ut_x = r_u8(&r);
+    pkt->sale_ut_z = r_u8(&r);
+    pkt->sold_item = r_u16(&r);
+    pkt->sold_rsv_item = r_u16(&r);
+
+    return r.error ? -1 : (int)(hlen + r.offset);
+}
+
 /* --- Zone Enter --- */
 
 int net_pack_zone_enter(u8* buf, size_t buf_size, const pkt_s2c_zone_enter_t* pkt) {

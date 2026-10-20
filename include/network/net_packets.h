@@ -44,6 +44,7 @@ enum {
     /* World & Gameplay Interactions (Reliable) */
     PKT_C2S_INTERACT_REQ  = 0x30,
     PKT_S2C_FG_DELTA      = 0x31,
+    PKT_S2C_SHOP_SYNC     = 0x32,
     PKT_S2C_ZONE_ENTER    = 0x40,
 
     /* Dialogue & UI (Reliable) */
@@ -83,7 +84,10 @@ enum {
     NET_INTERACT_PICK_ITEM,
     NET_INTERACT_DROP_ITEM,
     NET_INTERACT_CUT_TREE,
-    NET_INTERACT_PULL_WEED
+    NET_INTERACT_PULL_WEED,
+    NET_INTERACT_SHOP_BUY,
+    NET_INTERACT_SHOP_PLUS_SALES,
+    NET_INTERACT_SHOP_LOTTERY
 };
 
 /* Maximum constants */
@@ -91,6 +95,9 @@ enum {
 #define NET_MAX_AUTH_TOKEN_LEN 32
 #define NET_MAX_ENTITIES_PER_SYNC 32
 #define NET_MAX_ROOM_FURNITURE 64
+#define NET_SHOP_GOODS_COUNT 39
+#define NET_SHOP_LOTTERY_COUNT 3
+#define NET_SHOP_PRIORITY_COUNT 5
 
 /* Packet Header (Wire format: 6 bytes) */
 typedef struct {
@@ -249,6 +256,26 @@ typedef struct {
     u16 new_item;
 } pkt_s2c_fg_delta_t;
 
+/* Shop State & Sale Sync Server -> Client */
+typedef struct {
+    u16 items[NET_SHOP_GOODS_COUNT];
+    u16 rare_item;
+    u16 lottery_items[NET_SHOP_LOTTERY_COUNT];
+    s8  flowers_candy_grab_bag_count;
+    u8  shop_info_raw0;
+    u8  shop_info_raw1;
+    u8  visitor_flag;
+    u32 sales_sum;
+    lbRTC_time_c exchange_time;
+    lbRTC_time_c renewal_time;
+    u8  priority_packed[NET_SHOP_PRIORITY_COUNT];
+    u8  has_sale_event;
+    u8  sale_ut_x;
+    u8  sale_ut_z;
+    u16 sold_item;
+    u16 sold_rsv_item;
+} pkt_s2c_shop_sync_t;
+
 /* Room Furniture Entry */
 typedef struct {
     u16 ftr_id;
@@ -337,6 +364,10 @@ int net_unpack_interact_req(const u8* buf, size_t buf_size, pkt_c2s_interact_req
 /* FG Delta */
 int net_pack_fg_delta(u8* buf, size_t buf_size, const pkt_s2c_fg_delta_t* pkt);
 int net_unpack_fg_delta(const u8* buf, size_t buf_size, pkt_s2c_fg_delta_t* pkt);
+
+/* Shop Sync */
+int net_pack_shop_sync(u8* buf, size_t buf_size, const pkt_s2c_shop_sync_t* pkt);
+int net_unpack_shop_sync(const u8* buf, size_t buf_size, pkt_s2c_shop_sync_t* pkt);
 
 /* Zone Enter */
 int net_pack_zone_enter(u8* buf, size_t buf_size, const pkt_s2c_zone_enter_t* pkt);

@@ -228,10 +228,20 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Acceptance Criteria**: When Player 1 digs a hole or chops a tree, the modification appears instantaneously on Player 2's screen.
 
 - [ ] **Task 7.4: Economy & Shop Synchronization**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_shop.c`, `src/actor/npc/ac_npc_shop_master.c`
-  - **Description**: Synchronize Nook's shelf stock and purchase limits. When an item is purchased, the shelf slot is marked sold-out across all clients currently in the shop.
-  - **Acceptance Criteria**: Two players cannot purchase the same limited daily item from Nook's store.
+  - **State**: `In Progress`
+  - **Files**: `include/network/net_packets.h`, `pc/src/network/net_packer.c`, `pc/include/server/server_world.h`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `src/actor/ac_shop_design.c`, `src/actor/npc/ac_npc_shop_common.c`, `src/actor/npc/ac_npc_shop_mastersp_talk.c_inc`, `src/game/m_shop.c`, `src/game/m_play.c`
+  - **Description**: Synchronize Nook's shelf stock, `sales_sum`, and purchase limits across all clients. Keep tools (shovel, net, rod, axe), saplings (regular and cedar), and flower bags in unlimited daily stock (never depleting to sold-out signs, matching stationery behavior) so all players in multiplayer can purchase tools and plants freely. When a limited item (furniture, clothing, carpet, wallpaper, umbrella, diary, paint, signboard) is purchased, mark its shelf slot sold-out authoritatively on the server and broadcast the update to all clients in the shop.
+  - **Current Progress**:
+    - **Completed**:
+      - Added `PKT_S2C_SHOP_SYNC`, `pkt_s2c_shop_sync_t`, and `NET_INTERACT_SHOP_BUY` / `NET_INTERACT_SHOP_PLUS_SALES` / `NET_INTERACT_SHOP_LOTTERY` in `include/network/net_packets.h` and `pc/src/network/net_packer.c`.
+      - Implemented server-side shop initialization/validation, `server_world_send_shop_sync`, `server_world_handle_shop_sync_packet`, `server_world_notify_shop_purchase`, `server_world_notify_shop_plus_sales`, `server_world_notify_shop_lottery`, `server_world_reapply_cached_shop`, and unit tests in `pc/src/server/server_world.c` and `pc/include/server/server_world.h`.
+      - Wired `PKT_S2C_SHOP_SYNC` reception in `pc/src/client/client_network.c` and `NET_INTERACT_SHOP_*` dispatch in `pc/src/server/server_network.c`.
+    - **Remaining**:
+      - Hook `aSD_ReportGoodsSales` and implement `aSD_ApplyRemoteSale` in `src/actor/ac_shop_design.c` (keep tools, saplings, and flower bags unlimited; notify server on purchase; apply live remote sold-out updates in shop).
+      - Guard `aNSC_sell_answer0` against double-buying an already sold-out item and hook `aNSC_buy_check` / `aNSC_order_check` (`mSP_PlusSales`) in `src/actor/npc/ac_npc_shop_common.c` and lottery wins in `src/actor/npc/ac_npc_shop_mastersp_talk.c_inc`.
+      - Guard `mSP_SetShopRareFurnitureChirashi` (`player_no < 0`) and prevent connected clients from overwriting server shop stock in `src/game/m_shop.c`, and initialize `mSP_ShopGameStartCt` / `mSP_ExchangeLineUp_InGame` on server boot in `src/game/m_play.c`.
+      - Run `compile_check` and `run_server_test`.
+  - **Acceptance Criteria**: Tools, saplings, and flower bags never sell out when purchased; limited daily items (such as furniture or clothing) immediately become sold-out for all players when bought by any player.
 
 - [ ] **Task 7.5: Dynamic Entity Lifecycle Synchronization (Bugs & Fish)**
   - **State**: `Not Implemented`

@@ -9,11 +9,14 @@
 #include "m_name_table.h"
 #include "m_scene_table.h"
 #include "m_collision_bg.h"
+#include "m_shop.h"
 #include "ac_effectbg.h"
 #include "libultra/libultra.h"
 
 #include <stdio.h>
 #include <string.h>
+
+extern void aSD_ApplyRemoteSale(int ux, int uz, mActor_name_t sold_item, mActor_name_t sold_rsv_item);
 
 /* Re-entrancy guard to prevent incoming PKT_S2C_FG_DELTA from echoing PKT_C2S_INTERACT_REQ */
 static int s_applying_remote_fg_delta = 0;
@@ -39,6 +42,9 @@ static inline u16 fg_read_u16(const u8* buf, size_t* offset) {
 static bool s_has_cached_server_fg = false;
 static u16  s_cached_server_fg[FG_BLOCK_Z_NUM][FG_BLOCK_X_NUM][UT_Z_NUM][UT_X_NUM];
 static u16  s_cached_server_deposit[FG_BLOCK_TOTAL_NUM][UT_Z_NUM];
+
+static bool   s_has_cached_server_shop = false;
+static Shop_c s_cached_server_shop;
 
 /* Track original item on tiles temporarily reserved with RSV_NO (0xFFFF) during dig/bury/drop animations */
 #define RSV_CACHE_SIZE 32
@@ -281,10 +287,23 @@ static void apply_cached_fg_snapshot(void) {
     s_applying_remote_fg_delta = 0;
 }
 
+void server_world_reapply_cached_shop(void) {
+#ifndef TARGET_SERVER
+    if (client_network_is_connected() && s_has_cached_server_shop) {
+        Save_Get(shop) = s_cached_server_shop;
+    }
+#endif
+}
+
 void server_world_on_field_init(int scene) {
 #ifndef TARGET_SERVER
-    if (scene == SCENE_FG && client_network_is_connected() && s_has_cached_server_fg) {
-        apply_cached_fg_snapshot();
+    if (client_network_is_connected()) {
+        if (scene == SCENE_FG && s_has_cached_server_fg) {
+            apply_cached_fg_snapshot();
+        }
+        if (s_has_cached_server_shop) {
+            Save_Get(shop) = s_cached_server_shop;
+        }
     }
 #else
     (void)scene;
@@ -321,6 +340,7 @@ void server_world_send_initial_sync(u16 client_id) {
     }
 
     server_network_send_raw(client_id, NET_CH_RELIABLE, s_snap_buf, offset, true);
+    server_world_send_shop_sync(client_id, 0, 0, 0, EMPTY_NO, EMPTY_NO);
 }
 
 void server_world_notify_local_fg_change(int bx, int bz, int ut_x, int ut_z, u16 old_item, u16 new_item) {
@@ -514,6 +534,80 @@ bool server_world_apply_fg_mutation(u16 zone_id, int bx, int bz, int ut_x, int u
 void server_world_handle_fg_interact(u16 client_id, const pkt_c2s_interact_req_t* req) {
     if (req == NULL) return;
 
+    /* Economy & Shop interactions (Task 7.4) */
+    if (req->action_type == NET_INTERACT_SHOP_BUY) {
+        u16 sold_item = req->item_arg;
+        u16 sold_rsv_item = (u16)(req->target_actor_id & 0xFFFFu);
+        u32 price = mSP_ItemNo2ItemPrice(sold_item);
+        int ut_x = (int)req->ut_x;
+        int ut_z = (int)req->ut_z;
+
+        if (sold_rsv_item != EMPTY_NO) {
+            /* Verify limited item is still in stock on the server before marking sold out */
+            int in_stock = 0;
+            if (sold_item == ITM_HUKUBUKURO_BAG || sold_item == ITM_FOOD_CANDY) {
+                if (Save_Get(shop).flowers_candy_grab_bag_count > 0) {
+                    in_stock = 1;
+                }
+            } else if (Save_Get(shop).rare_item == sold_item) {
+                in_stock = 1;
+            } else {
+                for (int i = 0; i < mSP_GOODS_COUNT; i++) {
+                    if (Save_Get(shop).items[i] == sold_item) {
+                        in_stock = 1;
+                        break;
+                    }
+                }
+                if (!in_stock) {
+                    for (int i = 0; i < mEv_BARGIN_ITEM_NUM; i++) {
+                        if (Save_Get(event_save_data).special.event.bargin.items[i] == sold_item) {
+                            Save_Get(event_save_data).special.event.bargin.items[i] = sold_rsv_item;
+                            in_stock = 1;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (!in_stock) {
+                printf("[SERVER SHOP] Client %u attempted to buy already sold-out item 0x%04X at ut(%d,%d)\n",
+                       client_id, sold_item, ut_x, ut_z);
+                server_world_send_shop_sync(client_id, 1, ut_x, ut_z, sold_item, sold_rsv_item);
+                return;
+            }
+
+            mSP_ShopSaleReport(sold_item, Save_Get(shop).items, mSP_GOODS_COUNT, sold_rsv_item);
+        }
+
+        mSP_PlusSales(price);
+        server_storage_mark_dirty();
+        server_world_send_shop_sync(0, sold_rsv_item != EMPTY_NO ? 1 : 0, ut_x, ut_z, sold_item, sold_rsv_item);
+        printf("[SERVER SHOP] Client %u bought 0x%04X for %u Bells at ut(%d,%d) -> rsv 0x%04X (sales_sum=%u)\n",
+               client_id, sold_item, (unsigned)price, ut_x, ut_z, sold_rsv_item,
+               (unsigned)Save_Get(shop).sales_sum);
+        return;
+    } else if (req->action_type == NET_INTERACT_SHOP_PLUS_SALES) {
+        u32 sum = req->target_actor_id;
+        mSP_PlusSales(sum);
+        server_storage_mark_dirty();
+        server_world_send_shop_sync(0, 0, 0, 0, EMPTY_NO, EMPTY_NO);
+        printf("[SERVER SHOP] Client %u added %u Bells to shop sales (sales_sum=%u)\n",
+               client_id, (unsigned)sum, (unsigned)Save_Get(shop).sales_sum);
+        return;
+    } else if (req->action_type == NET_INTERACT_SHOP_LOTTERY) {
+        int lottery_idx = (int)req->ut_x;
+        u16 sold_item = req->item_arg;
+        if (lottery_idx >= 0 && lottery_idx < mSP_LOTTERY_ITEM_COUNT &&
+            Save_Get(shop).lottery_items[lottery_idx] == sold_item) {
+            Save_Get(shop).lottery_items[lottery_idx] = RSV_SHOP_SOLD_FTR;
+            server_storage_mark_dirty();
+            server_world_send_shop_sync(0, 0, 0, 0, sold_item, RSV_SHOP_SOLD_FTR);
+            printf("[SERVER SHOP] Client %u won lottery prize slot %d (0x%04X)\n",
+                   client_id, lottery_idx, sold_item);
+        }
+        return;
+    }
+
     int bx = (int)req->block_x;
     int bz = (int)req->block_z;
     int ut_x = (int)(req->ut_x & FG_DELTA_UT_MASK);
@@ -684,6 +778,197 @@ void server_world_apply_client_fg_delta(const pkt_s2c_fg_delta_t* delta) {
     s_applying_remote_fg_delta = 0;
 }
 
+/* --- Economy & Shop Synchronization (Task 7.4) --- */
+
+static void server_world_ensure_shop_initialized(void) {
+#ifdef TARGET_SERVER
+    Shop_c* shop = Save_GetPointer(shop);
+    int needs_regen = 0;
+
+    if (shop->exchange_time.year == 0) {
+        mSP_ShopGameStartCt(NULL);
+        server_storage_mark_dirty();
+        return;
+    }
+
+    if (mSP_CheckExchangeDay2()) {
+        mSP_ExchangeLineUp_InGame(NULL);
+        server_storage_mark_dirty();
+        return;
+    }
+
+    /* Ensure tools and plants are stocked if an older save had depleted them */
+    for (int i = 0; i < mSP_GOODS_COUNT; i++) {
+        if (shop->items[i] == RSV_SHOP_SOLD_TOOL || shop->items[i] == RSV_SHOP_SOLD_PLANT) {
+            needs_regen = 1;
+            break;
+        }
+    }
+    if (needs_regen) {
+        mSP_ExchangeLineUp_ZeldaMalloc();
+        server_storage_mark_dirty();
+    }
+#endif
+}
+
+void server_world_send_shop_sync(u16 client_id, int has_sale_event, int ut_x, int ut_z,
+                                 u16 sold_item, u16 sold_rsv_item) {
+    server_world_ensure_shop_initialized();
+
+    Shop_c* shop = Save_GetPointer(shop);
+    pkt_s2c_shop_sync_t pkt;
+    memset(&pkt, 0, sizeof(pkt));
+
+    for (int i = 0; i < NET_SHOP_GOODS_COUNT && i < mSP_GOODS_COUNT; i++) {
+        pkt.items[i] = shop->items[i];
+    }
+    pkt.rare_item = shop->rare_item;
+    for (int i = 0; i < NET_SHOP_LOTTERY_COUNT && i < mSP_LOTTERY_ITEM_COUNT; i++) {
+        pkt.lottery_items[i] = shop->lottery_items[i];
+    }
+    pkt.flowers_candy_grab_bag_count = shop->flowers_candy_grab_bag_count;
+    pkt.shop_info_raw0 = (u8)((shop->shop_info.shop_level & 0x3) |
+                              ((shop->shop_info.upgrading_today & 0x1) << 2) |
+                              ((shop->shop_info.send_upgrade_notice & 0x1) << 3) |
+                              ((shop->shop_info.not_loaded_before & 0x1) << 4));
+    pkt.shop_info_raw1 = (u8)(shop->shop_info.paint_color & 0xF);
+    pkt.visitor_flag = (u8)(shop->visitor_flag != 0 ? 1 : 0);
+    pkt.sales_sum = shop->sales_sum;
+    pkt.exchange_time = shop->exchange_time;
+    pkt.renewal_time = shop->renewal_time;
+    for (int i = 0; i < NET_SHOP_PRIORITY_COUNT && i < mSP_KIND_MAX; i++) {
+        pkt.priority_packed[i] = (u8)((shop->priority_lists[i].a & 0x3) |
+                                      ((shop->priority_lists[i].b & 0x3) << 2) |
+                                      ((shop->priority_lists[i].c & 0x3) << 4));
+    }
+    pkt.has_sale_event = (u8)(has_sale_event ? 1 : 0);
+    pkt.sale_ut_x = (u8)ut_x;
+    pkt.sale_ut_z = (u8)ut_z;
+    pkt.sold_item = sold_item;
+    pkt.sold_rsv_item = sold_rsv_item;
+
+    u8 buf[256];
+    int len = net_pack_shop_sync(buf, sizeof(buf), &pkt);
+    if (len > 0) {
+        if (client_id != 0) {
+            server_network_send_raw(client_id, NET_CH_RELIABLE, buf, (size_t)len, true);
+        } else {
+            server_network_broadcast_raw(NET_CH_RELIABLE, buf, (size_t)len, true, 0);
+        }
+    }
+}
+
+void server_world_notify_shop_purchase(int ux, int uz, u16 sold_item, u16 sold_rsv_item, u32 price) {
+    (void)price;
+    if (s_has_cached_server_shop) {
+        s_cached_server_shop = Save_Get(shop);
+    }
+
+#ifndef TARGET_SERVER
+    if (client_network_is_connected()) {
+        pkt_c2s_interact_req_t req;
+        memset(&req, 0, sizeof(req));
+        req.client_id = client_network_get_client_id();
+        req.action_type = NET_INTERACT_SHOP_BUY;
+        req.ut_x = (u8)ux;
+        req.ut_z = (u8)uz;
+        req.target_actor_id = (u32)sold_rsv_item;
+        req.item_arg = sold_item;
+
+        u8 buf[64];
+        int len = net_pack_interact_req(buf, sizeof(buf), &req);
+        if (len > 0) {
+            client_network_send_raw(NET_CH_RELIABLE, buf, (size_t)len, true);
+        }
+    }
+#endif
+}
+
+void server_world_notify_shop_plus_sales(u32 sum) {
+    if (s_has_cached_server_shop) {
+        s_cached_server_shop.sales_sum = Save_Get(shop).sales_sum;
+    }
+
+#ifndef TARGET_SERVER
+    if (client_network_is_connected() && sum > 0) {
+        pkt_c2s_interact_req_t req;
+        memset(&req, 0, sizeof(req));
+        req.client_id = client_network_get_client_id();
+        req.action_type = NET_INTERACT_SHOP_PLUS_SALES;
+        req.target_actor_id = sum;
+
+        u8 buf[64];
+        int len = net_pack_interact_req(buf, sizeof(buf), &req);
+        if (len > 0) {
+            client_network_send_raw(NET_CH_RELIABLE, buf, (size_t)len, true);
+        }
+    }
+#endif
+}
+
+void server_world_notify_shop_lottery(int lottery_idx, u16 sold_item) {
+    if (s_has_cached_server_shop && lottery_idx >= 0 && lottery_idx < mSP_LOTTERY_ITEM_COUNT) {
+        s_cached_server_shop.lottery_items[lottery_idx] = RSV_SHOP_SOLD_FTR;
+    }
+
+#ifndef TARGET_SERVER
+    if (client_network_is_connected()) {
+        pkt_c2s_interact_req_t req;
+        memset(&req, 0, sizeof(req));
+        req.client_id = client_network_get_client_id();
+        req.action_type = NET_INTERACT_SHOP_LOTTERY;
+        req.ut_x = (u8)lottery_idx;
+        req.item_arg = sold_item;
+
+        u8 buf[64];
+        int len = net_pack_interact_req(buf, sizeof(buf), &req);
+        if (len > 0) {
+            client_network_send_raw(NET_CH_RELIABLE, buf, (size_t)len, true);
+        }
+    }
+#endif
+}
+
+void server_world_handle_shop_sync_packet(const u8* data, size_t len) {
+    pkt_s2c_shop_sync_t pkt;
+    if (net_unpack_shop_sync(data, len, &pkt) <= 0) {
+        return;
+    }
+
+    Shop_c* shop = Save_GetPointer(shop);
+    for (int i = 0; i < NET_SHOP_GOODS_COUNT && i < mSP_GOODS_COUNT; i++) {
+        shop->items[i] = pkt.items[i];
+    }
+    shop->rare_item = pkt.rare_item;
+    for (int i = 0; i < NET_SHOP_LOTTERY_COUNT && i < mSP_LOTTERY_ITEM_COUNT; i++) {
+        shop->lottery_items[i] = pkt.lottery_items[i];
+    }
+    shop->flowers_candy_grab_bag_count = pkt.flowers_candy_grab_bag_count;
+    shop->shop_info.shop_level = pkt.shop_info_raw0 & 0x3;
+    shop->shop_info.upgrading_today = (pkt.shop_info_raw0 >> 2) & 0x1;
+    shop->shop_info.send_upgrade_notice = (pkt.shop_info_raw0 >> 3) & 0x1;
+    shop->shop_info.not_loaded_before = (pkt.shop_info_raw0 >> 4) & 0x1;
+    shop->shop_info.paint_color = pkt.shop_info_raw1 & 0xF;
+    shop->visitor_flag = pkt.visitor_flag ? TRUE : FALSE;
+    shop->sales_sum = pkt.sales_sum;
+    shop->exchange_time = pkt.exchange_time;
+    shop->renewal_time = pkt.renewal_time;
+    for (int i = 0; i < NET_SHOP_PRIORITY_COUNT && i < mSP_KIND_MAX; i++) {
+        shop->priority_lists[i].a = pkt.priority_packed[i] & 0x3;
+        shop->priority_lists[i].b = (pkt.priority_packed[i] >> 2) & 0x3;
+        shop->priority_lists[i].c = (pkt.priority_packed[i] >> 4) & 0x3;
+    }
+
+    s_cached_server_shop = *shop;
+    s_has_cached_server_shop = true;
+
+#ifndef TARGET_SERVER
+    if (pkt.has_sale_event && pkt.sold_rsv_item != EMPTY_NO) {
+        aSD_ApplyRemoteSale((int)pkt.sale_ut_x, (int)pkt.sale_ut_z, pkt.sold_item, pkt.sold_rsv_item);
+    }
+#endif
+}
+
 /* --- Self-Tests --- */
 
 #define TEST_WORLD_ASSERT(cond, msg) \
@@ -761,6 +1046,45 @@ int server_world_run_tests(void) {
     /* Restore original tile state */
     Save_Get(fg[bz - 1][bx - 1]).items[ut_z][ut_x] = orig_item;
     set_block_deposit_bit(bx, bz, ut_x, ut_z, orig_dep);
+
+    /* 5. Shop synchronization tests (Task 7.4) */
+    Shop_c orig_shop = Save_Get(shop);
+    memset(&Save_Get(shop), 0, sizeof(Shop_c));
+    Save_Get(shop).exchange_time.year = 2026;
+    Save_Get(shop).exchange_time.month = 10;
+    Save_Get(shop).exchange_time.day = 20;
+    Save_Get(shop).items[0] = ITM_SHOVEL;
+    Save_Get(shop).items[1] = ITM_SAPLING;
+    Save_Get(shop).items[2] = ITM_WHITE_PANSY_BAG;
+    Save_Get(shop).items[3] = ITM_CLOTH000;
+    Save_Get(shop).sales_sum = 0;
+
+    /* Unlimited item purchase (shovel): stays in shop.items, increases sales_sum */
+    memset(&req, 0, sizeof(req));
+    req.client_id = 1;
+    req.action_type = NET_INTERACT_SHOP_BUY;
+    req.ut_x = 4;
+    req.ut_z = 4;
+    req.target_actor_id = EMPTY_NO;
+    req.item_arg = ITM_SHOVEL;
+    server_world_handle_fg_interact(1, &req);
+    TEST_WORLD_ASSERT(Save_Get(shop).items[0] == ITM_SHOVEL, "shovel remains in stock after purchase");
+    TEST_WORLD_ASSERT(Save_Get(shop).sales_sum > 0, "shovel purchase increases sales_sum");
+
+    /* Limited item purchase (clothing): marks slot RSV_SHOP_SOLD_CLOTH */
+    u32 sales_before_cloth = Save_Get(shop).sales_sum;
+    req.target_actor_id = RSV_SHOP_SOLD_CLOTH;
+    req.item_arg = ITM_CLOTH000;
+    server_world_handle_fg_interact(1, &req);
+    TEST_WORLD_ASSERT(Save_Get(shop).items[3] == RSV_SHOP_SOLD_CLOTH, "clothing slot becomes RSV_SHOP_SOLD_CLOTH");
+    TEST_WORLD_ASSERT(Save_Get(shop).sales_sum > sales_before_cloth, "clothing purchase increases sales_sum");
+
+    /* Duplicate purchase of already sold-out clothing is rejected */
+    u32 sales_after_cloth = Save_Get(shop).sales_sum;
+    server_world_handle_fg_interact(2, &req);
+    TEST_WORLD_ASSERT(Save_Get(shop).sales_sum == sales_after_cloth, "duplicate purchase of sold-out item rejected");
+
+    Save_Get(shop) = orig_shop;
 
     printf("[SERVER WORLD TEST] All authoritative foreground mutation tests passed!\n");
     return 1;
