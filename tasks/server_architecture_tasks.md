@@ -14,9 +14,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | **Phase 4** | Multi-Player Entity Decoupling | 5 | 5 | Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 5 | 5 | Implemented |
 | **Phase 6** | Network Transport Layer (ENet / UDP) | 4 | 4 | Implemented |
-| **Phase 7** | World State Replication & Spatial Management | 0 | 5 | Not Implemented |
-| **Phase 8** | Resident Ownership, Extended Storage & Tiered Persistence | 6 | 6 | Implemented |
-| **Total** | | **32** | **37** | **86% Complete** |
+| **Phase 7** | World State Replication & Spatial Management | 2 | 5 | In Progress |
+| **Phase 8** | Resident Ownership, Extended Storage & Tiered Persistence | 6 | 7 | In Progress |
+| **Total** | | **34** | **38** | **89% Complete** |
 
 ---
 
@@ -278,4 +278,11 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Files**: `src/actor/ac_haniwa.c`, `src/actor/ac_haniwa_move.c_inc`, `include/ac_haniwa.h`, `src/game/m_house.c`, `include/m_house.h`, `pc/src/server/server_network.c`, `pc/src/server/server_storage.c`, `pc/src/client/client_network.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
   - **Description**: Hook house exterior Gyroids to display a "Move In" prompt when spoken to by an eligible visitor. Check that the house has an open roommate slot (< 2 residents), assign the player to the house, and update mailbox/door permissions.
   - **Acceptance Criteria**: A visitor speaking to a house Gyroid can claim an open slot, becoming a permanent town resident and roommate.
+
+- [ ] **Task 8.7: Per-Player Appearance Synchronization & Rendering (Model, Face & Clothing)**
+  - **State**: `Not Implemented`
+  - **Files**: `src/game/m_player_draw.c_inc`, `src/game/m_player_main_dma.c_inc`, `src/game/m_player_lib.c`, `pc/src/client/client_sync.c`, `pc/src/server/server_sync.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
+  - **Description**: Synchronize each player's appearance attributes (`sex` / boy-girl mesh, `face_type`, `sunburn_rank`, and `cloth.idx`) across the network and maintain per-slot model, clothing texture/palette, eye/mouth texture, and face palette buffers so remote `PLAYER_ACTOR` instances render with their own character model, face, and outfit instead of cloning the local player's `object_exchange` bank.
+  - **Acceptance Criteria**: Two connected players with different genders, faces, or outfits see each other rendered with their respective boy/girl model, face eyes/mouth, skin tone, and shirt texture/palette.
+
 

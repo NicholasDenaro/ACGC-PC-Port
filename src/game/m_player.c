@@ -1829,7 +1829,31 @@ extern void Player_actor_move(ACTOR* actorx, GAME* game) {
     }
 #elif defined(TARGET_PC)
     if ((player->is_dummy || player->player_no > 0) && player->now_main_index != mPlayer_INDEX_DMA) {
+        f32 prev_frame = player->keyframe0.frame_control.current_frame;
         Player_actor_CulcAnimation_Base(actorx);
+        actorx->bg_collision_check.result.unit_attribute = mCoBG_Wpos2BgAttribute_Original(actorx->world.position);
+        if (player->animation0_idx == mPlayer_ANIM_DASH1) {
+            if (!Player_actor_Check_AnimationFrame_PerfectEquel(actorx, prev_frame)) {
+                Player_actor_Set_FootMark_Base1(actorx, game, FALSE, FALSE);
+                if (eEC_CLIP != NULL) {
+                    if (Player_actor_Check_AnimationFrame(&player->keyframe0.frame_control, 1.0f) != FALSE) {
+                        eEC_CLIP->effect_make_proc(eEC_EFFECT_DASH_ASIMOTO, player->left_foot_pos, 2,
+                                                   player->left_foot_angle.y, game, 0xFFFF,
+                                                   actorx->bg_collision_check.result.unit_attribute, 0);
+                    } else if (Player_actor_Check_AnimationFrame(&player->keyframe0.frame_control, 9.0f) != FALSE) {
+                        eEC_CLIP->effect_make_proc(eEC_EFFECT_DASH_ASIMOTO, player->right_foot_pos, 2,
+                                                   player->right_foot_angle.y, game, 0xFFFF,
+                                                   actorx->bg_collision_check.result.unit_attribute, 0);
+                    }
+                }
+            }
+            Player_actor_set_lean_angle(actorx);
+        } else if (player->animation0_idx == mPlayer_ANIM_RUN1 || player->animation0_idx == mPlayer_ANIM_WALK1) {
+            Player_actor_SearchAnimation_Walk(actorx, game, prev_frame);
+            Player_actor_set_lean_angle(actorx);
+        } else {
+            Player_actor_recover_lean_angle(actorx);
+        }
         Player_actor_set_eye_pattern_normal(actorx);
         Player_actor_Excute_Corect_forStand(actorx, game);
         Player_actor_Set_force_shadow_position_fromWorldPosition(actorx);
@@ -1931,7 +1955,27 @@ void pc_player_set_animation(PLAYER_ACTOR* player, GAME* game, int anim_idx) {
             if (player->keyframe0.animation_enabled != 0) {
                 cKF_SkeletonInfo_R_AnimationMove_dt(&player->keyframe0);
             }
-            Player_actor_InitAnimation_Base1((ACTOR*)player, game, anim_idx, anim_idx, 1.0f, 1.0f, 0.5f, morph, mPlayer_PART_TABLE_NORMAL);
+            int prev_anim = player->animation0_idx;
+            int prev_is_locomotion = (prev_anim == mPlayer_ANIM_WALK1 || prev_anim == mPlayer_ANIM_RUN1 || prev_anim == mPlayer_ANIM_DASH1);
+            int next_is_locomotion = (anim_idx == mPlayer_ANIM_WALK1 || anim_idx == mPlayer_ANIM_RUN1 || anim_idx == mPlayer_ANIM_DASH1);
+            f32 start_frame = (prev_is_locomotion && next_is_locomotion) ? player->keyframe0.frame_control.current_frame : 1.0f;
+            f32 speed = 0.5f;
+            if (anim_idx == mPlayer_ANIM_DASH1) {
+                speed = 0.60f;
+            } else if (anim_idx == mPlayer_ANIM_RUN1) {
+                speed = 0.484f;
+            } else if (anim_idx == mPlayer_ANIM_WALK1) {
+                speed = 0.38f;
+            }
+            Player_actor_InitAnimation_Base1((ACTOR*)player, game, anim_idx, anim_idx, start_frame, 1.0f, speed, morph, mPlayer_PART_TABLE_NORMAL);
+            if (anim_idx == mPlayer_ANIM_RUN_SLIP1) {
+                Player_actor_sound_slip((ACTOR*)player);
+                if (eEC_CLIP != NULL) {
+                    eEC_CLIP->effect_make_proc(eEC_EFFECT_TURN_ASIMOTO, player->actor_class.world.position, 2,
+                                               player->actor_class.world.angle.y, game, 0xFFFF,
+                                               player->actor_class.bg_collision_check.result.unit_attribute, 0);
+                }
+            }
             if (morph == 0.0f) {
                 Player_actor_CulcAnimation_Base((ACTOR*)player);
             }

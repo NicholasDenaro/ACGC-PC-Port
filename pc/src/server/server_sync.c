@@ -39,7 +39,7 @@ void server_sync_on_client_input(uint32_t client_id, const pkt_c2s_input_t* inpu
 
     /* Determine gait and animation index (prefer client-reported animation0_idx) */
     uint16_t anim_id = mPlayer_ANIM_WAIT1;
-    if (input->anim_id > 0 && input->anim_id < mPlayer_ANIM_NUM) {
+    if (input->anim_id < mPlayer_ANIM_NUM) {
         anim_id = input->anim_id;
     } else if (dist > 4.0f) {
         anim_id = mPlayer_ANIM_RUN1;

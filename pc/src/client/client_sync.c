@@ -284,7 +284,7 @@ void client_sync_tick(GAME_PLAY* play) {
 
             /* Select animation from network state, or fallback to displacement */
             int desired_anim = remote->target_anim_id;
-            if (desired_anim <= 0 || desired_anim >= mPlayer_ANIM_NUM) {
+            if (desired_anim < 0 || desired_anim >= mPlayer_ANIM_NUM) {
                 desired_anim = mPlayer_ANIM_WAIT1;
                 if (dist > 3.2f) {
                     desired_anim = mPlayer_ANIM_RUN1;
