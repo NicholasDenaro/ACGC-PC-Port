@@ -44,6 +44,7 @@ static u16  s_cached_server_deposit[FG_BLOCK_TOTAL_NUM][UT_Z_NUM];
 #define RSV_CACHE_SIZE 32
 typedef struct {
     u8  active;
+    u8  is_remote;
     u8  bx;
     u8  bz;
     u8  ut_x;
@@ -54,8 +55,8 @@ typedef struct {
 static RsvTileCacheEntry s_rsv_cache[RSV_CACHE_SIZE];
 static int s_rsv_cache_next = 0;
 
-static void rsv_cache_record(int bx, int bz, int ut_x, int ut_z, u16 old_item) {
-    if (old_item == RSV_NO) return;
+static void rsv_cache_record(int bx, int bz, int ut_x, int ut_z, u16 old_item, int is_remote) {
+    if (old_item == RSV_NO) old_item = EMPTY_NO;
     for (int i = 0; i < RSV_CACHE_SIZE; i++) {
         if (s_rsv_cache[i].active &&
             s_rsv_cache[i].bx == (u8)bx &&
@@ -63,12 +64,14 @@ static void rsv_cache_record(int bx, int bz, int ut_x, int ut_z, u16 old_item) {
             s_rsv_cache[i].ut_x == (u8)ut_x &&
             s_rsv_cache[i].ut_z == (u8)ut_z) {
             s_rsv_cache[i].pre_rsv_item = old_item;
+            s_rsv_cache[i].is_remote = (u8)is_remote;
             return;
         }
     }
     RsvTileCacheEntry* e = &s_rsv_cache[s_rsv_cache_next];
     s_rsv_cache_next = (s_rsv_cache_next + 1) % RSV_CACHE_SIZE;
     e->active = 1;
+    e->is_remote = (u8)is_remote;
     e->bx = (u8)bx;
     e->bz = (u8)bz;
     e->ut_x = (u8)ut_x;
@@ -76,7 +79,22 @@ static void rsv_cache_record(int bx, int bz, int ut_x, int ut_z, u16 old_item) {
     e->pre_rsv_item = old_item;
 }
 
-static u16 rsv_cache_consume(int bx, int bz, int ut_x, int ut_z) {
+static bool rsv_cache_is_remote(int bx, int bz, int ut_x, int ut_z) {
+    for (int i = 0; i < RSV_CACHE_SIZE; i++) {
+        if (s_rsv_cache[i].active &&
+            s_rsv_cache[i].is_remote &&
+            s_rsv_cache[i].bx == (u8)bx &&
+            s_rsv_cache[i].bz == (u8)bz &&
+            s_rsv_cache[i].ut_x == (u8)ut_x &&
+            s_rsv_cache[i].ut_z == (u8)ut_z) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static u16 rsv_cache_consume(int bx, int bz, int ut_x, int ut_z, int* out_is_remote) {
+    if (out_is_remote != NULL) *out_is_remote = 0;
     for (int i = 0; i < RSV_CACHE_SIZE; i++) {
         if (s_rsv_cache[i].active &&
             s_rsv_cache[i].bx == (u8)bx &&
@@ -84,6 +102,7 @@ static u16 rsv_cache_consume(int bx, int bz, int ut_x, int ut_z) {
             s_rsv_cache[i].ut_x == (u8)ut_x &&
             s_rsv_cache[i].ut_z == (u8)ut_z) {
             s_rsv_cache[i].active = 0;
+            if (out_is_remote != NULL) *out_is_remote = s_rsv_cache[i].is_remote;
             return s_rsv_cache[i].pre_rsv_item;
         }
     }
@@ -127,6 +146,59 @@ static u8 classify_fg_action(u16 old_item, u16 new_item) {
     }
     return NET_INTERACT_DROP_ITEM;
 }
+
+#ifndef TARGET_SERVER
+static s16 get_tree_effect_variant(u16 item) {
+    int tree_type = FGTreeType_check(item);
+    if (IS_ITEM_XMAS_TREE(item)) {
+        return (tree_type == mNT_TREE_TYPE_CEDAR) ? EffectBG_VARIANT_CEDAR_XMAS : EffectBG_VARIANT_TREE_XMAS;
+    }
+    if (tree_type == mNT_TREE_TYPE_PALM) {
+        return EffectBG_VARIANT_PALM_FULL;
+    }
+    if (tree_type == mNT_TREE_TYPE_CEDAR) {
+        return EffectBG_VARIANT_CEDAR_FULL;
+    }
+    if (tree_type == mNT_TREE_TYPE_GOLD) {
+        return EffectBG_VARIANT_GOLD_FULL;
+    }
+    return EffectBG_VARIANT_TREE_FULL;
+}
+
+static bool get_shaken_tree_drop_info(u16 old_tree_item, u16 new_tree_item, u16* out_drop_item, s16* out_drop_count) {
+    static const struct {
+        u16 src_tree;
+        u16 dst_tree;
+        u16 drop_item;
+        s16 drop_count;
+    } s_tree_drops[] = {
+        { TREE_APPLE_FRUIT,   TREE_APPLE_NOFRUIT_0,  ITM_FOOD_APPLE,    3 },
+        { TREE_ORANGE_FRUIT,  TREE_ORANGE_NOFRUIT_0, ITM_FOOD_ORANGE,   3 },
+        { TREE_PEACH_FRUIT,   TREE_PEACH_NOFRUIT_0,  ITM_FOOD_PEACH,    3 },
+        { TREE_PEAR_FRUIT,    TREE_PEAR_NOFRUIT_0,   ITM_FOOD_PEAR,     3 },
+        { TREE_CHERRY_FRUIT,  TREE_CHERRY_NOFRUIT_0, ITM_FOOD_CHERRY,   3 },
+        { TREE_PALM_FRUIT,    TREE_PALM_NOFRUIT_0,   ITM_FOOD_COCONUT,  2 },
+        { TREE_1000BELLS,     TREE,                  ITM_MONEY_1000,    3 },
+        { TREE_10000BELLS,    TREE,                  ITM_MONEY_10000,   3 },
+        { TREE_30000BELLS,    TREE,                  ITM_MONEY_30000,   3 },
+        { TREE_100BELLS,      TREE,                  ITM_MONEY_100,     3 },
+        { TREE_BELLS,         TREE,                  ITM_MONEY_100,     1 },
+        { CEDAR_TREE_BELLS,   CEDAR_TREE,            ITM_MONEY_100,     1 },
+        { GOLD_TREE_BELLS,    GOLD_TREE,             ITM_MONEY_100,     1 },
+        { TREE_PRESENT,       TREE,                  ITM_PRESENT,       1 },
+        { GOLD_TREE_SHOVEL,   GOLD_TREE,             ITM_GOLDEN_SHOVEL, 1 },
+    };
+
+    for (size_t i = 0; i < sizeof(s_tree_drops) / sizeof(s_tree_drops[0]); i++) {
+        if (s_tree_drops[i].src_tree == old_tree_item && s_tree_drops[i].dst_tree == new_tree_item) {
+            *out_drop_item = s_tree_drops[i].drop_item;
+            *out_drop_count = s_tree_drops[i].drop_count;
+            return true;
+        }
+    }
+    return false;
+}
+#endif
 
 static int get_block_deposit_bit(int bx, int bz, int ut_x, int ut_z) {
     if (ut_x < 0 || ut_x >= UT_X_NUM || ut_z < 0 || ut_z >= UT_Z_NUM) {
@@ -252,15 +324,20 @@ void server_world_send_initial_sync(u16 client_id) {
 }
 
 void server_world_notify_local_fg_change(int bx, int bz, int ut_x, int ut_z, u16 old_item, u16 new_item) {
-    if (s_applying_remote_fg_delta) {
-        return;
-    }
-
     /* Validate outdoor town block coordinates (1..FG_BLOCK_X_NUM, 1..FG_BLOCK_Z_NUM) */
     if (bx < 1 || bx > FG_BLOCK_X_NUM || bz < 1 || bz > FG_BLOCK_Z_NUM) {
         return;
     }
     if (ut_x < 0 || ut_x >= UT_X_NUM || ut_z < 0 || ut_z >= UT_Z_NUM) {
+        return;
+    }
+
+    if (s_applying_remote_fg_delta) {
+        /* If a remote animation (such as bIT_CLIP->fruit_set_proc) reserves a landing tile with RSV_NO,
+         * mark it as a remote reservation so when the falling fruit lands locally it doesn't echo to server. */
+        if (new_item == RSV_NO) {
+            rsv_cache_record(bx, bz, ut_x, ut_z, old_item, 1);
+        }
         return;
     }
 
@@ -272,13 +349,20 @@ void server_world_notify_local_fg_change(int bx, int bz, int ut_x, int ut_z, u16
 
     /* Record RSV_NO temporary reservation and wait for the committed item write */
     if (new_item == RSV_NO) {
-        rsv_cache_record(bx, bz, ut_x, ut_z, old_item);
+        rsv_cache_record(bx, bz, ut_x, ut_z, old_item, 0);
         return;
     }
 
     /* Recover original item if tile was temporarily reserved with RSV_NO */
+    int was_remote_rsv = 0;
     if (old_item == RSV_NO) {
-        old_item = rsv_cache_consume(bx, bz, ut_x, ut_z);
+        old_item = rsv_cache_consume(bx, bz, ut_x, ut_z, &was_remote_rsv);
+        if (was_remote_rsv) {
+            if (s_has_cached_server_fg && is_syncable_fg_item(new_item)) {
+                s_cached_server_fg[bz - 1][bx - 1][ut_z][ut_x] = new_item;
+            }
+            return;
+        }
     }
 
     /* Ignore runtime structure/actor/dummy placeholders */
@@ -535,37 +619,63 @@ void server_world_apply_client_fg_delta(const pkt_s2c_fg_delta_t* delta) {
     s_applying_remote_fg_delta = 1;
 
     u16 local_item = Save_Get(fg[bz - 1][bx - 1]).items[ut_z][ut_x];
-    Save_Get(fg[bz - 1][bx - 1]).items[ut_z][ut_x] = new_item;
     if (s_has_cached_server_fg) {
         s_cached_server_fg[bz - 1][bx - 1][ut_z][ut_x] = new_item;
     }
     set_block_deposit_bit(bx, bz, ut_x, ut_z, deposit);
 
-    if (mFI_CheckFieldData() == TRUE && mFI_GET_TYPE(mFI_GetFieldId()) == mFI_FIELD_FG) {
-        mActor_name_t* fg_p = mFI_BkNumtoUtFGTop(bx, bz);
-        if (fg_p != NULL) {
-            local_item = fg_p[(ut_z << 4) | ut_x];
-        }
+    /* If a remote fruit drop animation is currently in flight targeting this tile (RSV_NO),
+     * let bIT_actor_drop_move_fly finish its bounce and write the item on landing! */
+    if (local_item == RSV_NO && rsv_cache_is_remote(bx, bz, ut_x, ut_z)) {
+        s_applying_remote_fg_delta = 0;
+        return;
+    }
 
+    Save_Get(fg[bz - 1][bx - 1]).items[ut_z][ut_x] = new_item;
+
+    if (mFI_CheckFieldData() == TRUE && mFI_GET_TYPE(mFI_GetFieldId()) == mFI_FIELD_FG) {
         mFI_BlockUtNumtoFGSet(new_item, bx, bz, ut_x, ut_z);
 
-        /* If a remote player chopped down a tree into a stump, update collision offset and play tree fall effect */
-        if (local_item != new_item && mNT_ItIsStump(new_item)) {
+        if (local_item != new_item) {
             int world_ut_x = bx * UT_X_NUM + ut_x;
             int world_ut_z = bz * UT_Z_NUM + ut_z;
             xyz_t wpos;
-            if (mFI_UtNum2CenterWpos(&wpos, world_ut_x, world_ut_z)) {
+
+            /* 1. Remote player chopped down a tree into a stump */
+            if (mNT_ItIsStump(new_item) && mFI_UtNum2CenterWpos(&wpos, world_ut_x, world_ut_z)) {
                 mNT_offset_table_c* ofs_tbl = obj_hight_table_item0_nogrow(new_item);
                 if (ofs_tbl != NULL) {
                     mCoBG_SetPlussOffset(wpos, ofs_tbl->table.centerRight_offset, ofs_tbl->table.unit_attribute);
                 }
 #ifndef TARGET_SERVER
-                if (gamePT != NULL && Common_Get(clip).make_effect_bg_proc != NULL && IS_ITEM_TREE(delta->old_item)) {
+                u16 tree_item = IS_ITEM_TREE(local_item) ? local_item : delta->old_item;
+                if (gamePT != NULL && Common_Get(clip).make_effect_bg_proc != NULL && IS_ITEM_TREE(tree_item)) {
                     wpos.y = mCoBG_UtNum2UtCenterY_Keep(world_ut_x, world_ut_z);
-                    Common_Get(clip).make_effect_bg_proc(gamePT, EffectBG_EFFECT_CUT_RIGHT, EffectBG_VARIANT_TREE_FULL, &wpos);
+                    Common_Get(clip).make_effect_bg_proc(gamePT, EffectBG_EFFECT_CUT_RIGHT,
+                                                         get_tree_effect_variant(tree_item), &wpos);
                 }
 #endif
             }
+#ifndef TARGET_SERVER
+            /* 2. Remote player shook a fruit/bell/item tree: play tree shake & falling fruit animations */
+            else {
+                u16 src_tree = (local_item != EMPTY_NO && local_item != new_item) ? local_item : delta->old_item;
+                u16 drop_item = EMPTY_NO;
+                s16 drop_count = 0;
+                if (get_shaken_tree_drop_info(src_tree, new_item, &drop_item, &drop_count)) {
+                    if (gamePT != NULL && Common_Get(clip).make_effect_bg_proc != NULL &&
+                        mFI_UtNum2CenterWpos(&wpos, world_ut_x, world_ut_z)) {
+                        wpos.y = mCoBG_UtNum2UtCenterY_Keep(world_ut_x, world_ut_z);
+                        Common_Get(clip).make_effect_bg_proc(gamePT, EffectBG_EFFECT_SHAKE_LARGE,
+                                                             get_tree_effect_variant(src_tree), &wpos);
+                    }
+                    if (Common_Get(clip).bg_item_clip != NULL &&
+                        Common_Get(clip).bg_item_clip->fruit_set_proc != NULL) {
+                        Common_Get(clip).bg_item_clip->fruit_set_proc(drop_item, world_ut_x, world_ut_z, drop_count, 0);
+                    }
+                }
+            }
+#endif
         }
 
         mFI_SetFGUpData();
