@@ -29,11 +29,15 @@ typedef struct {
     xyz_t target_pos;
     s16 target_angle_y;
 
-    /* Animation and tool state */
+    /* Animation, tool, and appearance state */
     u16 current_anim_id;
     u16 target_anim_id;
     u16 tool_id;
     u16 state_flags;
+    u8  gender;
+    u8  face_type;
+    u8  sunburn_rank;
+    u16 cloth_idx;
 
     /* Timing */
     uint32_t last_packet_ms;

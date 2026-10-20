@@ -940,6 +940,12 @@ static u8* Player_actor_Get_eye_tex_p(ACTOR* actorx) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     int idx = player->eye_tex_idx;
 
+#ifdef TARGET_PC
+    if (player->is_dummy || player->player_no > 0) {
+        extern u8* pc_player_get_remote_eye_tex_p(PLAYER_ACTOR* player, int idx);
+        return pc_player_get_remote_eye_tex_p(player, idx);
+    }
+#endif
     return mPlib_Get_eye_tex_p(idx);
 }
 
@@ -953,6 +959,12 @@ static u8* Player_actor_Get_mouth_tex_p(ACTOR* actorx) {
     PLAYER_ACTOR* player = (PLAYER_ACTOR*)actorx;
     int idx = player->mouth_tex_idx;
 
+#ifdef TARGET_PC
+    if (player->is_dummy || player->player_no > 0) {
+        extern u8* pc_player_get_remote_mouth_tex_p(PLAYER_ACTOR* player, int idx);
+        return pc_player_get_remote_mouth_tex_p(player, idx);
+    }
+#endif
     return mPlib_Get_mouth_tex_p(idx);
 }
 

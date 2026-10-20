@@ -56,6 +56,11 @@ void server_sync_on_client_input(uint32_t client_id, const pkt_c2s_input_t* inpu
     cc->current_tool_id = input->current_tool_id;
     cc->anim_id = anim_id;
     cc->anim_frame++;
+    cc->private_data.gender = input->gender;
+    cc->private_data.face = input->face_type;
+    cc->private_data.sunburn.rank = input->sunburn_rank;
+    cc->private_data.cloth.idx = input->cloth_idx;
+    cc->private_data.cloth.item = (mActor_name_t)(ITM_CLOTH_START + input->cloth_idx);
 
     /* Update spatial interest grid acre assignment */
     server_spatial_update_client_wpos(client_id, cc->zone_id, input->player_x, input->player_z);
@@ -115,6 +120,10 @@ void server_sync_tick(GAME_PLAY* play) {
                 ent->anim_frame = other->anim_frame;
                 ent->tool_id = other->current_tool_id;
                 ent->state_flags = other->state_flags;
+                ent->gender = other->private_data.gender;
+                ent->face_type = other->private_data.face;
+                ent->sunburn_rank = other->private_data.sunburn.rank;
+                ent->cloth_idx = other->private_data.cloth.idx;
 
                 if (sync_pkt.count >= NET_MAX_ENTITIES_PER_SYNC) {
                     break;

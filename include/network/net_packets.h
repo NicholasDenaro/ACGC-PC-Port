@@ -192,6 +192,10 @@ typedef struct {
     f32 player_y;
     f32 player_z;
     s16 angle_y;
+    u8  gender;
+    u8  face_type;
+    u8  sunburn_rank;
+    u16 cloth_idx;
 } pkt_c2s_input_t;
 
 /* Entity State for Entity Sync */
@@ -206,6 +210,10 @@ typedef struct {
     u16 anim_frame;
     u16 tool_id;
     u16 state_flags;
+    u8  gender;
+    u8  face_type;
+    u8  sunburn_rank;
+    u16 cloth_idx;
 } net_entity_state_t;
 
 /* Entity Sync Server -> Client */

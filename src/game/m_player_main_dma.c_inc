@@ -30,7 +30,13 @@ static void Player_actor_request_proc_index_fromDma(ACTOR* actorx, GAME* game) {
             }
             keyf = &actor->keyframe0;
             type = actor->actor_class.actor_specific;
+#ifdef TARGET_PC
+            extern cKF_Skeleton_R_c* pc_player_get_remote_mdl_p(PLAYER_ACTOR* player);
+            cKF_Skeleton_R_c* mdl_p = (actor->is_dummy || actor->player_no > 0) ? pc_player_get_remote_mdl_p(actor) : mPlib_get_player_mdl_p();
+            cKF_SkeletonInfo_R_ct(keyf, mdl_p, NULL, actor->joint_data, actor->morph_data);
+#else
             cKF_SkeletonInfo_R_ct(keyf, mPlib_get_player_mdl_p(), NULL, actor->joint_data, actor->morph_data);
+#endif
 
             actor->keyframe1 = *keyf;
 

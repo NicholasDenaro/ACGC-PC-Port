@@ -224,9 +224,24 @@ static void Player_actor_draw_Normal(ACTOR* actorx, GAME* game) {
 
     gSPSegment(POLY_OPA_DISP++, ANIME_1_TXT_SEG, eye_tex_p);
     gSPSegment(POLY_OPA_DISP++, ANIME_2_TXT_SEG, mouth_tex_p);
+#ifdef TARGET_PC
+    if (player->is_dummy || player->player_no > 0) {
+        extern u8* pc_player_get_remote_tex_p(PLAYER_ACTOR* player, GAME* game);
+        extern u16* pc_player_get_remote_pallet_p(PLAYER_ACTOR* player, GAME* game);
+        extern u16* pc_player_get_remote_face_pallet_p(PLAYER_ACTOR* player, GAME* game);
+        gSPSegment(POLY_OPA_DISP++, ANIME_3_TXT_SEG, pc_player_get_remote_tex_p(player, game));
+        gSPSegment(POLY_OPA_DISP++, ANIME_4_TXT_SEG, pc_player_get_remote_pallet_p(player, game));
+        gSPSegment(POLY_OPA_DISP++, ANIME_5_TXT_SEG, pc_player_get_remote_face_pallet_p(player, game));
+    } else {
+        gSPSegment(POLY_OPA_DISP++, ANIME_3_TXT_SEG, mPlib_get_player_tex_p(game));
+        gSPSegment(POLY_OPA_DISP++, ANIME_4_TXT_SEG, mPlib_get_player_pallet_p(game));
+        gSPSegment(POLY_OPA_DISP++, ANIME_5_TXT_SEG, mPlib_get_player_face_pallet_p(game));
+    }
+#else
     gSPSegment(POLY_OPA_DISP++, ANIME_3_TXT_SEG, mPlib_get_player_tex_p(game));
     gSPSegment(POLY_OPA_DISP++, ANIME_4_TXT_SEG, mPlib_get_player_pallet_p(game));
     gSPSegment(POLY_OPA_DISP++, ANIME_5_TXT_SEG, mPlib_get_player_face_pallet_p(game));
+#endif
 
     CLOSE_POLY_OPA_DISP(graph);
 

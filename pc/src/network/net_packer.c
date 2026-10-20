@@ -507,8 +507,8 @@ int net_unpack_movein_ack(const u8* buf, size_t buf_size, pkt_s2c_movein_ack_t* 
 
 int net_pack_input(u8* buf, size_t buf_size, const pkt_c2s_input_t* pkt) {
     net_buf_writer_t w;
-    /* 4 (seq) + 2 (client_id) + 1 (stick_x) + 1 (stick_y) + 4 (buttons) + 2 (tool) + 2 (anim) + 12 (xyz) + 2 (angle_y) = 30 */
-    u16 payload_size = 4 + 2 + 1 + 1 + 4 + 2 + 2 + 12 + 2;
+    /* 4 (seq) + 2 (client_id) + 1 (stick_x) + 1 (stick_y) + 4 (buttons) + 2 (tool) + 2 (anim) + 12 (xyz) + 2 (angle_y) + 5 (appearance) = 35 */
+    u16 payload_size = 4 + 2 + 1 + 1 + 4 + 2 + 2 + 12 + 2 + 5;
     net_header_t hdr = { NET_PACKET_MAGIC, PKT_C2S_INPUT, NET_CH_UNRELIABLE, payload_size };
     w_init(&w, buf, buf_size);
     w_u16(&w, hdr.magic);
@@ -527,6 +527,10 @@ int net_pack_input(u8* buf, size_t buf_size, const pkt_c2s_input_t* pkt) {
     w_f32(&w, pkt->player_y);
     w_f32(&w, pkt->player_z);
     w_s16(&w, pkt->angle_y);
+    w_u8(&w, pkt->gender);
+    w_u8(&w, pkt->face_type);
+    w_u8(&w, pkt->sunburn_rank);
+    w_u16(&w, pkt->cloth_idx);
 
     return w.error ? -1 : (int)w.offset;
 }
@@ -549,6 +553,10 @@ int net_unpack_input(const u8* buf, size_t buf_size, pkt_c2s_input_t* pkt) {
     pkt->player_y = r_f32(&r);
     pkt->player_z = r_f32(&r);
     pkt->angle_y = r_s16(&r);
+    pkt->gender = r_u8(&r);
+    pkt->face_type = r_u8(&r);
+    pkt->sunburn_rank = r_u8(&r);
+    pkt->cloth_idx = r_u16(&r);
 
     return r.error ? -1 : (int)(hlen + r.offset);
 }
@@ -558,8 +566,8 @@ int net_unpack_input(const u8* buf, size_t buf_size, pkt_c2s_input_t* pkt) {
 int net_pack_entity_sync(u8* buf, size_t buf_size, const pkt_s2c_entity_sync_t* pkt) {
     net_buf_writer_t w;
     u16 count = pkt->count > NET_MAX_ENTITIES_PER_SYNC ? NET_MAX_ENTITIES_PER_SYNC : pkt->count;
-    /* Single entity record size: 4 (actor_id) + 2 (zone_id) + 12 (pos) + 2 (angle) + 2 (anim) + 2 (frame) + 2 (tool) + 2 (flags) = 28 bytes */
-    u16 payload_size = 4 + 2 + (count * 28);
+    /* Single entity record size: 4 (actor_id) + 2 (zone_id) + 12 (pos) + 2 (angle) + 2 (anim) + 2 (frame) + 2 (tool) + 2 (flags) + 5 (appearance) = 33 bytes */
+    u16 payload_size = 4 + 2 + (count * 33);
     net_header_t hdr = { NET_PACKET_MAGIC, PKT_S2C_ENTITY_SYNC, NET_CH_UNRELIABLE, payload_size };
     u16 i;
 
@@ -584,6 +592,10 @@ int net_pack_entity_sync(u8* buf, size_t buf_size, const pkt_s2c_entity_sync_t* 
         w_u16(&w, e->anim_frame);
         w_u16(&w, e->tool_id);
         w_u16(&w, e->state_flags);
+        w_u8(&w, e->gender);
+        w_u8(&w, e->face_type);
+        w_u8(&w, e->sunburn_rank);
+        w_u16(&w, e->cloth_idx);
     }
 
     return w.error ? -1 : (int)w.offset;
@@ -616,6 +628,10 @@ int net_unpack_entity_sync(const u8* buf, size_t buf_size, pkt_s2c_entity_sync_t
         e->anim_frame = r_u16(&r);
         e->tool_id = r_u16(&r);
         e->state_flags = r_u16(&r);
+        e->gender = r_u8(&r);
+        e->face_type = r_u8(&r);
+        e->sunburn_rank = r_u8(&r);
+        e->cloth_idx = r_u16(&r);
     }
 
     return r.error ? -1 : (int)(hlen + r.offset);
@@ -959,7 +975,7 @@ int net_packer_run_tests(void) {
 
     /* 4. Input Stream */
     {
-        pkt_c2s_input_t orig = { 1024, 1, -45, 80, 0x00000009, 0x2410, 5, 1234.5f, 50.0f, -678.9f, 0x4000 };
+        pkt_c2s_input_t orig = { 1024, 1, -45, 80, 0x00000009, 0x2410, 5, 1234.5f, 50.0f, -678.9f, 0x4000, 1, 3, 0, 12 };
         pkt_c2s_input_t dec;
         len = net_pack_input(buf, sizeof(buf), &orig);
         TEST_ASSERT(len > 0, "net_pack_input");

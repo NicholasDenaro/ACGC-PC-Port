@@ -3906,4 +3906,146 @@ extern void mPlib_Set_change_color_request(void) {
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR_NOW();
 
     player->change_color_request = TRUE;
+#ifdef TARGET_PC
+    ;
+#endif
 }
+
+#ifdef TARGET_PC
+#define PC_MAX_REMOTE_APPEARANCE_SLOTS 8
+
+typedef struct {
+    int initialized;
+    int buf_idx;
+    int gender;
+    int face_type;
+    int sunburn_rank;
+    int cloth_idx;
+    u8  cloth_tex[2][mNW_DESIGN_TEX_SIZE] ATTRIBUTE_ALIGN(32);
+    u16 cloth_pal[2][mNW_PALETTE_COUNT] ATTRIBUTE_ALIGN(32);
+    u8  face_tex[2][0xE00] ATTRIBUTE_ALIGN(32);
+    u16 face_pal[2][mNW_PALETTE_COUNT] ATTRIBUTE_ALIGN(32);
+} PcRemotePlayerAppearance;
+
+static PcRemotePlayerAppearance s_remote_appearance[PC_MAX_REMOTE_APPEARANCE_SLOTS];
+
+void pc_player_update_remote_appearance(PLAYER_ACTOR* player, int slot, int gender, int face_type, int sunburn_rank, int cloth_idx) {
+    if (slot < 0 || slot >= PC_MAX_REMOTE_APPEARANCE_SLOTS) {
+        return;
+    }
+
+    int safe_gender = (gender == mPr_SEX_FEMALE) ? mPr_SEX_FEMALE : mPr_SEX_MALE;
+    int safe_face = (face_type >= 0 && face_type < mPr_FACE_TYPE_NUM) ? face_type : mPr_FACE_TYPE0;
+    int safe_sunburn = (sunburn_rank >= 0 && sunburn_rank <= mPr_SUNBURN_RANK_MAX) ? sunburn_rank : 0;
+    int safe_cloth = mPlib_Check_PlayerClothInAram(cloth_idx) ? cloth_idx : 0;
+
+    PcRemotePlayerAppearance* app = &s_remote_appearance[slot];
+    if (!app->initialized ||
+        app->gender != safe_gender ||
+        app->face_type != safe_face ||
+        app->sunburn_rank != safe_sunburn ||
+        app->cloth_idx != safe_cloth) {
+        int next_buf = app->initialized ? (app->buf_idx ^ 1) : 0;
+
+        mPlib_Load_PlayerTexAndPallet(app->cloth_tex[next_buf], app->cloth_pal[next_buf], safe_cloth);
+
+        u32 face_tex_rom = mPlib_Get_UseFaceTexRom_p_common(safe_gender, safe_face, FALSE, FALSE);
+        if (face_tex_rom != 0) {
+            _JW_GetResourceAram(face_tex_rom, app->face_tex[next_buf], 0xE00);
+            DCStoreRangeNoSync(app->face_tex[next_buf], 0xE00);
+
+            u32 face_pal_rom;
+            if (safe_sunburn > 0) {
+                u32 idx = mPlib_Get_UseFaceRom_index(safe_gender, safe_face, FALSE, FALSE, mPlayer_USE_FACE_ROM_TYPE_PAL);
+                u32 base = mPlib_Get_UseFaceTexRom_p_common(mPr_SEX_FEMALE, mPr_FACE_TYPE7, TRUE, TRUE);
+                face_pal_rom = base + 0xE00 + (safe_sunburn + idx) * 0x20;
+            } else {
+                face_pal_rom = face_tex_rom + 0xE00;
+            }
+            _JW_GetResourceAram(face_pal_rom, (u8*)app->face_pal[next_buf], mNW_PALETTE_SIZE);
+            mPlib_ByteSwapPlayerPalette(app->face_pal[next_buf]);
+            DCStoreRangeNoSync(app->face_pal[next_buf], mNW_PALETTE_SIZE);
+        }
+
+        app->buf_idx = next_buf;
+        app->gender = safe_gender;
+        app->face_type = safe_face;
+        app->sunburn_rank = safe_sunburn;
+        app->cloth_idx = safe_cloth;
+        app->initialized = 1;
+    }
+
+    if (player != NULL) {
+        cKF_Skeleton_R_c* skel = (app->gender == mPr_SEX_FEMALE) ? &cKF_bs_r_grl_1 : &cKF_bs_r_boy_1;
+        if (player->keyframe0.skeleton != NULL && player->keyframe0.skeleton != skel) {
+            player->keyframe0.skeleton = skel;
+            player->keyframe1.skeleton = skel;
+        }
+    }
+}
+
+cKF_Skeleton_R_c* pc_player_get_remote_mdl_p(PLAYER_ACTOR* player) {
+    if (player != NULL) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            return (s_remote_appearance[slot].gender == mPr_SEX_FEMALE) ? &cKF_bs_r_grl_1 : &cKF_bs_r_boy_1;
+        }
+    }
+    return mPlib_get_player_mdl_p();
+}
+
+u8* pc_player_get_remote_tex_p(PLAYER_ACTOR* player, GAME* game) {
+    if (player != NULL) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            int b = s_remote_appearance[slot].buf_idx;
+            return s_remote_appearance[slot].cloth_tex[b];
+        }
+    }
+    return mPlib_get_player_tex_p(game);
+}
+
+u16* pc_player_get_remote_pallet_p(PLAYER_ACTOR* player, GAME* game) {
+    if (player != NULL) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            int b = s_remote_appearance[slot].buf_idx;
+            return s_remote_appearance[slot].cloth_pal[b];
+        }
+    }
+    return mPlib_get_player_pallet_p(game);
+}
+
+u16* pc_player_get_remote_face_pallet_p(PLAYER_ACTOR* player, GAME* game) {
+    if (player != NULL) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            int b = s_remote_appearance[slot].buf_idx;
+            return s_remote_appearance[slot].face_pal[b];
+        }
+    }
+    return mPlib_get_player_face_pallet_p(game);
+}
+
+u8* pc_player_get_remote_eye_tex_p(PLAYER_ACTOR* player, int idx) {
+    if (player != NULL && idx >= 0 && idx < mPlayer_EYE_TEX_NUM) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            int b = s_remote_appearance[slot].buf_idx;
+            return s_remote_appearance[slot].face_tex[b] + idx * 0x100;
+        }
+    }
+    return mPlib_Get_eye_tex_p(idx);
+}
+
+u8* pc_player_get_remote_mouth_tex_p(PLAYER_ACTOR* player, int idx) {
+    if (player != NULL && idx >= 0 && idx < mPlayer_MOUTH_TEX_NUM) {
+        int slot = player->player_no;
+        if (slot >= 0 && slot < PC_MAX_REMOTE_APPEARANCE_SLOTS && s_remote_appearance[slot].initialized) {
+            int b = s_remote_appearance[slot].buf_idx;
+            return s_remote_appearance[slot].face_tex[b] + (mPlayer_EYE_TEX_NUM * 0x100) + idx * 0x100;
+        }
+    }
+    return mPlib_Get_mouth_tex_p(idx);
+}
+#endif

@@ -80,6 +80,10 @@ void client_sync_handle_packet(const pkt_s2c_entity_sync_t* pkt) {
                     remote->target_anim_id = ent->anim_id;
                     remote->tool_id = ent->tool_id;
                     remote->state_flags = ent->state_flags;
+                    remote->gender = ent->gender;
+                    remote->face_type = ent->face_type;
+                    remote->sunburn_rank = ent->sunburn_rank;
+                    remote->cloth_idx = ent->cloth_idx;
                     remote->last_packet_ms = now;
                     printf("[CLIENT SYNC] Registered remote player Client ID %u in slot %d\n",
                            (unsigned int)ent->actor_id, j);
@@ -97,6 +101,10 @@ void client_sync_handle_packet(const pkt_s2c_entity_sync_t* pkt) {
             remote->target_anim_id = ent->anim_id;
             remote->tool_id = ent->tool_id;
             remote->state_flags = ent->state_flags;
+            remote->gender = ent->gender;
+            remote->face_type = ent->face_type;
+            remote->sunburn_rank = ent->sunburn_rank;
+            remote->cloth_idx = ent->cloth_idx;
             remote->last_packet_ms = now;
         }
     }
@@ -130,7 +138,15 @@ void client_sync_send_local(GAME_PLAY* play) {
     inp.button_mask = (u32)getButton();
 
     Private_c* priv = Common_Get(now_private);
-    inp.current_tool_id = (priv != NULL) ? priv->equipment : EMPTY_NO;
+    if (priv != NULL) {
+        inp.current_tool_id = priv->equipment;
+        inp.gender = priv->gender;
+        inp.face_type = priv->face;
+        inp.sunburn_rank = priv->sunburn.rank;
+        inp.cloth_idx = priv->cloth.idx;
+    } else {
+        inp.current_tool_id = EMPTY_NO;
+    }
     inp.anim_id = (u16)((player->animation0_idx >= 0 && player->animation0_idx < mPlayer_ANIM_NUM)
                             ? player->animation0_idx
                             : mPlayer_ANIM_WAIT1);
@@ -234,6 +250,13 @@ void client_sync_tick(GAME_PLAY* play) {
             g_server_clients[actor_slot].is_connected = 1;
             g_server_clients[actor_slot].is_dummy = 1;
             g_server_clients[actor_slot].client_id = remote->client_id;
+            g_server_clients[actor_slot].private_data.gender = remote->gender;
+            g_server_clients[actor_slot].private_data.face = remote->face_type;
+            g_server_clients[actor_slot].private_data.sunburn.rank = remote->sunburn_rank;
+            g_server_clients[actor_slot].private_data.cloth.idx = remote->cloth_idx;
+
+            extern void pc_player_update_remote_appearance(PLAYER_ACTOR* player, int slot, int gender, int face_type, int sunburn_rank, int cloth_idx);
+            pc_player_update_remote_appearance(NULL, actor_slot, remote->gender, remote->face_type, remote->sunburn_rank, remote->cloth_idx);
 
             remote->player_actor = server_player_spawn_actor(play, actor_slot, remote->current_pos, angle);
             if (remote->player_actor != NULL) {
@@ -243,12 +266,22 @@ void client_sync_tick(GAME_PLAY* play) {
                 remote->player_actor->actor_class.cull_distance = 10000.0f;
                 remote->player_actor->actor_class.state_bitfield |=
                     (ACTOR_STATE_NO_CULL | ACTOR_STATE_NO_MOVE_WHILE_CULLED | ACTOR_STATE_NO_DRAW_WHILE_CULLED);
+                pc_player_update_remote_appearance(remote->player_actor, actor_slot, remote->gender, remote->face_type, remote->sunburn_rank, remote->cloth_idx);
                 printf("[CLIENT SYNC] Spawned remote PLAYER_ACTOR for Client ID %u in slot %d.\n",
                        (unsigned int)remote->client_id, actor_slot);
             }
         }
 
         if (remote->player_actor != NULL) {
+            int actor_slot = remote->player_actor->player_no;
+            if (actor_slot > 0 && actor_slot < MAX_SERVER_CLIENTS) {
+                g_server_clients[actor_slot].private_data.gender = remote->gender;
+                g_server_clients[actor_slot].private_data.face = remote->face_type;
+                g_server_clients[actor_slot].private_data.sunburn.rank = remote->sunburn_rank;
+                g_server_clients[actor_slot].private_data.cloth.idx = remote->cloth_idx;
+            }
+            extern void pc_player_update_remote_appearance(PLAYER_ACTOR* player, int slot, int gender, int face_type, int sunburn_rank, int cloth_idx);
+            pc_player_update_remote_appearance(remote->player_actor, actor_slot, remote->gender, remote->face_type, remote->sunburn_rank, remote->cloth_idx);
             /* Position interpolation (Exponential Decay Lerp) */
             float dx = remote->target_pos.x - remote->current_pos.x;
             float dy = remote->target_pos.y - remote->current_pos.y;
