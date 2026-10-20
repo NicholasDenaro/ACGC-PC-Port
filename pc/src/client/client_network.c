@@ -4,6 +4,7 @@
 #include "client/client_sync.h"
 #include "server/server_network.h"
 #include "server/server_storage.h"
+#include "server/server_world.h"
 #include "network/net_packets.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -463,6 +464,11 @@ void client_network_poll(void) {
                             break;
                         }
 
+                        case PKT_S2C_FG_DELTA: {
+                            server_world_handle_fg_packet(event.packet->data, event.packet->dataLength);
+                            break;
+                        }
+
                         case PKT_C2S_INTERACT_REQ: {
                             pkt_c2s_interact_req_t req;
                             if (net_unpack_interact_req(event.packet->data, event.packet->dataLength, &req) > 0) {
@@ -666,7 +672,49 @@ int client_network_run_tests(void) {
         TEST_CLIENT_ASSERT(fabsf(cc->predicted_pos.x - 100.5f) < 0.01f, "server received input pos.x");
         TEST_CLIENT_ASSERT(fabsf(cc->predicted_pos.z - (-250.25f)) < 0.01f, "server received input pos.z");
 
-        /* 4. Client Disconnect */
+        /* 5. Foreground Item Mutation (PKT_C2S_INTERACT_REQ -> PKT_S2C_FG_DELTA broadcast) */
+        {
+            u16 saved_tile = Save_Get(fg[1][1]).items[4][4];
+            Save_Get(fg[1][1]).items[4][4] = EMPTY_NO;
+
+            pkt_c2s_interact_req_t fg_req;
+            memset(&fg_req, 0, sizeof(fg_req));
+            fg_req.client_id = client_network_get_client_id();
+            fg_req.action_type = NET_INTERACT_DROP_ITEM;
+            fg_req.block_x = 2;
+            fg_req.block_z = 2;
+            fg_req.ut_x = 4;
+            fg_req.ut_z = 4;
+            fg_req.target_actor_id = EMPTY_NO;
+            fg_req.item_arg = TREE_SAPLING;
+
+            u8 ibuf[64];
+            int ilen = net_pack_interact_req(ibuf, sizeof(ibuf), &fg_req);
+            TEST_CLIENT_ASSERT(ilen > 0 && client_network_send_raw(NET_CH_RELIABLE, ibuf, (size_t)ilen, true),
+                               "send FG interact req");
+            enet_host_flush(g_client_net.host);
+
+            /* Pump server to process interact req and queue PKT_S2C_FG_DELTA, then clear local tile to prove delta reception */
+            start_ms = SDL_GetTicks();
+            while (Save_Get(fg[1][1]).items[4][4] != TREE_SAPLING && SDL_GetTicks() - start_ms < 500) {
+                server_network_poll();
+                SDL_Delay(2);
+            }
+            TEST_CLIENT_ASSERT(Save_Get(fg[1][1]).items[4][4] == TREE_SAPLING, "server mutated Save.fg to TREE_SAPLING");
+
+            /* Clear local tile and pump client_network_poll to verify PKT_S2C_FG_DELTA restores it */
+            Save_Get(fg[1][1]).items[4][4] = EMPTY_NO;
+            start_ms = SDL_GetTicks();
+            while (Save_Get(fg[1][1]).items[4][4] != TREE_SAPLING && SDL_GetTicks() - start_ms < 500) {
+                server_network_poll();
+                client_network_poll();
+                SDL_Delay(2);
+            }
+            TEST_CLIENT_ASSERT(Save_Get(fg[1][1]).items[4][4] == TREE_SAPLING, "client received PKT_S2C_FG_DELTA");
+            Save_Get(fg[1][1]).items[4][4] = saved_tile;
+        }
+
+        /* 6. Client Disconnect */
         client_network_disconnect(0);
         TEST_CLIENT_ASSERT(client_network_get_state() == CLIENT_NET_DISCONNECTED, "client state disconnected");
 

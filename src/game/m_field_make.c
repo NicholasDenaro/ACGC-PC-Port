@@ -1223,6 +1223,12 @@ extern void mFM_FieldInit(GAME_PLAY* play) {
         bg_disp_num = mFM_VISIBLE_BLOCK_NUM;
     }
 
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+    {
+        extern void server_world_on_field_init(int scene);
+        server_world_on_field_init(scene);
+    }
+#endif
     g_fdinfo = mFM_MakeField(scene, bg_disp_size, bg_disp_num);
     mFI_InitMoveActorBitData();
     mFI_ClearColKeep();
@@ -1237,7 +1243,16 @@ extern void mFM_FieldInit(GAME_PLAY* play) {
 
     mFM_PoorTreeUnderPlayerBlock();
     mAGrw_ChangeCedar2Tree();
+#if defined(TARGET_PC) && !defined(TARGET_SERVER)
+    {
+        extern bool client_network_is_connected(void);
+        if (!client_network_is_connected()) {
+            mAGrw_RenewalFgItem(Common_GetPointer(time.rtc_time));
+        }
+    }
+#else
     mAGrw_RenewalFgItem(Common_GetPointer(time.rtc_time));
+#endif
     mAGrw_SetXmasTree();
     mFM_SetFruit_title_demo(Save_Get(scene_no));
 

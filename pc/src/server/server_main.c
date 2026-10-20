@@ -8,6 +8,7 @@
 #include "server/server_spatial.h"
 #include "server/server_storage.h"
 #include "server/server_sync.h"
+#include "server/server_world.h"
 #include "client/client_network.h"
 #include "network/net_packets.h"
 #include <enet/enet.h>
@@ -242,9 +243,10 @@ int main(int argc, char** argv) {
             int s_res = server_network_run_tests();
             int c_res = client_network_run_tests();
             int sy_res = server_sync_run_tests();
+            int w_res = server_world_run_tests();
             enet_deinitialize();
             SDL_Quit();
-            if (sp_res && st_res && s_res && c_res && sy_res) {
+            if (sp_res && st_res && s_res && c_res && sy_res && w_res) {
                 printf("[SERVER] All spatial, storage, sync, listener & client controller tests passed successfully!\n");
                 return 0;
             } else {

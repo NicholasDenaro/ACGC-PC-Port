@@ -14,9 +14,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
 | **Phase 4** | Multi-Player Entity Decoupling | 5 | 5 | Implemented |
 | **Phase 5** | Multi-Zone Simulation Engine (Outdoor + Rooms) | 5 | 5 | Implemented |
 | **Phase 6** | Network Transport Layer (ENet / UDP) | 4 | 4 | Implemented |
-| **Phase 7** | World State Replication & Spatial Management | 2 | 5 | In Progress |
-| **Phase 8** | Resident Ownership, Extended Storage & Tiered Persistence | 6 | 7 | In Progress |
-| **Total** | | **34** | **38** | **89% Complete** |
+| **Phase 7** | World State Replication & Spatial Management | 3 | 5 | In Progress |
+| **Phase 8** | Resident Ownership, Extended Storage & Tiered Persistence | 7 | 7 | Implemented |
+| **Total** | | **36** | **38** | **95% Complete** |
 
 ---
 
@@ -221,9 +221,9 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Stream player and mobile entity positions, yaw rotation, velocity, and animation indices at 20–30 Hz over ENet Channel 0. Implement client-side linear interpolation ($lerp$) to ensure smooth visual movement.
   - **Acceptance Criteria**: Remote players move smoothly on screen without jitter or rubber-banding.
 
-- [ ] **Task 7.3: Authoritative Foreground Item (`Save.fg`) Mutations**
-  - **State**: `Not Implemented`
-  - **Files**: `src/game/m_field_make.c`, `pc/src/server/server_world.c`
+- [x] **Task 7.3: Authoritative Foreground Item (`Save.fg`) Mutations**
+  - **State**: `Implemented`
+  - **Files**: `src/game/m_field_make.c`, `src/game/m_field_info.c`, `pc/src/server/server_world.c`, `pc/include/server/server_world.h`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`
   - **Description**: Handle digging holes, burying items, planting seeds/trees, picking fruit, picking flowers, and cutting trees authoritatively on the server. Broadcast `PKT_S2C_FG_DELTA` to update all nearby clients.
   - **Acceptance Criteria**: When Player 1 digs a hole or chops a tree, the modification appears instantaneously on Player 2's screen.
 

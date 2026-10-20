@@ -342,6 +342,7 @@ set(PC_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_storage.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_backup.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_sync.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/server/server_world.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/client/client_sync.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/client/client_network.c
     ${CMAKE_CURRENT_SOURCE_DIR}/src/client/client_identity.c

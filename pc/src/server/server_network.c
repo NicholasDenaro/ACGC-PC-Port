@@ -6,6 +6,7 @@
 #include "server/server_runner.h"
 #include "server/server_storage.h"
 #include "server/server_sync.h"
+#include "server/server_world.h"
 #include "network/net_packets.h"
 #include "m_common_data.h"
 #include "m_name_table.h"
@@ -325,6 +326,7 @@ static void server_network_handle_handshake(ServerClientSession* session, const 
     int slen = net_pack_handshake_ack(sbuf, sizeof(sbuf), &ack);
     if (slen > 0) {
         server_network_send_raw(session->client_id, NET_CH_RELIABLE, sbuf, slen, true);
+        server_world_send_initial_sync(session->client_id);
         enet_host_flush(s_server_host);
         session->state = NET_SESSION_AUTHENTICATED;
         server_spatial_update_client_acre(session->client_id, ack.starting_zone_id, 3, 1);
@@ -508,6 +510,13 @@ static void server_network_handle_interact(ServerClientSession* session, const u
             /* Broadcast zone change so observing clients immediately despawn the remote actor */
             server_network_broadcast_raw(NET_CH_RELIABLE, data, len, true, session->client_id);
         }
+    } else if (req->action_type == NET_INTERACT_DIG ||
+               req->action_type == NET_INTERACT_FILL_HOLE ||
+               req->action_type == NET_INTERACT_SHAKE_TREE ||
+               req->action_type == NET_INTERACT_CUT_TREE ||
+               req->action_type == NET_INTERACT_PICK_ITEM ||
+               req->action_type == NET_INTERACT_DROP_ITEM) {
+        server_world_handle_fg_interact(session->client_id, req);
     }
 }
 

@@ -1348,7 +1348,14 @@ extern int mFI_BlockUtNumtoFGSet(mActor_name_t item, int bx, int bz, int ut_x, i
         int ut_num = mFI_GetUtNum(ut_x, ut_z);
 
         res = TRUE;
+#ifdef TARGET_PC
+        extern void server_world_notify_local_fg_change(int bx, int bz, int ut_x, int ut_z, u16 old_item, u16 new_item);
+        mActor_name_t prev_fg_item = fg_p[ut_num];
+#endif
         fg_p[ut_num] = item;
+#ifdef TARGET_PC
+        server_world_notify_local_fg_change(bx, bz, ut_x, ut_z, prev_fg_item, item);
+#endif
     }
 
     return res;
@@ -1385,7 +1392,14 @@ extern int mFI_UtNumtoFGSet_common(mActor_name_t item, int ut_x, int ut_z, int u
     }
 #endif
 
+#ifdef TARGET_PC
+    extern void server_world_notify_local_fg_change(int bx, int bz, int ut_x, int ut_z, u16 old_item, u16 new_item);
+    mActor_name_t prev_fg_item = g_fdinfo->block_info[block_num].fg_info.items_p[ut_num];
+#endif
     g_fdinfo->block_info[block_num].fg_info.items_p[ut_num] = item;
+#ifdef TARGET_PC
+    server_world_notify_local_fg_change(bx, bz, b_ut_x, b_ut_z, prev_fg_item, item);
+#endif
     
     if (update) {
         mFI_SetFGUpData();
@@ -2265,6 +2279,10 @@ static int mFI_UtNum2SetDeposit(int ut_x, int ut_z, int type) {
 
 extern void mFI_UtNum2DepositON(int ut_x, int ut_z) {
     mFI_UtNum2SetDeposit(ut_x, ut_z, mFI_DEPOSIT_ON);
+#ifdef TARGET_PC
+    extern void server_world_notify_local_deposit_change(int world_ut_x, int world_ut_z, int deposit_on);
+    server_world_notify_local_deposit_change(ut_x, ut_z, 1);
+#endif
 }
 
 extern void mFI_UtNum2DepositOFF(int ut_x, int ut_z) {
