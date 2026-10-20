@@ -1422,6 +1422,9 @@ extern void Player_actor_force_outdoor(ACTOR* actorx, GAME* game) {
     Player_actor_change_proc_index(actorx, game);
     player->requested_main_index_priority = mPlayer_REQUEST_PRIORITY_NONE;
     player->main_data.outdoor.is_demo = TRUE;
+    Player_actor_CulcAnimation_Base(actorx);
+    cKF_SkeletonInfo_R_AnimationMove_base(&actorx->world.position, NULL, &actorx->scale,
+                                          actorx->world.angle.y, &player->keyframe0);
 }
 #endif
 

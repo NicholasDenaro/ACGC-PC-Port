@@ -170,8 +170,9 @@ void client_sync_tick(GAME_PLAY* play) {
         if (mFI_IS_PLAYER_ROOM(cur_field)) {
             house_idx = (int)mFI_GET_PLAYER_ROOM_NO(cur_field);
         }
-        client_network_send_zone_change(play->scene_id, house_idx);
         client_sync_reset();
+        client_sync_send_local(play);
+        client_network_send_zone_change(play->scene_id, house_idx);
     }
 
     /* Transmit local transform stream to server only when not fading/wiping out of scene */
