@@ -239,6 +239,18 @@ This task tracker outlines all implementation milestones defined in [Specificati
   - **Description**: Synchronize fish shadows and insect spawns/despawns from the server. When any player catches or scares a fish/bug, broadcast the despawn event to all clients.
   - **Acceptance Criteria**: Both players see the same fish shadow swimming in the river; one player catching it removes it for both players.
 
+- [ ] **Task 7.6: Villager & Roaming NPC Synchronization**
+  - **State**: `Not Implemented`
+  - **Files**: `src/actor/npc/ac_npc.c`, `src/game/m_npc.c`, `pc/src/server/server_sync.c`, `pc/src/client/client_sync.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
+  - **Description**: Authoritatively simulate villager and roaming NPC positions, room/acre occupancy, facing yaw, and animations on the dedicated server, and stream their transforms/states to subscribed clients via `PKT_S2C_ENTITY_SYNC` so clients interpolate NPC movement instead of running divergent local AI.
+  - **Acceptance Criteria**: All connected clients see villager animals at the exact same locations, walking in sync, and in the same indoor/outdoor zones.
+
+- [ ] **Task 7.7: Player House Interior & Furniture Synchronization (`Save.homes`)**
+  - **State**: `Not Implemented`
+  - **Files**: `src/actor/ac_my_indoor.c`, `src/actor/ac_my_room.c`, `src/game/m_field_info.c`, `pc/src/server/server_world.c`, `pc/src/server/server_network.c`, `pc/src/client/client_network.c`, `include/network/net_packets.h`, `pc/src/network/net_packer.c`
+  - **Description**: Synchronize interior room layouts (`Save.homes[i].floors`), including placing, picking up, rotating, and pushing/pulling furniture, as well as changing wallpaper/carpet and toggling interactive furniture states across all players inside the room and persisting changes to the server save.
+  - **Acceptance Criteria**: When a player places, picks up, rotates, or pushes/pulls furniture inside a player house, the change is replicated in real time to other players in the house and persists across reconnects.
+
 ---
 
 ### Phase 8: Resident Ownership, Extended Storage & Tiered Persistence
