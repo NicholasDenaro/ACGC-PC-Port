@@ -10,6 +10,9 @@
 #include "m_card.h"
 #include "m_submenu.h"
 #include "m_scene_ftr.h"
+#ifdef TARGET_PC
+#include "server/server_zone.h"
+#endif
 
 static void mSc_set_bank_status_after(Object_Bank_c* bank) {
     bank->bank_id = ABS(bank->bank_id);
@@ -523,6 +526,12 @@ extern int goto_other_scene(GAME_PLAY* play, Door_data_c* door_data, int update_
     PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
     int res = 0; // failed
 
+#ifdef TARGET_PC
+    if (server_zone_is_background()) {
+        return 0;
+    }
+#endif
+
     if (player != NULL) {
         if (play->fb_wipe_mode == WIPE_MODE_NONE) {
             play->fb_fade_type = FADE_TYPE_OUT;
@@ -570,6 +579,12 @@ extern int goto_emu_game(GAME* game, s16 famicom_rom_id) {
     GAME_PLAY* play = (GAME_PLAY*)game;
     PLAYER_ACTOR* player = get_player_actor_withoutCheck(play);
     int res = FALSE;
+
+#ifdef TARGET_PC
+    if (server_zone_is_background()) {
+        return FALSE;
+    }
+#endif
 
     if (player != NULL) {
         Door_data_c* door_data;

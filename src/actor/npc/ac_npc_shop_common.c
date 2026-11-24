@@ -1293,7 +1293,18 @@ static int aNSC_message_ctrl(NPC_SHOP_COMMON_ACTOR* shop_common, GAME_PLAY* play
     if (player_actorx != NULL && CLIP(shop_design_clip) != NULL) {
         PLAYER_ACTOR* player = (PLAYER_ACTOR*)player_actorx;
 
-        if (player->item_in_front == EXIT_DOOR1) {
+        if (player->item_in_front == EXIT_DOOR1
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            && mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_INVADE
+            && !mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)
+            && !mDemo_Check(mDemo_TYPE_SPEAK, (ACTOR*)shop_common)
+            && !mDemo_Check(mDemo_TYPE_TALK, (ACTOR*)shop_common)
+            && shop_common->action != aNSC_ACTION_EMPTY
+            && shop_common->action != aNSC_ACTION_SAY_HELLO_APPROACH
+            && shop_common->action != aNSC_ACTION_SAY_HELLO_END_WAIT
+            && mDemo_CheckDemo() == FALSE
+#endif
+        ) {
             int next_act_idx;
 
             if ((ACTOR*)shop_common == aNMD_actor_p[aNMD_selectIdx]) {
@@ -1321,7 +1332,18 @@ static int aNSC_message_ctrl(NPC_SHOP_COMMON_ACTOR* shop_common, GAME_PLAY* play
     int res = 0;
 
     if (player != NULL && CLIP(shop_design_clip) != NULL) {
-        if (player->item_in_front == EXIT_DOOR1) {
+        if (player->item_in_front == EXIT_DOOR1
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            && mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_INVADE
+            && !mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)
+            && !mDemo_Check(mDemo_TYPE_SPEAK, (ACTOR*)shop_common)
+            && !mDemo_Check(mDemo_TYPE_TALK, (ACTOR*)shop_common)
+            && shop_common->action != aNSC_ACTION_EMPTY
+            && shop_common->action != aNSC_ACTION_SAY_HELLO_APPROACH
+            && shop_common->action != aNSC_ACTION_SAY_HELLO_END_WAIT
+            && mDemo_CheckDemo() == FALSE
+#endif
+        ) {
             aNSC_setupAction(shop_common, play, aNSC_ACTION_GOODBYE_WAIT);
             res = TRUE;
         } else {

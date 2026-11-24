@@ -512,6 +512,11 @@ extern void Actor_info_call_actor(GAME_PLAY* play, Actor_info* actor_info) {
                     continue;
                 }
             }
+#elif defined(TARGET_PC)
+            if (i == ACTOR_PART_PLAYER && server_zone_is_background()) {
+                actor = actor->next_actor;
+                continue;
+            }
 #endif
             play->game.doing_point = actor->id;
             play->game.doing_point_specific = 151;

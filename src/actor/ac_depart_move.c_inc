@@ -268,6 +268,11 @@ static void aDPT_open_wait(DEPART_ACTOR* depart, GAME_PLAY* play) {
     xyz_t pos;
 
     actorx = (ACTOR*)depart;
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (play->fb_wipe_mode != WIPE_MODE_NONE) {
+        return;
+    }
+#endif
     if (!mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)) {
         if (mSP_ShopOpen() != mSP_SHOP_STATUS_OPEN && mSP_ShopOpen() != mSP_SHOP_STATUS_OPENEVENT) {
             aDPT_setup_action(depart, aDPT_ACTION_CLOSE_DOOR);
@@ -306,7 +311,13 @@ static void aDPT_pl_into_wait(DEPART_ACTOR* depart, GAME_PLAY* play) {
     }
 
     aDPT_rewrite_out_data(depart, play);
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (goto_other_scene(play, &aDPT_depart_door_data, FALSE) == 1) {
+        aDPT_setup_action(depart, aDPT_ACTION_OPEN_WAIT);
+    }
+#else
     goto_other_scene(play, &aDPT_depart_door_data, FALSE);
+#endif
 }
 
 static void aDPT_setup_action(DEPART_ACTOR* depart, int action) {

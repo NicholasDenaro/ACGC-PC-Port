@@ -48,7 +48,13 @@ static u8 area_table[aNNW_AREA_NUM * aNNW_AREA_NUM] = {
 static int player_go_away(GAME_PLAY* play) {
     PLAYER_ACTOR* player = GET_PLAYER_ACTOR(play);
 
-    if (player != NULL && player->item_in_front == EXIT_DOOR1) {
+    if (player != NULL && player->item_in_front == EXIT_DOOR1
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+        && mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_INVADE
+        && !mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)
+        && mDemo_CheckDemo() == FALSE
+#endif
+    ) {
         return TRUE;
     }
 

@@ -326,7 +326,13 @@ static void aPOL2_player_getout_check(GAME_PLAY* play, ACTOR* playerx) {
         PLAYER_ACTOR* player = (PLAYER_ACTOR*)playerx;
         mActor_name_t item = player->item_in_front;
 
-        if (item == EXIT_DOOR1) {
+        if (item == EXIT_DOOR1
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            && mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_INVADE
+            && !mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)
+            && mDemo_CheckDemo() == FALSE
+#endif
+        ) {
             mBGMPsComp_scene_mode(14);
             mBGMPsComp_make_ps_wipe(0x195);
             mPB_copy_itemBuf(Save_Get(police_box).keep_items);

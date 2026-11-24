@@ -2580,6 +2580,12 @@ static void Player_actor_AppearShadow_fromAnimationFrame(ACTOR* actorx, f32 appe
 }
 
 static void* Player_actor_get_door_label(GAME* game) {
+#ifdef TARGET_PC
+    extern int server_zone_is_background(void);
+    if (server_zone_is_background()) {
+        return NULL;
+    }
+#endif
     if (mPlib_get_player_actor_main_index(game) == mPlayer_INDEX_DOOR) {
         return (void*)GET_PLAYER_ACTOR_GAME(game)->main_data.door.label;
     }

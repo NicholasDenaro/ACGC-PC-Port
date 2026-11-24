@@ -70,7 +70,11 @@ static void aSHOP_rewrite_out_data(ACTOR* actor, GAME_PLAY* play) {
         return;
     }
 
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    door_data->next_scene_id = SCENE_FG;
+#else
     door_data->next_scene_id = Save_Get(scene_no);
+#endif
     door_data->exit_orientation = mSc_DIRECT_SOUTH_WEST;
     door_data->exit_type = 0;
     door_data->extra_data = 3;
@@ -237,6 +241,11 @@ static void aSHOP_open_wait(STRUCTURE_ACTOR* shop, GAME_PLAY* play) {
     if (mPlib_check_player_actor_main_index_OutDoorMove(&play->game) != FALSE) {
         return;
     }
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (play->fb_wipe_mode != WIPE_MODE_NONE) {
+        return;
+    }
+#endif
 
     if (mSP_ShopOpen() != mSP_SHOP_STATUS_OPEN && mSP_ShopOpen() != mSP_SHOP_STATUS_OPENEVENT) {
         sAdo_OngenTrgStart(8, &actor->world.position);
@@ -281,7 +290,13 @@ static void aSHOP_pl_into_wait(STRUCTURE_ACTOR* shop, GAME_PLAY* play) {
     }
 
     aSHOP_rewrite_out_data(&shop->actor_class, play);
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+    if (goto_other_scene(play, &aSHOP_shop_door_data, FALSE) == 1) {
+        aSHOP_setup_action(shop, aSHOP_ACTION_OPEN_WAIT);
+    }
+#else
     goto_other_scene(play, &aSHOP_shop_door_data, FALSE);
+#endif
 }
 
 static void aSHOP_setup_action(STRUCTURE_ACTOR* shop, int action) {

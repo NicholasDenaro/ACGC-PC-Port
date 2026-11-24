@@ -5,7 +5,13 @@ static int player_go_away(GAME_PLAY* play) {
         PLAYER_ACTOR* player = (PLAYER_ACTOR*)playerx;
         mActor_name_t front_item = player->item_in_front;
 
-        if (front_item == EXIT_DOOR1) {
+        if (front_item == EXIT_DOOR1
+#if defined(TARGET_PC) || defined(TARGET_SERVER)
+            && mPlib_get_player_actor_main_index((GAME*)play) != mPlayer_INDEX_INVADE
+            && !mPlib_check_player_actor_main_index_OutDoorMove((GAME*)play)
+            && mDemo_CheckDemo() == FALSE
+#endif
+        ) {
             return TRUE;
         }
     }
